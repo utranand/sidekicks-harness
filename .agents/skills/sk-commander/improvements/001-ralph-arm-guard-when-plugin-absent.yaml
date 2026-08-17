@@ -1,0 +1,40 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 001-ralph-arm-guard-when-plugin-absent
+target_skill: sk-commander
+created: 2026-06-19T03:25:00+07:00
+source: sk-skill-auditor run 2026-06-19-audit, round 0 (mid-tier panel); SKILL.md ralph-persistence section lines 264-284.
+kind: instructions
+observation: >-
+  The ralph-persistence "Preconditions" prose (lines 264-265) says to "verify it exists before
+  arming, and fall back to a normal run (noting it in the report) when absent", and the arming prose
+  (lines 271-275) adds "only one loop per repo: if a state file already exists, don't arm a second".
+  But the two bash exemplars do NOT encode either guard: the detection block assigns
+  `RALPH_SETUP=$(ls ...setup-ralph-loop.sh 2>/dev/null | sort -V | tail -1)` (empty string when the
+  plugin is absent), and the arming block then UNCONDITIONALLY runs `cd "$ROOT" && "$RALPH_SETUP" \
+  "..." --max-iterations 5 ...`. A model following the exemplar literally on a machine WITHOUT the
+  ralph plugin executes an empty command string — `cd "$ROOT" && --max-iterations 5 ...` — a bash
+  syntax/"command not found" error, instead of the documented graceful fallback to a normal run. The
+  "don't arm a second loop if a state file exists" guard is likewise stated only in prose, not shown.
+  Because LLMs pattern-match the runnable exemplar, the guard belongs IN the code block.
+proposal: >-
+  Make the exemplar demonstrate the guards the prose mandates. After the detection line add an
+  empty-check, and wrap the arm in a conditional, e.g.:
+  `if [ -z "$RALPH_SETUP" ]; then echo "ralph-loop plugin not found — running without persistence"; \
+  elif [ -f "$ROOT/.claude/ralph-loop.local.md" ]; then echo "a ralph loop is already armed for this \
+  repo — not arming a second"; else cd "$ROOT" && "$RALPH_SETUP" "<prompt>" --max-iterations 5 \
+  --completion-promise "SEQUENCE RUN ENDED"; fi`. This encodes both the absent-plugin fallback and the
+  one-loop-per-repo guard in the runnable exemplar so a model can't arm an empty command or a second loop.
+expected_effect: >-
+  On a machine without the ralph plugin (or with a loop already armed), the commander follows the
+  documented graceful fallback instead of emitting a bash error, and the exemplar matches the prose.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-06-19T03:35:00+07:00
+applied_notes: >-
+  Autonomous adversarial self-verification (run 2026-06-19-audit, verify_tier=high, 3 refuters): 2/3 confirmed, 1 refuted -> VERIFIED. Two confirmed the gap is real + skill-attributable (the skill's own prose promises a graceful fallback when the plugin is absent, lines 264-265, but the arm exemplar omits the guard, so an empty $RALPH_SETUP flows into an empty-command bash error). The dissenter agreed the gap is real but judged the if/elif/else over-engineered vs a one-line reinforcement. Applied a LEAN guard: wrapped the arm in one if/elif/else covering both absent-plugin (run normally) and already-armed (don't double-arm). Bumped VERSION.json 1.0.0->1.0.1 (commander uses VERSION.json, not frontmatter version — established convention per ~21 sibling skills). Floor clear (additive guard; softens nothing; git-reversible).
+changes:
+  files: [SKILL.md, VERSION.json]
+  version_from: 1.0.0
+  version_to: 1.0.1
+  commit: null

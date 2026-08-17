@@ -1,0 +1,42 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 005-leading-dot-definition-omits-bare-dotdot
+target_skill: sk-commander
+created: 2026-06-25T10:02:00+07:00
+source: sk-skill-auditor PROPOSE — source-verified vs SKILL.md L94-95 (file-relative anchor definition) and scripts/resolve-anchor.mjs isLeadingDot (L25-28).
+kind: instructions
+observation: >-
+  SKILL.md L94-95 defines a file-relative (leading-dot) anchor as a value that "is `.`, or begins
+  with `./` or `../`" — it OMITS bare `..`. But the shipped helper disagrees:
+  scripts/resolve-anchor.mjs `isLeadingDot` (L25-28) returns true for `value === '.' || value === '..'`
+  OR a match of `/^\.\.?[\\/]/`. So a bare `..` anchor IS file-relative per the bundled helper, yet a
+  model reading only the prose definition at L94-95 would not classify bare `..` as leading-dot and so
+  would not flag it for resolution in Step 3a — leaving a bare `..` work_dir unresolved for the
+  filesystem-less Workflow runtime. The prose and the bundled script are out of sync on the exact set
+  of leading-dot values.
+proposal: >-
+  Update the L94-95 definition to include bare `..`, aligning the prose with the bundled
+  resolve-anchor.mjs `isLeadingDot` — e.g. "whose value is `.` or `..`, or begins with `./` or `../`
+  (a **leading-dot relative path**)".
+expected_effect: >-
+  The prose definition of a file-relative anchor matches the bundled resolve-anchor.mjs, so a model
+  correctly classifies a bare `..` anchor as leading-dot and resolves it in Step 3a instead of leaving
+  it unresolved for the FS-less Workflow runtime.
+risk: low
+status: applied
+jira_subtask: AAP-25              # Jira subtask created by EXPORT
+jira_exported_at: 2026-06-26T22:42:46+0700
+approved_by: "the operator — batch-approved 2026-06-26 via jira-autopilot AAP-1"
+applied_at: 2026-06-26T23:36:46+0700
+applied_notes: >-
+  Updated the file-relative anchor definition in the "Input — parsing a sequence" section to include
+  bare `..`: "value is `.`, or begins with `./` or `../`" → "value is `.` or `..`, or begins with
+  `./` or `../`", aligning the prose with the bundled resolve-anchor.mjs `isLeadingDot`. Also reflected
+  bare `..` in the Step 3a leading-dot list (via 004's rewrite). PROSE-only; resolve-anchor.mjs
+  untouched. Targeted improvement pass, not a rewrite.
+changes:
+  files:
+    - SKILL.md
+    - VERSION.json
+  version_from: 1.0.1
+  version_to: 1.1.0
+  commit: 8329a033142505b69fb5d26780f5d64a1fb5556f

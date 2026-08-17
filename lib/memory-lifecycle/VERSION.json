@@ -1,0 +1,25 @@
+{
+  "name": "memory-lifecycle",
+  "version": "2.0.0",
+  "description": "memory-lifecycle library component — the central memory store: one tree with scope namespaces, action categories and hard rules, a machine index plus knowledge graph for retrieval, scenario packs and their triggers, and durable-only lineage anchors",
+  "files": [
+    "_shared.mjs",
+    "_store.mjs",
+    "_triggers.mjs",
+    "add.mjs",
+    "append.mjs",
+    "doctor.mjs",
+    "export.mjs",
+    "graph.mjs",
+    "import.mjs",
+    "link.mjs",
+    "list.mjs",
+    "map.mjs",
+    "pack.mjs",
+    "query.mjs",
+    "rebuild.mjs",
+    "remove.mjs",
+    "show.mjs",
+    "triggers.mjs"
+  ]
+}

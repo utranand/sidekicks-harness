@@ -1,0 +1,9 @@
+{
+  "name": "yaml-subset",
+  "version": "1.0.0",
+  "description": "yaml-subset library component",
+  "files": [
+    ".gitkeep",
+    "yaml.mjs"
+  ]
+}

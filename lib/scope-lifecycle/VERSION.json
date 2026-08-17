@@ -1,0 +1,9 @@
+{
+  "name": "scope-lifecycle",
+  "version": "1.0.0",
+  "description": "scope-lifecycle library component",
+  "files": [
+    "inventory.mjs",
+    "working-folder.mjs"
+  ]
+}

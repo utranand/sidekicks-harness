@@ -1,0 +1,8 @@
+{
+  "name": "skill-config",
+  "version": "1.0.0",
+  "description": "skill-config library component",
+  "files": [
+    "resolve.mjs"
+  ]
+}

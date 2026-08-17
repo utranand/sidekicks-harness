@@ -1,0 +1,8 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning).
+
+skill: sk-commander
+
+rules:
+  - id: criterion.command-sequences
+    title: A command-sequence exists to be executed
+    body: rules/criterion.command-sequences.md

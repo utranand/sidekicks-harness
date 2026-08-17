@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+// bin/sidekicks — thin entry point. ~15 lines. ALL logic in lib/sk-cli/cli.mjs.
+// Mode 0755; extensionless shebang script.
+
+import { main } from "../lib/sk-cli/cli.mjs";
+
+await main(process.argv.slice(2));

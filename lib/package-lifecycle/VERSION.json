@@ -1,0 +1,10 @@
+{
+  "name": "package-lifecycle",
+  "version": "1.0.0",
+  "description": "package-lifecycle library component",
+  "files": [
+    "componentVersions.mjs",
+    "index.mjs",
+    "versions.mjs"
+  ]
+}

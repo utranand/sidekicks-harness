@@ -1,0 +1,14 @@
+{
+  "name": "framework-lifecycle",
+  "version": "1.0.0",
+  "description": "framework-lifecycle library component",
+  "files": [
+    "_shared.mjs",
+    "check.mjs",
+    "disable.mjs",
+    "doctor.mjs",
+    "enable.mjs",
+    "list.mjs",
+    "show.mjs"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "branch-lifecycle",
+  "version": "1.0.0",
+  "description": "branch-lifecycle library component",
+  "files": [
+    "create.mjs",
+    "current.mjs",
+    "delete.mjs",
+    "list.mjs",
+    "resolve.mjs",
+    "switch.mjs"
+  ]
+}

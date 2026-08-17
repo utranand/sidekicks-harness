@@ -1,0 +1,12 @@
+{
+  "name": "framework-settings",
+  "version": "1.0.0",
+  "description": "framework-settings library component",
+  "files": [
+    "core-registry.mjs",
+    "floor.mjs",
+    "framework-config.mjs",
+    "registry.mjs",
+    "resolve.mjs"
+  ]
+}

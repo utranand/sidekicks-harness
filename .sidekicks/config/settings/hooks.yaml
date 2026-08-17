@@ -1,0 +1,29 @@
+# .sidekicks/config/settings/hooks.yaml — which wired hooks are ON in this repo (COMMITTED, team default).
+#
+# SETTINGS, not configuration: booleans only. Values — tunables, endpoints, credentials — live
+# in the family files one directory up (.sidekicks/config/<family>.yaml). See
+# docs/guide/settings-vs-configuration.md.
+#
+# The top level IS the slug map: an entry is `<slug>: true|false`, and the hook
+# kind comes from the filename, so an id like `hook.example-slug` is written here
+# as `example-slug`.
+#
+# Managed by `sidekicks framework enable|disable <id>` and materialised by `sidekicks framework
+# sync`. Never hand-edit it (Rule 1). An absent or empty file means "everything enabled" and is
+# never an error.
+#
+# Safety-floor ids cannot appear here (lib/framework-settings/floor.mjs) — writing one is a
+# validation error, not a silent no-op.
+artifact-autotrigger: true
+artifact-liveness: true
+enforce-branch-safety: true
+enhance-prompt: true
+fable-escalation: true
+gtd-orphan-watch: true
+load-local-memory: true
+office-viz: true
+recompile-validation-checklist: true
+rtk: true
+run-notify: true
+skill-advisor: true
+memory-trigger: true

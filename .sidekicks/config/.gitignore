@@ -1,0 +1,15 @@
+# Committed on purpose, and it must stay committed: this is what keeps the credential half of
+# every family file out of git NO MATTER WHICH REPO this directory ends up in.
+#
+# The repo-root .gitignore cannot be relied on here. A project may be a git SUBMODULE with its own
+# ignore rules (projects/shp-sk, projects/workspace-sk) or a symlink to an out-of-tree directory —
+# in both cases the root rule does not apply and `git add config/` would have staged the secrets.
+# A .gitignore inside the directory travels with it.
+*.secret.yaml
+
+# The pre-family monolith, kept for one release as a rollback reference after
+# `sidekicks config migrate` proved every block resolves identically. It still holds every
+# credential the split moved into the .secret.yaml siblings, so it is ignored just as hard.
+# Nothing reads it any more: the store reads <scope>/config.yaml and config/<family>.yaml,
+# and this name matches neither.
+pending-removal.*

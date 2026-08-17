@@ -1,0 +1,12 @@
+{
+  "name": "cli-executor-lifecycle",
+  "version": "1.1.0",
+  "description": "cli-executor-lifecycle library component",
+  "files": [
+    "_shared.mjs",
+    "list.mjs",
+    "register.mjs",
+    "remove.mjs",
+    "route.mjs"
+  ]
+}

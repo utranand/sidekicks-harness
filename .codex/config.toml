@@ -1,0 +1,91 @@
+# Codex CLI project config — Sidekicks hooks.
+#
+# Mirrors the Claude Code hooks in .claude/settings.json. Codex's hook events map
+# 1:1 to Claude's (SessionStart, UserPromptSubmit, PreToolUse) and Codex consumes
+# the SAME stdin shape (`prompt`, `tool_name`, `tool_input`, `cwd`) and the SAME
+# stdout schema (`hookSpecificOutput.additionalContext`) the hook scripts already
+# emit — so the scripts run UNCHANGED here.
+#
+# Paths are repo-relative on purpose (clone-portable, no machine-absolute leak).
+# Codex runs command hooks with cwd at the workspace root, so launch `codex` from
+# the repo root for these to resolve. The scripts themselves walk up to the
+# `.sidekicks` marker, so artifact resolution is robust to a deeper cwd; only the
+# script-file path above depends on cwd=root.
+#
+# NOT ported (intentionally):
+#   - enforce-local-memory : Claude-specific — it guards writes into Claude's
+#                            global ~/.claude memory store, which Codex doesn't use.
+#                            The AGENTS.md=CLAUDE.md convention already tells Codex
+#                            to keep project memory local by hand.
+#   - skill-advisor        : NOT POSSIBLE on Codex. Codex activates a skill by
+#                            reading its SKILL.md inline — there is no tool call, so
+#                            no PreToolUse event fires on activation and nothing can
+#                            gate it. (It IS wired on Gemini, whose `activate_skill`
+#                            tool fires BeforeTool.)
+#   - rtk-hook.sh          : Codex uses the compatible Claude-envelope branch in the
+#                            dispatcher. RTK has no native `hook codex` subcommand;
+#                            keep the branch narrow and fail open for unknown payloads.
+#   - recompile-validation-checklist : Claude fires it on PostToolUse(Write|Edit);
+#                            Codex has no post-tool hook event, so the checklist
+#                            resyncs on the next Claude session instead.
+
+[[hooks.SessionStart]]
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "node scripts/load-local-memory-hook.mjs"
+statusMessage = "Loading project local memory"
+timeout = 15
+
+[[hooks.UserPromptSubmit]]
+
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = "node scripts/enhance-prompt-hook.mjs"
+
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "node scripts/enforce-flow-headful.mjs"
+statusMessage = "Enforcing headful-only Flow automation"
+timeout = 10
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = ".sidekicks/hooks/rtk-hook.sh"
+statusMessage = "Routing shell commands through RTK"
+timeout = 10
+
+# enforce-branch-safety: guards a SHARED git working tree. It ASKS for the user's
+# permission on a HEAD move (git switch / checkout <branch> / -c / -b) while the tree has
+# uncommitted changes — only the user knows what else is live in the checkout — and on
+# EVERY `git worktree add`, which writes a second checkout outside the folder the user is
+# watching (the prompt names the destination). It DENIES outright the
+# work-destroying commands (git stash, reset --hard, restore, checkout -- <path>,
+# clean -f) and a worktree path nested inside the repo, where nothing is left to weigh.
+# Policy: CLAUDE.md → "Protected branches" and "Git worktrees" — work branches are created
+# in a SIBLING WORKTREE, never by moving the shared HEAD.
+# Same script as Claude's PreToolUse(Bash) / Gemini's BeforeTool (run_command) wiring. Where
+# a CLI's hook contract knows only allow/deny, the reason is also written to stderr, so the
+# agent still sees the notification and must obtain the permission itself.
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "node scripts/enforce-branch-safety.mjs"
+statusMessage = "Guarding the shared working tree"
+timeout = 10
+
+# memory-trigger: SessionStart loads only the memory CATEGORY MAP (~300 tokens); this is
+# what delivers the bodies, once per category per session, right before the first action
+# of that category runs. Codex has no PreToolUse matcher, so the hook receives every tool
+# call and decides for itself — it reads tool_input.command (string or argv array) and
+# returns nothing unless a trigger in .sidekicks/memory/triggers.yaml matches.
+# NOTE the Codex-specific gap: Codex activates a skill by reading SKILL.md inline, so the
+# `Skill` half of this hook never fires here (same reason skill-advisor is not ported) —
+# only the shell-command triggers do. The SessionStart map text carries the instruction to
+# run `sidekicks memory pack <category>` by hand, which is the fallback that covers it.
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "node scripts/memory-trigger-hook.mjs"
+statusMessage = "Loading memory for this category"
+timeout = 20

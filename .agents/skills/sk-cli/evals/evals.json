@@ -1,0 +1,29 @@
+{
+  "skill_name": "sk-cli",
+  "evals": [
+    {
+      "id": 0,
+      "name": "full-verb-listing",
+      "prompt": "What sidekicks CLI commands can I use? Give me the full list.",
+      "expected_output": "Runs `node bin/sidekicks --help` (not a global binary) and presents the real verb surface across project and service namespaces. No invented verbs.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 1,
+      "name": "specific-verb-howto",
+      "prompt": "How do I create a new project called acme-platform using the sidekicks cli?",
+      "expected_output": "Identifies `node bin/sidekicks project create acme-platform` from live --help output. Signature matches `create <name>`.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "signature-precision",
+      "prompt": "What's the exact signature of `service add`? Does it take an optional name argument?",
+      "expected_output": "States the signature `add <git-url> [<name>]` with the optional name, sourced from live --help, no fabrication.",
+      "files": [],
+      "assertions": []
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "database-lifecycle",
+  "version": "1.0.0",
+  "description": "database-lifecycle library component",
+  "files": [
+    "stamp.mjs"
+  ]
+}

@@ -1,0 +1,51 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 004-step3a-extract-embedded-anchor-before-helper
+target_skill: sk-commander
+created: 2026-06-25T10:01:00+07:00
+source: sk-skill-auditor PROPOSE — source-verified vs SKILL.md Step 3a (L446-457) and scripts/resolve-anchor.mjs (isLeadingDot L25-28; resolveAnchor L36-45).
+kind: instructions
+observation: >-
+  Step 3a (SKILL.md L446-453) tells the model to rewrite leading-dot anchors "(`.`, `./…`, `../…`;
+  also `docs_dir=` / `artifacts_dir=` embedded in instruction text)" and then to "Use the bundled
+  helper ... so you can run it on every anchor blindly", invoking
+  `resolved="$(node .../resolve-anchor.mjs "$SEQ" "$VALUE" "$ROOT")"`. But the helper takes a SINGLE
+  already-extracted anchor VALUE as `$VALUE`. Source-verified: resolve-anchor.mjs `isLeadingDot(value)`
+  (L25-28) returns false for a whole token like `docs_dir=../x` (it does not equal `.`/`..` and does
+  not match `/^\.\.?[\\/]/`), so `resolveAnchor` (L39) takes the non-leading-dot branch and passes
+  that token through UNCHANGED. Consequently, if the model follows "run it on every anchor blindly"
+  literally and hands the whole embedded token `docs_dir=../foo`, the embedded anchor is NOT
+  resolved — leaving a leading-dot path that the filesystem-less Workflow runtime cannot resolve. The
+  prose conflates "the helper handles everything" with the reality that the model must FIRST extract
+  the value after `docs_dir=` / `artifacts_dir=` before passing it to the helper.
+proposal: >-
+  In Step 3a, make the embedded-anchor case explicit: for an anchor embedded in instruction text,
+  first EXTRACT the value (the token after `docs_dir=` / `artifacts_dir=`), pass ONLY that value to
+  resolve-anchor.mjs as `$VALUE`, then splice the resolved path back into the instruction string.
+  Keep the existing "passes repo-relative and absolute values through unchanged" convenience note for
+  bare anchor values, but stop implying the helper auto-extracts embedded `docs_dir=` / `artifacts_dir=`
+  tokens (it does not — those must be extracted by the model first).
+expected_effect: >-
+  Step 3a no longer leaves embedded `docs_dir=` / `artifacts_dir=` leading-dot anchors unresolved;
+  the model extracts the value, resolves it, and splices it back — so the FS-less Workflow runtime
+  receives a repo-relative path for embedded anchors as it already does for bare ones.
+risk: medium
+status: applied
+jira_subtask: AAP-24              # Jira subtask created by EXPORT
+jira_exported_at: 2026-06-26T22:42:45+0700
+approved_by: "the operator — batch-approved 2026-06-26 via jira-autopilot AAP-1"
+applied_at: 2026-06-26T23:36:46+0700
+applied_notes: >-
+  Rewrote Step 3a prose to make the helper's single-value contract explicit: split into a BARE
+  anchor case (hand the YAML value straight to resolve-anchor.mjs) and an EMBEDDED anchor case
+  (extract the value after `docs_dir=`/`artifacts_dir=`, pass only that as `$VALUE`, then splice the
+  resolved path back into the instruction string). Stated that handing the whole `docs_dir=../x`
+  token through leaves it unchanged. Kept the bash invocation example, the inline/pasted error note,
+  and the pass-through convenience note. PROSE-only change as the proposal directs — the bundled
+  scripts/resolve-anchor.mjs logic was NOT changed. Targeted improvement pass, not a rewrite.
+changes:
+  files:
+    - SKILL.md
+    - VERSION.json
+  version_from: 1.0.1
+  version_to: 1.1.0
+  commit: 8329a033142505b69fb5d26780f5d64a1fb5556f

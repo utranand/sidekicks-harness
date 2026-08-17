@@ -1,0 +1,10 @@
+{
+  "name": "index-lifecycle",
+  "version": "1.0.0",
+  "description": "index-lifecycle library component",
+  "files": [
+    "get.mjs",
+    "rebuild.mjs",
+    "show.mjs"
+  ]
+}

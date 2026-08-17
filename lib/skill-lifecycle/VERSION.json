@@ -1,0 +1,26 @@
+{
+  "name": "skill-lifecycle",
+  "version": "1.6.0",
+  "description": "The `sidekicks skill` verbs: dependency scanning, audit findings, inventory, per-skill detail, integrity verification, repair, relation advice, import/export against any repository that holds skills, the registration-profile registry, and parking or uninstalling an installed skill",
+  "files": [
+    "_shared.mjs",
+    "advise.mjs",
+    "audit.mjs",
+    "destinations.mjs",
+    "doctor.mjs",
+    "export.mjs",
+    "heal.mjs",
+    "import.mjs",
+    "known-gaps.mjs",
+    "list.mjs",
+    "manifest.mjs",
+    "offload.mjs",
+    "references.mjs",
+    "registry.mjs",
+    "remove.mjs",
+    "scan.mjs",
+    "settings-split.mjs",
+    "show.mjs",
+    "verify.mjs"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "schema-extractor",
+  "version": "1.0.0",
+  "description": "schema-extractor library component",
+  "files": [
+    "extractor.mjs"
+  ]
+}

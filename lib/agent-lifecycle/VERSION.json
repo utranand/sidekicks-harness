@@ -1,0 +1,30 @@
+{
+  "name": "agent-lifecycle",
+  "version": "1.8.0",
+  "description": "agent-lifecycle library component",
+  "files": [
+    "_bridge.mjs",
+    "_comms.mjs",
+    "_routines.mjs",
+    "_shared.mjs",
+    "_threads.mjs",
+    "bridge.mjs",
+    "claim.mjs",
+    "complete.mjs",
+    "create.mjs",
+    "delegate.mjs",
+    "heartbeat.mjs",
+    "inbox.mjs",
+    "list.mjs",
+    "retire.mjs",
+    "routine.mjs",
+    "scheduler.mjs",
+    "send.mjs",
+    "serve.mjs",
+    "show.mjs",
+    "start.mjs",
+    "stop.mjs",
+    "telegram.mjs",
+    "wait.mjs"
+  ]
+}

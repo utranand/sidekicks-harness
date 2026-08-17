@@ -1,0 +1,16 @@
+{
+  "name": "core-lifecycle",
+  "version": "1.0.0",
+  "description": "core-lifecycle library component",
+  "files": [
+    "_derive.mjs",
+    "_guard.mjs",
+    "_seed.mjs",
+    "_shared.mjs",
+    "_wiring.mjs",
+    "doctor.mjs",
+    "init.mjs",
+    "status.mjs",
+    "update.mjs"
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "sidekicks-agents",
+  "description": "Imported Claude agents from .claude/agents",
+  "version": "1.0.0"
+}

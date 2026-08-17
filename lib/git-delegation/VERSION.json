@@ -1,0 +1,9 @@
+{
+  "name": "git-delegation",
+  "version": "1.2.0",
+  "description": "git-delegation library component",
+  "files": [
+    ".gitkeep",
+    "git.mjs"
+  ]
+}

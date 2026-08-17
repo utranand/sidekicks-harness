@@ -1,0 +1,148 @@
+#!/bin/sh
+# .githooks/pre-commit — enforce the agent-context mirror invariant before every commit.
+#
+# CLAUDE.md (Claude Code) and GEMINI.md (Gemini CLI) are symlinks to AGENTS.md.
+# If a staged change replaces a symlink with a divergent regular file (e.g. an
+# atomic-save editor like vim/VS Code, or an accidental copy), this hook aborts
+# the commit so the drift never lands.
+#
+# Edit AGENTS.md only — the mirrors follow automatically.
+#
+# Installed via: node scripts/install-hooks.mjs  (sets core.hooksPath=.githooks)
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+
+# GUI git clients (VS Code Source Control, GitLens, SourceTree, ...) often invoke hooks with a
+# minimal PATH that omits Homebrew/nvm/Windows install dirs, so a bare `node` lookup can fail even
+# though Node is installed. Probe common locations before giving up, so the mirror check itself
+# (not an unrelated PATH gap) is what decides pass/fail.
+node_bin=""
+if command -v node >/dev/null 2>&1; then
+  node_bin=$(command -v node)
+else
+  for candidate in \
+    /opt/homebrew/bin/node \
+    /usr/local/bin/node \
+    /usr/bin/node \
+    "$HOME/.nvm/current/bin/node" \
+    /mingw64/bin/node.exe \
+    "/c/Program Files/nodejs/node.exe"; do
+    if [ -x "$candidate" ]; then
+      node_bin="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$node_bin" ]; then
+  echo "✖ pre-commit: could not find a 'node' executable to run the mirror check." >&2
+  echo "  This looks like a PATH issue with whatever is invoking git (GUI clients often use a" >&2
+  echo "  minimal PATH), not a broken mirror. Commit from a terminal, or add node's install" >&2
+  echo "  directory to that app's PATH." >&2
+  exit 1
+fi
+
+"$node_bin" --test "$repo_root/tests/agent-context-mirror.test.mjs" >/dev/null 2>&1 || {
+  echo "✖ pre-commit: agent-context mirror is broken." >&2
+  echo "  CLAUDE.md / GEMINI.md must be symlinks to AGENTS.md (do not edit them directly)." >&2
+  echo "  If you meant to change agent instructions, edit AGENTS.md instead, then:" >&2
+  echo "      ln -sf AGENTS.md CLAUDE.md && ln -sf AGENTS.md GEMINI.md" >&2
+  echo "  Details: $node_bin --test tests/agent-context-mirror.test.mjs" >&2
+  exit 1
+}
+
+# --- Never commit a scope config.yaml (it holds the image-generation api_key) ---
+# The Sidekicks project config lives at .sidekicks/config.yaml and projects/<name>/config.yaml.
+# These are git-ignored on purpose; this hook is the belt to .gitignore's suspenders, and also
+# catches files that were committed BEFORE the ignore rule (git keeps tracking those).
+# Intentionally NOT matched: bmad/**/config.yaml (framework config, meant to be committed) and
+# any config.example.yaml (the committed, key-free schema).
+staged_configs=$(
+  git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^(\.sidekicks/config\.yaml|projects/[^/]+/config\.yaml)$' || true
+)
+if [ -n "$staged_configs" ]; then
+  echo "✖ pre-commit: refusing to commit a scope config.yaml (it may contain an api_key):" >&2
+  echo "$staged_configs" | sed 's/^/      /' >&2
+  echo "  These files are git-ignored by design. If one is still tracked from before, untrack it:" >&2
+  echo "      git rm --cached <path>   # keeps your local file, stops tracking it" >&2
+  echo "  Put shareable, non-secret settings in config.example.yaml instead." >&2
+  exit 1
+fi
+
+# --- A skill's committed config.defaults.yaml must not carry a credential ---
+# AAP-93 introduced per-skill defaults files under .agents/skills/**/config.defaults.yaml (and
+# the offloaded tree). Unlike config.yaml these ARE meant to be committed — which is exactly why a
+# token that lands in one would be published. The rule is "non-secret values only", so this hook
+# rejects a staged defaults file carrying a secret-shaped KEY with a value. tests/skill-config.test.mjs
+# asserts the same property for every defaults file already in the tree.
+staged_defaults=$(
+  git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^(\.agents/skills|\.sidekicks/skill-offloaded)/[^/]+/config\.defaults\.yaml$' || true
+)
+if [ -n "$staged_defaults" ]; then
+  offenders=""
+  for f in $staged_defaults; do
+    # Uncommented `key: value` lines whose key looks like a credential and whose value is non-empty.
+    hits=$(git show ":$f" 2>/dev/null \
+      | grep -nEi '^[[:space:]]*[A-Za-z0-9_-]*(api_key|apikey|token|password|passwd|secret|pass)[A-Za-z0-9_-]*[[:space:]]*:[[:space:]]*[^[:space:]#]' \
+      | grep -vEi ':[[:space:]]*(""|'"''"'|null|~)[[:space:]]*$' || true)
+    if [ -n "$hits" ]; then
+      offenders="$offenders$f:\n$hits\n"
+    fi
+  done
+  if [ -n "$offenders" ]; then
+    echo "✖ pre-commit: a skill config.defaults.yaml carries a credential-shaped value:" >&2
+    printf "$offenders" | sed 's/^/      /' >&2
+    echo "  Defaults files are COMMITTED — keep them non-secret." >&2
+    echo "  Put the credential in the scope's git-ignored config.yaml instead." >&2
+    exit 1
+  fi
+fi
+
+# --- A committed config FAMILY file must not carry a credential, and must not declare a block twice ---
+# The config store splits each scope's configuration into one family file per category under
+# <scope>/config/. The family file is COMMITTED on purpose — that is how real structure travels to a
+# fresh clone instead of a hand-maintained example that drifts — and every credential belongs in its
+# `<family>.secret.yaml` sibling, which .gitignore refuses.
+#
+# The duplicate-block half is here because YAML keeps only the LAST block of a repeated name, silently:
+# that defect once dropped `default_namespace: shph` from prod cluster-ops in this repo, and nothing
+# re-checked it afterwards. `sidekicks config doctor` runs the same two checks on every scope.
+staged_family=$(
+  git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^(\.sidekicks|projects/[^/]+)/config/[^/]+\.yaml$' \
+    | grep -vE '\.(secret|example)\.yaml$' || true
+)
+if [ -n "$staged_family" ]; then
+  offenders=""
+  for f in $staged_family; do
+    hits=$(git show ":$f" 2>/dev/null \
+      | grep -nEi '^[[:space:]]*[A-Za-z0-9_-]*(api_key|apikey|token|password|passwd|secret|pass)[A-Za-z0-9_-]*[[:space:]]*:[[:space:]]*[^[:space:]#]' \
+      | grep -vEi ':[[:space:]]*(""|'"''"'|null|~)[[:space:]]*$' || true)
+    if [ -n "$hits" ]; then
+      offenders="$offenders$f:\n$hits\n"
+    fi
+    dups=$(git show ":$f" 2>/dev/null \
+      | grep -nE '^[A-Za-z][A-Za-z0-9_-]*:' \
+      | sed 's/^\([0-9]*\):\([^:]*\):.*/\2/' \
+      | sort | uniq -d || true)
+    if [ -n "$dups" ]; then
+      echo "✖ pre-commit: $f declares a top-level block more than once:" >&2
+      echo "$dups" | sed 's/^/      /' >&2
+      echo "  Every YAML parser keeps only the LAST one, silently. Merge them, then:" >&2
+      echo "      node bin/sidekicks config doctor" >&2
+      exit 1
+    fi
+  done
+  if [ -n "$offenders" ]; then
+    echo "✖ pre-commit: a committed config family file carries a credential-shaped value:" >&2
+    printf "$offenders" | sed 's/^/      /' >&2
+    echo "  Family files are COMMITTED — keep them non-secret." >&2
+    echo "  Move the credential to the '<family>.secret.yaml' sibling (git-ignored):" >&2
+    echo "      node bin/sidekicks config where <block>" >&2
+    exit 1
+  fi
+fi

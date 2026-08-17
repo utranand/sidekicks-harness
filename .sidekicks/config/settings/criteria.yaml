@@ -1,0 +1,21 @@
+# .sidekicks/config/settings/criteria.yaml — which behavioural criteria are ON in this repo (COMMITTED, team default).
+#
+# SETTINGS, not configuration: booleans only. Values — tunables, endpoints, credentials — live
+# in the family files one directory up (.sidekicks/config/<family>.yaml). See
+# docs/guide/settings-vs-configuration.md.
+#
+# The top level IS the slug map: an entry is `<slug>: true|false`, and the criterion
+# kind comes from the filename, so an id like `criterion.example-slug` is written here
+# as `example-slug`.
+#
+# Managed by `sidekicks framework enable|disable <id>` and materialised by `sidekicks framework
+# sync`. Never hand-edit it (Rule 1). An absent or empty file means "everything enabled" and is
+# never an error.
+#
+# Safety-floor ids cannot appear here (lib/framework-settings/floor.mjs) — writing one is a
+# validation error, not a silent no-op.
+command-sequences: true
+model-tier-substitution: true
+new-skill-checklist: false
+session-practices: false
+memory-lazy-load: true

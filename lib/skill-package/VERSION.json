@@ -1,0 +1,12 @@
+{
+  "name": "skill-package",
+  "version": "1.3.0",
+  "description": "The manifest-driven skill packaging core: one closure function every consumer shares, where a bundled file s recorded content is recovered from, the copy/provenance surface a skills repository needs, and reading a skills tree this framework did not lay out",
+  "files": [
+    "adopt.mjs",
+    "closure.mjs",
+    "content.mjs",
+    "portable.mjs",
+    "source-layout.mjs"
+  ]
+}

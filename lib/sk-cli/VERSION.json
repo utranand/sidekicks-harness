@@ -1,0 +1,14 @@
+{
+  "name": "sk-cli",
+  "version": "1.0.0",
+  "description": "sk-cli library component",
+  "files": [
+    "cli.mjs",
+    "core-mount.mjs",
+    "errors.mjs",
+    "help.mjs",
+    "paths.mjs",
+    "skill-links.mjs",
+    "skill-trees.mjs"
+  ]
+}

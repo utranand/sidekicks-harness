@@ -1,0 +1,15 @@
+{
+  "name": "project-lifecycle",
+  "version": "1.0.0",
+  "description": "project-lifecycle library component",
+  "files": [
+    ".gitkeep",
+    "add.mjs",
+    "create.mjs",
+    "current.mjs",
+    "list.mjs",
+    "remove.mjs",
+    "set-remote.mjs",
+    "use.mjs"
+  ]
+}

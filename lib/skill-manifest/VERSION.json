@@ -1,0 +1,11 @@
+{
+  "name": "skill-manifest",
+  "version": "1.0.0",
+  "description": "Per-skill dependency manifest: schema, discovery, LF-normalized hashing, and reconciliation of the derived sections against skill.yaml",
+  "files": [
+    "hash.mjs",
+    "materialize.mjs",
+    "read.mjs",
+    "schema.mjs"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "journal-lifecycle",
+  "version": "1.1.0",
+  "description": "journal-lifecycle library component",
+  "files": [
+    "_shared.mjs",
+    "diary.mjs",
+    "doctor.mjs",
+    "improve.mjs",
+    "incident.mjs",
+    "issue.mjs",
+    "lesson.mjs",
+    "log.mjs",
+    "push.mjs",
+    "rebuild.mjs",
+    "report.mjs",
+    "retro.mjs"
+  ]
+}

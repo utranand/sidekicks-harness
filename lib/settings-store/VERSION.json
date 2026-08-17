@@ -1,0 +1,9 @@
+{
+  "name": "settings-store",
+  "version": "1.0.0",
+  "description": "settings-store library component",
+  "files": [
+    ".gitkeep",
+    "settings.mjs"
+  ]
+}

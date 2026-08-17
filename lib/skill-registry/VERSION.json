@@ -1,0 +1,9 @@
+{
+  "name": "skill-registry",
+  "version": "1.0.0",
+  "description": "Registration profiles: the committed receipt an import leaves under .sidekicks/registry/skills/, recording what taking a skill in changed in this repo so a later removal can undo it",
+  "files": [
+    "profile.mjs",
+    "store.mjs"
+  ]
+}

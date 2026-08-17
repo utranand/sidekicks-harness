@@ -1,0 +1,51 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 003-set-remote-is-registry-mutating
+target_skill: sk-commander
+created: 2026-06-25T10:00:00+07:00
+source: sk-skill-auditor PROPOSE — source-verified vs lib/project-lifecycle/set-remote.mjs (imports rebuildRootIndex L62; stages .gitmodules + gitlink into the ROOT repo as a submodule, header L23-32) and SKILL.md L163-167 (registry-mutating list at L164) + the Step-3 pre-flight L433-434.
+kind: instructions
+observation: >-
+  The commander's "registry-mutating CLI steps must be sequential" rule lists the registry-mutating
+  verbs at SKILL.md L164 as "`sidekicks project create/add/remove/use`, `service add/remove/use`",
+  and the Step-3 pre-flight at L433-434 forbids "no two registry-mutating CLI steps in one wave"
+  using that same list. The list OMITS `project set-remote`. Source-verified:
+  lib/project-lifecycle/set-remote.mjs imports `rebuildRootIndex` (L62) and, in step 4 of its flow
+  (header comment L23-32), runs `git submodule add` in the repo root — staging `.gitmodules` + the
+  gitlink into the ROOT repo as a submodule. That is the exact same shared-`.sidekicks/` /
+  root-repo mutation class as `project create` / `project add` (which ARE listed and also call
+  rebuildRootIndex). So two `project set-remote` steps in one parallel wave would race the shared
+  root index plus the root-repo `.gitmodules` staging, and worktree isolation does not fix it —
+  precisely the hazard the L163-167 section describes ("conflicting registry edits and the post-wave
+  merge would conflict"). With `set-remote` missing from the enumerated set, the Step-3 pre-flight
+  would wrongly admit two `set-remote` steps in one wave.
+proposal: >-
+  Add `project set-remote` to the registry-mutating verb list at SKILL.md L164 (e.g.
+  "`sidekicks project create/add/remove/use/set-remote`, `service add/remove/use`") and anywhere
+  else the commander enumerates registry-mutating verbs, so `project set-remote` is treated as
+  must-be-sequential / never-fanned-out and the Step-3 pre-flight at L433-434 catches two of them in
+  one wave. (Apply alongside pending 002, which adds the DIFFERENT verb `service pull` to the same
+  list — `set-remote` is a project-lifecycle verb mutating the root index + root-repo submodule
+  staging, so it is not a duplicate of 002's service-lifecycle finding.)
+expected_effect: >-
+  The commander's registry-mutating list covers `project set-remote`, so its Step-3 pre-flight no
+  longer admits two `set-remote` steps in one wave that would race the shared root index and the
+  root-repo `.gitmodules` staging.
+risk: medium
+status: applied
+jira_subtask: AAP-23              # Jira subtask created by EXPORT
+jira_exported_at: 2026-06-26T22:42:43+0700
+approved_by: "the operator — batch-approved 2026-06-26 via jira-autopilot AAP-1"
+applied_at: 2026-06-26T23:36:46+0700
+applied_notes: >-
+  Added `project set-remote` to the registry-mutating verb list in the scope-race section
+  (the CLI-steps paragraph): `project create/add/remove/use` → `project create/add/remove/use/set-remote`,
+  so the Step-3 pre-flight catches two `set-remote` steps in one wave (they race the root index +
+  root-repo `.gitmodules` staging). Applied on the same line as 002 (service pull). Prose-only;
+  scripts/resolve-anchor.mjs untouched. Targeted improvement pass, not a rewrite.
+changes:
+  files:
+    - SKILL.md
+    - VERSION.json
+  version_from: 1.0.1
+  version_to: 1.1.0
+  commit: 8329a033142505b69fb5d26780f5d64a1fb5556f

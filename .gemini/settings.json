@@ -1,0 +1,62 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/load-local-memory-hook.mjs\""
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/enhance-prompt-hook.mjs\""
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "activate_skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/skill-advisor-hook.mjs\""
+          },
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/memory-trigger-hook.mjs\""
+          }
+        ]
+      },
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".sidekicks/hooks/rtk-hook.sh"
+          },
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/enforce-flow-headful.mjs\""
+          },
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/enforce-branch-safety.mjs\""
+          },
+          {
+            "type": "command",
+            "command": "node \"$GEMINI_PROJECT_DIR/scripts/memory-trigger-hook.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

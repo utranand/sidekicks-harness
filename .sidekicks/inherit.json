@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "runtime": "sidekicks-harness",
+  "direction": "one-way: sidekicks source -> this runtime",
+  "source": {
+    "repo": "sidekicks",
+    "commit": "5a673dc6",
+    "inherited_at": "2026-08-17T16:51:28+07:00",
+    "tool": "sk-inherit"
+  },
+  "options": {
+    "full_scripts": false
+  },
+  "units": {
+    "skills/sk-hello": {
+      "kind": "skill",
+      "origin": "active",
+      "version": "1.7.0",
+      "source_path": ".agents/skills/sk-hello",
+      "source_commit": "5a673dc6",
+      "inherited_at": "2026-08-17T16:51:28+07:00",
+      "files": {
+        "SKILL.md": "f11c1febd69326b4bd14465a1387dcee48be7db8f25f7be5b6a4127489318ad2",
+        "VERSION.json": "9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af",
+        "improvements/001-trim-description-under-cap.yaml": "d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599",
+        "improvements/INDEX.md": "a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5",
+        "scripts/capability.mjs": "f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3",
+        "scripts/readiness.mjs": "69995a9706f1a48a1d07d9d099fc17d1d3f0fcc99a970228971919f07f9f0de6",
+        "skill.manifest.yaml": "fb28f2fcd969f5755aeed1166fab8034bcec278a3eb3bfddace88c6b6c18a76f"
+      }
+    },
+    "skills/sk-cli": {
+      "kind": "skill",
+      "origin": "active",
+      "version": "1.0.0",
+      "source_path": ".agents/skills/sk-cli",
+      "source_commit": "5a673dc6",
+      "inherited_at": "2026-08-17T16:51:29+07:00",
+      "files": {
+        "SKILL.md": "339bbc3ed4999dc91550811ea86f99d994dba6d5d1bf71f04c06b8092d7f95d8",
+        "VERSION.json": "23ae847800c72cb55557e9a52d3d9e1f5f5650f218db63c1b8ab7ade771c1646",
+        "evals/evals.json": "72aa2d239a8db4dfbdf438ecb34c16d84675b608b7863ebb440abbad03025143",
+        "skill.manifest.yaml": "373007d016410f08e06536495a0a0c2e0068a65a57a6390adff3a8ebe78002d8"
+      }
+    },
+    "skills/sk-commander": {
+      "kind": "skill",
+      "origin": "active",
+      "version": "1.1.0",
+      "source_path": ".agents/skills/sk-commander",
+      "source_commit": "5a673dc6",
+      "inherited_at": "2026-08-17T16:51:29+07:00",
+      "files": {
+        "SKILL.md": "34acc5142305b36f2e1abf10ed967e6fe25b1745803961e53791c1e40961e1c2",
+        "VERSION.json": "fdc9e7cf663085477c50138c550c904e8565ba700ae23d025f3cb1d316272ab1",
+        "improvements/001-ralph-arm-guard-when-plugin-absent.yaml": "66bffe4608f7057143e85870b9ebee9c3f327236dfcd9f8928ae085e6b6b877c",
+        "improvements/002-service-pull-is-registry-mutating.yaml": "5ae24c5b633ed24f27592234fe7362661008806ef0aab131da8753383219c02a",
+        "improvements/003-set-remote-is-registry-mutating.yaml": "28f353b5a752d4b4ee76370622dd7c03393479dd39377d085be5103f76f0d55c",
+        "improvements/004-step3a-extract-embedded-anchor-before-helper.yaml": "35fa6a84eb6baf5571775b1c654435ec9a88b99a14cad5de8fc739889ed06dfe",
+        "improvements/005-leading-dot-definition-omits-bare-dotdot.yaml": "baca1e072ab7a5f35e652e0b6cf072deafff9473543609b4e722b18edb607542",
+        "improvements/INDEX.md": "1cd45355806ec41188fb590cc5a9d7181bb29d4aafa2243adb720296021fc310",
+        "references/commander-workflow-template.js": "c781cfb88fb2bbf55433fd54b8437e7f13808c929f8a16848eb84366ce1ae014",
+        "rules/criterion.command-sequences.md": "356c6cf64ed6dae24caa5f2b47d211317a2212f3cceb7b4b2fc376e45600e51d",
+        "scripts/resolve-anchor.mjs": "9761a251f30243853ca0d713601bc119ef954d9f3079e544f8c6150166d8f1c3",
+        "skill.manifest.yaml": "b8f2cfdbfa470f2b92d434148a7c6adfc1768446fc2c9442364191fb867242c6",
+        "skill.yaml": "1442293ff64b10a42fd05ef0b4654b3d8f79cdc235ce5e7dbd66f4286af72828"
+      }
+    },
+    "skills/sk-scope-switch": {
+      "kind": "skill",
+      "origin": "active",
+      "version": "1.0.0",
+      "source_path": ".agents/skills/sk-scope-switch",
+      "source_commit": "5a673dc6",
+      "inherited_at": "2026-08-17T16:51:29+07:00",
+      "files": {
+        "SKILL.md": "0c429429f6d535e538680bd0d701a954c4737260a85b72d18d5dbbd7a1a60d17",
+        "VERSION.json": "2f8fffddaf0f59c6711434d2b4477beb3d19f847fdb02f09826ce348b3a4e405"
+      }
+    },
+    "skills/sk-config-doctor": {
+      "kind": "skill",
+      "origin": "active",
+      "version": "1.0.0",
+      "source_path": ".agents/skills/sk-config-doctor",
+      "source_commit": "5a673dc6",
+      "inherited_at": "2026-08-17T16:51:29+07:00",
+      "files": {
+        "SKILL.md": "198908336a007135039fa971f60708ebebc5dd30e779afd01b4e822b964ece46",
+        "VERSION.json": "86a579f1dc8a18d070e0e6a1f68488a04c94d19384c9f2c25888ce11f82fdf72",
+        "skill.manifest.yaml": "ec21b02d57f754e39c3cc249adb505bfbf421b3c1aeed082a18f3d55b84679bd"
+      }
+    }
+  }
+}

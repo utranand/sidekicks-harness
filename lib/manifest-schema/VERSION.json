@@ -1,0 +1,10 @@
+{
+  "name": "manifest-schema",
+  "version": "1.0.0",
+  "description": "manifest-schema library component",
+  "files": [
+    ".gitkeep",
+    "manifest.mjs",
+    "service.mjs"
+  ]
+}

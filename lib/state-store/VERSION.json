@@ -1,0 +1,8 @@
+{
+  "name": "state-store",
+  "version": "1.0.0",
+  "description": "state-store library component",
+  "files": [
+    "paths.mjs"
+  ]
+}

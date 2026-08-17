@@ -1,0 +1,8 @@
+{
+  "name": "scope-index",
+  "version": "1.0.0",
+  "description": "scope-index library component",
+  "files": [
+    "index.mjs"
+  ]
+}

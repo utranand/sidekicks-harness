@@ -1,0 +1,39 @@
+# The Core delivery team — the built-in agent pack every framework core ships.
+#
+# OPTIONAL. Shipping it is not installing it: `core init` and `core update` write no agent, ever.
+# A user opts in with `sidekicks agent pack install core`.
+#
+# Every charter under agents/ is an AUTHORED, PORTABLE definition — not a copy of an operator's
+# live agent. No credentials, no Telegram relay, no pacemaker or daemon knobs, no schedules, no
+# absolute paths, no project-specific references. `lib/agent-lifecycle/_pack.mjs` enforces that at
+# read time, so a charter that drifts cannot ship.
+#
+# The three skills below are DECLARED, never bundled: skills travel through the public skills
+# repository and its `sidekicks skill import` path, and a pack that carried its own copies would
+# fork them. `agent pack install` refuses before writing anything when one is missing, and prints
+# the exact commands that fix it.
+
+schema: agent-pack/v1
+id: core
+version: 1.0.0
+display_name: Core delivery team
+summary: An orchestrator that routes work, an implementation planner, a developer, and a read-only verifier.
+
+agents:
+  - ethan
+  - debby
+  - steve
+  - molly
+
+requires_skills:
+  - name: sk-task-planner
+    required: true
+    source: skills-repo
+  - name: sk-implementation-planner
+    required: true
+    source: skills-repo
+  - name: sk-validation-gate
+    required: true
+    source: skills-repo
+
+skills_repo: https://github.com/utranand/sidekicks-skills.git

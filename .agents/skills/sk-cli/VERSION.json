@@ -1,0 +1,8 @@
+{
+  "name": "sk-cli",
+  "version": "1.0.0",
+  "description": "Retrieve the live Sidekicks CLI verb surface by running `node bin/sidekicks --help` and answer from that output. Use whenever you need to know which `sidekicks` verbs exist, a verb's signature or arguments, what a verb does, or how to perform a project/service operation with the CLI — including questions like \"what sidekicks commands are there\", \"how do I create a project\", \"what's the signature of `service add`\", or \"list the CLI verbs\". This is the source of truth for the verb surface; never answer such questions from memory or a hardcoded list, because the CLI evolves and a static answer drifts silently. Not for current-scope or orientation questions — active project/service, working folder, what's writable, which skills are available — that's `sk-hello`; nor for editing the CLI's source code, general git operations, or BMAD story/PRD/review work.",
+  "files": [
+    "SKILL.md"
+  ]
+}

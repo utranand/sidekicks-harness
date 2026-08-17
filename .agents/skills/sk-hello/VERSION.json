@@ -1,0 +1,10 @@
+{
+  "name": "sk-hello",
+  "version": "1.7.0",
+  "description": "Orient an AI agent that has just landed in a Sidekicks repository by resolving the current active project, active service, working folder (free-write surface), and visible skills — entirely through the Sidekicks CLI — AND get the clone ready to work. The readiness step covers the things git does not carry across a clone or a macOS↔Windows hop (git hooks, CLAUDE.md/GEMINI.md mirrors as OS-correct symlinks, host skill links, registered-project git submodules, the per-scope config/ folder, enabled plugins, and the RTK token-killer CLI proxy with its per-agent activation hook): on a plain orientation call it reports state, and on a setup/resume call (run with --apply) it AUTO-APPLIES every idempotent fix. The capability audit (scripts/capability.mjs, report-only) then maps which capabilities of the Sidekicks skill family are configured for the active scope versus still locked. It derives nothing itself: it asks `sidekicks config list --json` and `sidekicks config sync --dry-run --json` and renders the join, classifying each declared block as configured / inherited-from-root / documented-but-unset / absent / no-defaults / root-scoped, flagging a first-time scope, and flagging drift where a live block does not override every key its skill's current defaults document. Writing is the CLI's job: `sidekicks config sync` documents each declared block in the scope's config/<family>.yaml, seeded from the owning skill's config.defaults.yaml and written INERT (commented out), so the block keeps resolving to that skill's defaults until a human uncomments a key, no placeholder can be actuated as a credential, and a block carrying live values is never rewritten. Run this at session start, on any orientation or setup/resume ask, when a project is used for the first time, when project skills were added or enhanced, or when the user asks to set up/regenerate connector config or which integrations are configured.",
+  "files": [
+    "SKILL.md",
+    "scripts/readiness.mjs",
+    "scripts/capability.mjs"
+  ]
+}

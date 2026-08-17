@@ -1,0 +1,24 @@
+# .sidekicks/config/settings/rules.yaml — which framework rules are ON in this repo (COMMITTED, team default).
+#
+# SETTINGS, not configuration: booleans only. Values — tunables, endpoints, credentials — live
+# in the family files one directory up (.sidekicks/config/<family>.yaml). See
+# docs/guide/settings-vs-configuration.md.
+#
+# The top level IS the slug map: an entry is `<slug>: true|false`, and the rule
+# kind comes from the filename, so an id like `rule.example-slug` is written here
+# as `example-slug`.
+#
+# Managed by `sidekicks framework enable|disable <id>` and materialised by `sidekicks framework
+# sync`. Never hand-edit it (Rule 1). An absent or empty file means "everything enabled" and is
+# never an error.
+#
+# Safety-floor ids cannot appear here (lib/framework-settings/floor.mjs) — writing one is a
+# validation error, not a silent no-op.
+branch-naming: true
+cross-platform: true
+incident-reports: false
+local-memory-register: true
+scope-anchors: true
+single-venv: true
+timezone-bangkok: true
+worktree-sibling-layout: true

@@ -1,0 +1,16 @@
+{
+  "name": "service-lifecycle",
+  "version": "1.0.0",
+  "description": "service-lifecycle library component",
+  "files": [
+    ".gitkeep",
+    "add.mjs",
+    "checkout.mjs",
+    "current.mjs",
+    "free.mjs",
+    "pull.mjs",
+    "remove.mjs",
+    "sync.mjs",
+    "use.mjs"
+  ]
+}

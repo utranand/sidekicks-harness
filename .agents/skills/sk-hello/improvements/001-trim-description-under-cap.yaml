@@ -1,0 +1,55 @@
+id: 001-trim-description-under-cap
+target_skill: sk-hello
+created: 2026-07-02T12:40:00+07:00
+source: skill-auditor run artifacts/runs/skill-auditor/audit-sk-hello-2026-07-02/ledger.yaml (round 0 discovery panel — all 3 tiers converged on this; empirically re-measured)
+kind: description
+observation: >-
+  The frontmatter description renders to 1809 characters (measured via yaml.safe_load on the
+  repo-root .venv python), ~1.77x over Claude's HARD 1024-char per-description cap (the cap
+  sk-skill-description-trimmer documents and enforces). The host truncates the tail, so
+  characters 1024-1809 are never seen by the trigger matcher — and that dropped tail contains the
+  ENTIRE explicit trigger-phrase list: "Use at session start; ... 'set me up', 'get me ready to
+  work', 'prepare my environment', 'pull the submodules / projects', 'create my config', 'why
+  aren't my skills / plugins / hooks working'", plus the fresh-clone / new-machine / OS-switch
+  cues. What survives before the cutoff is only the mechanism narration (hooks, symlinks,
+  submodules, config seeding, plugin install, RTK). Net effect: the skill's most important
+  discovery cues are invisible to host routing. (Auditor.sh evidence reported a false
+  description_chars_approx=9276 — it miscounts the raw folded YAML block, not the parsed value; the
+  empirically-correct figure is 1809.)
+proposal: >-
+  Replace the frontmatter description with the following rewrite (measured 1021 chars, under the
+  1024 cap), which front-loads all trigger phrases into the first ~600 chars so none are truncated,
+  and relies on SKILL.md Step 0 (which already documents the mechanism in full) for the mechanism
+  detail. Pairs with sk-skill-description-trimmer. New description text verbatim:
+
+
+  Orient an AI agent in a Sidekicks repo AND get a clone ready to work (first-run/resume setup). Use at session start; whenever the user asks where they are, what scope is active, what they can write, or what skills exist; and — even if "orientation" is never said — whenever the user pulls a fresh clone, resumes on a new machine, switches OS (macOS↔Windows), or says "set me up", "get me ready to work", "prepare my environment", "pull the submodules/projects", "create my config", or "why aren't my skills/plugins/hooks working". It resolves active scope (project, service, working folder, free-write surface, visible skills) via the Sidekicks CLI. On a plain "where am I?" call it just reports. On a setup/resume call it runs a readiness check and AUTO-APPLIES every idempotent fix for what git does not carry across a clone/OS hop: git hooks, the AGENTS.md/GEMINI.md mirrors of CLAUDE.md, host skill links, uninitialized submodules, a seeded per-scope config.yaml, missing host plugins, and the RTK token-killer proxy.
+expected_effect: >-
+  All explicit trigger phrases become visible to the host matcher (they no longer sit past the 1024
+  cutoff), improving discovery on setup/resume/orientation asks, while the description stays under
+  the hard cap. No behavior change to the skill's steps; the body already carries the mechanism
+  detail.
+risk: medium
+status: applied
+jira_subtask: null
+jira_exported_at: null
+approved_by: auto-verified
+applied_at: 2026-07-02T12:52:00+07:00
+applied_notes: >-
+  Adversarial self-verification (skill-auditor autonomous): 3 independent refuters, 2 CONFIRMED /
+  1 refuted → strict majority CONFIRMS. Both confirmers empirically re-measured current=1809c,
+  proposed≈1021-1023c (<=1024), and verified all trigger phrases move within the first 1024 and
+  mechanism detail is preserved in SKILL.md Step 0. The lone refute argued the cap is an
+  aggregate-budget rather than a hard 1024 cutoff, citing in-session skill-LIST display truncation
+  — rebutted: that is a context-render artifact, not the host trigger matcher; the authoritative
+  in-repo sk-skill-description-trimmer documents Claude's 1024 hard per-description cap, and
+  the defect class already has precedent artifacts (sk-jira-my-work, sk-jira-footprint).
+  Safety floor: all 3 refuters floor_hit=false (no safety/permission/irreversible rule touched;
+  those live in SKILL.md body; single frontmatter string swap, cleanly git-reversible). Below floor
+  → auto-apply lane.
+changes:
+  files:
+    - SKILL.md    # frontmatter description field only; body untouched
+  version_from: null    # skill has no frontmatter `version` field — none added (repo convention)
+  version_to: null
+  commit: b3265ed       # chore(skill-audit): trim sk-hello description under the 1024 host cap

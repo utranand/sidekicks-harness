@@ -1,0 +1,20 @@
+{
+  "name": "artifacts-lifecycle",
+  "version": "0.2.0",
+  "description": "artifacts-lifecycle library component",
+  "files": [
+    "_shared.mjs",
+    "_manage.mjs",
+    "archive.mjs",
+    "child.mjs",
+    "list.mjs",
+    "liveness-config.mjs",
+    "watch-config.mjs",
+    "rebuild.mjs",
+    "register.mjs",
+    "restore.mjs",
+    "scan.mjs",
+    "show.mjs",
+    "timeline.mjs"
+  ]
+}
