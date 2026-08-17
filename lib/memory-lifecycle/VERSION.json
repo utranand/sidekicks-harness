@@ -1,8 +1,10 @@
 {
   "name": "memory-lifecycle",
-  "version": "2.0.0",
-  "description": "memory-lifecycle library component — the central memory store: one tree with scope namespaces, action categories and hard rules, a machine index plus knowledge graph for retrieval, scenario packs and their triggers, and durable-only lineage anchors",
+  "version": "2.1.0",
+  "description": "memory-lifecycle library component — the central memory store: one tree with scope namespaces, action categories and hard rules, a machine index plus knowledge graph for retrieval, scenario packs and their triggers, durable-only lineage anchors, and the git merge driver plus staleness fingerprint that let one store be merged from several checkouts without conflicting",
   "files": [
+    "_merge-driver.mjs",
+    "_merge.mjs",
     "_shared.mjs",
     "_store.mjs",
     "_triggers.mjs",
@@ -15,10 +17,12 @@
     "link.mjs",
     "list.mjs",
     "map.mjs",
+    "merge.mjs",
     "pack.mjs",
     "query.mjs",
     "rebuild.mjs",
     "remove.mjs",
+    "resolve.mjs",
     "show.mjs",
     "triggers.mjs"
   ]

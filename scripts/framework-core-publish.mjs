@@ -181,7 +181,7 @@ const portable = (rel) => rel.split(sep).join("/");
 // ten generated files — `forged_at` (.sidekicks-core.json), `inherited_at` (.sidekicks/inherit.json,
 // once per unit), `generated_at` (.sidekicks/state/index.json, the only one carrying milliseconds
 // because lib/scope-index writes it), and the "Generated ... at <ts>" banners in AGENTS.md,
-// CLAUDE.framework.md, CLAUDE.md, GEMINI.md, README.md, install.sh and install.ps1. Measured: two
+// AGENTS.framework.md, CLAUDE.md, GEMINI.md, README.md, install.sh and install.ps1. Measured: two
 // forges of one source tree produced 509 files each, 10 differing, 30 differing lines, ALL of them
 // timestamps. Those stamps are deliberately kept (they say when a core was cut), so the check
 // normalizes them away rather than the forge dropping them.
@@ -1563,11 +1563,17 @@ async function doPublish() {
   // explicit per-invocation yes and never self-granted — so the run was stuck with nothing published
   // and no non-operator way forward.
   //
-  // Corroboration is what distinguishes the two: a release always leaves a state/log record OR its
-  // tag. Releases cut before content_hash existed still wrote both.
-  const taggedAlready = targetIsOwnRepo()
-    && git(["rev-parse", "-q", "--verify", `refs/tags/v${version}`], SRC_ABS).ok;
-  const alreadyReleased = releasedVersions(stateNow).has(version) || taggedAlready;
+  // So the marker's claim is believed only when something CORROBORATES it: a state/log record of any
+  // release, or that version's tag. Releases cut before content_hash existed still wrote both.
+  //
+  // The corroboration is deliberately attached to the MARKER clause rather than replacing it. Making
+  // a bare tag mean "already released" on its own looks tidier and is wrong: it short-circuits the
+  // tag-safety stop further down, which exists precisely to catch a tag that already names a
+  // DIFFERENT commit and says so with a message this refusal cannot give.
+  const markerCorroborated = ver.marker === version
+    && (Boolean(lastRelease(stateNow))
+      || (targetIsOwnRepo() && git(["rev-parse", "-q", "--verify", `refs/tags/v${version}`], SRC_ABS).ok));
+  const alreadyReleased = releasedVersions(stateNow).has(version) || markerCorroborated;
   const reference = alreadyReleased && !DRY ? referenceContent(version, stateNow, ver) : null;
 
   // A digest recorded in state.json proves WHETHER a re-forge diverged but cannot say WHICH paths
@@ -1605,7 +1611,7 @@ async function doPublish() {
     PRESET,
     // Explicit, not inferred. The engine turns --as-core on by itself only for `--preset framework`,
     // so the day this script stopped forging that preset the core-distribution files (the
-    // .sidekicks-core.json marker, install.sh, install.ps1, CLAUDE.framework.md, the generated
+    // .sidekicks-core.json marker, install.sh, install.ps1, AGENTS.framework.md, the generated
     // README) would have silently stopped travelling. What is published is a mountable core whatever
     // skill set it carries, so the flag says so rather than riding on the preset name.
     "--as-core",
@@ -1790,6 +1796,14 @@ async function doPublish() {
           version,
           source_commit: head.sha,
           source_branch: head.branch || null,
+          // Where the CORE's own release commit lands, which is a different repository's branch
+          // namespace from `source_branch` above. Recorded because verify-remote had nothing else to
+          // check and reached for `source_branch` — asking the core's remote for a branch that only
+          // ever existed in THIS repo, so the check could pass only while both happened to be called
+          // `main`. `core_ref` is not it either: that is the `--ref` INPUT (default 'main'), not
+          // where the commit went. Read here rather than after commitLocally() because the branch is
+          // already decided — that function reads the same value to make the same commit.
+          core_branch: targetIsOwnRepo() ? (git(["branch", "--show-current"], SRC_ABS).out || null) : null,
           core_ref: ref,
           published_at: when.stamp,
           commits: pending.commits.length,
@@ -1904,7 +1918,12 @@ function verifyRemote() {
   }
   const version = String(last.version);
   const tag = `v${version}`;
-  const branch = last.source_branch || "main";
+  // The core's OWN release branch, never this repo's. `source_branch` names the workspace branch the
+  // release was cut from and means nothing to the core's remote: checking it against the core told
+  // v1.0.0 "the remote has no chore/sk-repos-reforge" while the remote served the release perfectly.
+  // Absent on any release cut before core_branch was recorded, and an absent value is reported as
+  // unknown rather than checked — a check that cannot run must not be scored either way.
+  const branch = last.core_branch || null;
 
   const url = git(["remote", "get-url", "origin"], SRC_ABS);
   if (!url.ok || !url.out) {
@@ -1944,19 +1963,32 @@ function verifyRemote() {
         : `the remote serves ${tag} at ${remoteTag.slice(0, 12)}`,
   });
 
-  const localBranch = git(["rev-parse", `${branch}^{commit}`], SRC_ABS);
-  const remoteBranch = refs.get(`refs/heads/${branch}`) || null;
-  checks.push({
-    ref: `refs/heads/${branch}`,
-    expected: localBranch.ok ? localBranch.out : null,
-    remote: remoteBranch,
-    ok: Boolean(remoteBranch) && (!localBranch.ok || remoteBranch === localBranch.out),
-    detail: !remoteBranch
-      ? `the remote has no ${branch}`
-      : localBranch.ok && remoteBranch !== localBranch.out
-        ? `the remote's ${branch} is at ${remoteBranch.slice(0, 12)}, the local one at ${localBranch.out.slice(0, 12)}`
-        : `the remote's ${branch} matches the local one`,
-  });
+  if (branch) {
+    const localBranch = git(["rev-parse", `${branch}^{commit}`], SRC_ABS);
+    const remoteBranch = refs.get(`refs/heads/${branch}`) || null;
+    checks.push({
+      ref: `refs/heads/${branch}`,
+      expected: localBranch.ok ? localBranch.out : null,
+      remote: remoteBranch,
+      ok: Boolean(remoteBranch) && (!localBranch.ok || remoteBranch === localBranch.out),
+      detail: !remoteBranch
+        ? `the remote has no ${branch}`
+        : localBranch.ok && remoteBranch !== localBranch.out
+          ? `the remote's ${branch} is at ${remoteBranch.slice(0, 12)}, the local one at ${localBranch.out.slice(0, 12)}`
+          : `the remote's ${branch} matches the local one`,
+    });
+  } else {
+    // Not scored. The tag is the release identity and it WAS checked above; the branch this release
+    // landed on simply is not recorded, and inventing a branch name to check would be the original
+    // bug in a different costume.
+    checks.push({
+      ref: "refs/heads/(unrecorded)",
+      expected: null,
+      remote: null,
+      ok: true,
+      detail: "this release recorded no core branch — the tag above is what identifies it",
+    });
+  }
 
   return { ok: checks.every((c) => c.ok), version, checks };
 }

@@ -1,7 +1,7 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `5a673dc6` on 2026-08-17T16:51:30+07:00 (Asia/Bangkok). It is regenerated on every
+> `c27168e1` on 2026-08-18T00:41:03+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
 > instructions in `CLAUDE.local.md` and reference it from here if you need them to survive.
 
@@ -144,13 +144,16 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
   never nested inside the repo root. Never check a protected branch out into a worktree — git locks
   the branch to that worktree, so the primary checkout can no longer return to it; branch *off* it
   instead. `--force` removal only after the user OKs losing unmerged work.
-- **Production access — Teleport skills only (hard rule):** production Kubernetes and production
-  PostgreSQL are reached ONLY through the Teleport skills (`sk-teleport-cluster-ops`,
-  `sk-teleport-database-connector`). Never raw `kubectl` / `psql` / `tsh kube login` / a
-  direct connection against prod. `sk-database-connector` is direct/non-Teleport (nonprod)
-  only, and `sk-cluster-ops` is nonprod-only:
-  it hard-stops on prod — never override.
-  This rule stands whether or not those skills are installed in this runtime.
+- **Production access — direct allowed, Teleport as fallback (hard rule):** production Kubernetes
+  and production PostgreSQL MAY be reached directly through the registered non-Teleport target
+  (`sk-cluster-ops` or raw `kubectl` for Kubernetes, `sk-database-connector` for PostgreSQL). When
+  the direct route is unreachable — no route or VPN, blocked ingress, an expired or absent direct
+  credential — fall back to the Teleport skills (`sk-teleport-cluster-ops`,
+  `sk-teleport-database-connector`). Every run states which route it used: the direct route carries
+  no JIT approval gate and no per-session audit trail. Prefer Teleport when a live session already
+  exists and the run is not time-critical. Rule 4 still governs every production write (explicit
+  user permission, inside a rollback-capable transaction), and an unregistered prod target is
+  reachable by neither route. This rule stands whether or not those skills are installed here.
 - **Irreversible / outward-facing actions (hard rule):** confirm before acting unless durably
   authorized. Sending to an external service publishes; it may be cached or indexed even after
   deletion. Approval in one context does not extend to the next.

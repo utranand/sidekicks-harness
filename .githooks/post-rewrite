@@ -1,0 +1,13 @@
+#!/bin/sh
+# sidekicks-memory-merge
+# Regenerates .sidekicks/memory/{MEMORY.md,index.json,graph.json} after git rewrote the
+# entry files. The driver cannot do it: git merges paths in an unspecified order, so the
+# entries are not final while it runs. Safe to delete — every memory read also self-heals.
+command -v node >/dev/null 2>&1 || exit 0
+out=$(node bin/sidekicks memory rebuild --if-stale 2>/dev/null) || exit 0
+# Say so when it actually regenerated: the merge commit recorded the PRE-merge faces, so
+# they are now modified in the working tree and want a follow-up commit.
+case "$out" in
+  rebuilt*) printf 'sidekicks: memory faces regenerated after the merge — commit them (git add .sidekicks/memory)\n' ;;
+esac
+exit 0
