@@ -22,3 +22,4 @@ scope-anchors: true
 single-venv: true
 timezone-bangkok: true
 worktree-sibling-layout: true
+lean-main-merge: true

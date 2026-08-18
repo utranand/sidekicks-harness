@@ -1,0 +1,148 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 009-model-tier-token-is-undefined
+target_skill: sk-commander
+created: 2026-08-18T10:05:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (mid-tier panel, re-verified by the lead at verify_tier=high). Source-verified vs SKILL.md L123-133 + L214 + L637 + L688, and references/commander-workflow-template.js L190-206 / L234-237 (grep for `model_tier` in the template → 0 hits).
+kind: instructions
+observation: >-
+  The inline-sequence parse spec defines exactly one model token, and the skill's own examples use a
+  different one that nothing implements.
+
+  The spec, SKILL.md L129-133:
+    L129  `<skill-name> | work_dir=<path> | docs_dir=<path> | work_item=<slug> | model=<id> | <instruction>`
+    L130  "`work_dir=`, `docs_dir=`, `work_item=`, and `model=` are optional"
+    L131  "tokens before the instruction (any order); a `model=<id>` token sets that step's `model` (e.g."
+    L132  "`model_tier=mid`, common on the build (`sk-bmad-developer`) and review"
+  So the sentence defining `model=<id>` gives as its example a DIFFERENT key (`model_tier`) carrying a
+  DIFFERENT kind of value (a tier keyword, not a model id — L123 illustrates `<id>` as
+  `claude-haiku-4-5-20251001`).
+
+  Then the shipped examples use only the undefined token, as a real pipe-delimited step field:
+    L637  `3.  sk-bmad-code-review | work_dir=projects/acme/services/svc-a/src | model_tier=mid | review svc-a`
+    L688  `3.  sk-bmad-developer  | … | work_item=visit-sync | model_tier=mid | Implement every …`
+
+  Nothing resolves it. `rtk proxy grep -c model_tier references/commander-workflow-template.js` → 0.
+  The template's `runStep` (L195-206) reads only `opts.model || step.model` and passes it straight into
+  `agent()` as a literal model id; SKILL.md L214 likewise says "the step's optional `model` flows
+  through `runStep` into the `agent()` spawn". No tier→id mapping exists anywhere reachable from this
+  skill — the tier table lives in root CLAUDE.md and this SKILL.md never points at it.
+
+  Consequence: a model following the Examples emits `model_tier: 'mid'`, or bakes `model: 'mid'`, into
+  the authored Workflow script. `'mid'` is not a model id, so either the field is dropped (the step
+  runs on the session model, and the point of the pin — a cheap model for a trivial verification step,
+  a stronger one for heavy planning — is lost) or the spawn is handed a bogus id and errors. Which of
+  the two happens is NOT established here; the artifact deliberately does not assert one.
+  Skill-attributable either way: the spec sentence and the two Examples are the skill's own authored
+  text, and they disagree with each other and with the skill's own bundled template.
+
+  **VERIFICATION CORRECTED THIS — read the amended claim, not the original.** The first draft said the
+  paired planner emits `model_tier` by default "so the token arrives on real sequences constantly".
+  A refuter measured it and that is FALSE: of the **98** command-sequence files on disk
+  (`*.commander.yaml` + `*/command-sequence/*.yaml` + `command-sequence.yaml`), **0 carry
+  `model_tier`**; the **15** that pin a model all carry a literal id — including exactly where a
+  dropped tier would show, e.g.
+  `projects/workspace-sk/docs/get-things-done/visual-compass/inputs/command-sequence.yaml` L66-69
+  ("# Pinned to a fast mid-tier model per convention." → `model: claude-sonnet-4-6`). So the planner
+  already resolves the tier to an id before the commander ever sees it, and there is no active silent
+  drop in the field today. Two further corrections from the same pass: `model_tier` is really the
+  **sk-cli-executor** lane's vocabulary (sk-cli-executor SKILL.md L167-190 — "**The orchestrator**
+  picks a tier … this skill **resolves** that tier to the id at invoke time"), so the planner assets'
+  "resolved by the selected executor" means a registered external CLI executor, NOT the commander;
+  and the "0 hits" figure is the TEMPLATE only — SKILL.md itself has three (L132, L637, L688).
+
+  **What survives, and it is real.** The defect is a documentation-contract defect, not a live
+  failure: (i) the sentence defining `model=<id>` gives as its example a different key carrying a
+  different kind of value, which is simply wrong however few sequences use it; (ii) the skill's own
+  two Examples use a token its own parse spec never defines and its own template cannot consume — so a
+  reader who follows the Examples writes something the engine ignores; (iii) the token IS live in the
+  paired planner's shipped templates (sk-sequence-planner SKILL.md L247-248 "**Default convention** …
+  set `model_tier: mid` on every `sk-bmad-developer` **and** `sk-bmad-code-review` step", L676,
+  L785-786 warn on its absence; `assets/command-sequence.inline.txt` L20-26;
+  `assets/command-sequence.template.yaml` L47-51/L73-74/L159/L164;
+  `assets/parallel-fanout-sequence.template.yaml` L88-98 puts `model_tier: mid` on every fan-out
+  member), so the first sequence generated straight from a template rather than hand-resolved will
+  carry it. It is a latent contract gap on a shipped path, which is worth fixing — at `risk: low`.
+
+proposal: >-
+  Make the spec, the Examples, and the template agree on ONE token. Preferred fix (smallest, and it
+  keeps the useful tier vocabulary):
+
+  1. **SKILL.md L131-133** — stop presenting `model_tier=mid` as an example of `model=<id>`. Define
+     BOTH tokens explicitly: `model=<id>` sets a literal model id; `model_tier=<high|mid|low>` names a
+     tier that YOU resolve at parse time (run-procedure step 3/4) using the model-tier table in root
+     CLAUDE.md, because the Workflow runtime receives only the resolved `model` field — it has no tier
+     table and cannot resolve one. **Resolve to the table's FAMILY ALIAS, never a dated id** —
+     `top→fable, high→opus, mid→sonnet, low→haiku` — because CLAUDE.md L457 says "Model names in skills
+     are tier examples, not literal requirements" and a dated id like `claude-haiku-4-5-20251001` rots.
+     Aliases are already what this repo passes to spawns (sk-bmad-pm SKILL.md L221 `model: "sonnet"`,
+     sk-bmad-developer L419-420, sk-squad L57-59, sk-fable-advised L56 `model: 'fable'`), and `runStep`
+     (template L196-206) accepts them unchanged. State plainly that a tier keyword is never baked into
+     the script as `model`.
+  2. **SKILL.md Run procedure step 4 (L493-496)** — add the resolution to the same place that already
+     says every anchor is pre-resolved: "a `model_tier=` token is resolved to its CLAUDE.md tier
+     alias here too; never write a tier keyword into the script."
+  3. **references/commander-workflow-template.js L234-237** — extend the existing note ("Any step
+     (skill OR CLI) may carry an optional `model: '<model-id>'`") with one line: it must be a real
+     model id; a `model_tier=` token from the sequence was resolved by the commander before authoring,
+     because this script cannot resolve tiers.
+
+  4. **Cross-skill note the fix must carry.** sk-sequence-planner
+     `assets/command-sequence.template.yaml` L47-51 additionally promises that a tier "never falls
+     back to a Claude id" and that "An unavailable tier is a validation error" — that is
+     sk-cli-executor registry semantics leaking into skill-step field docs, and it will read as
+     contradicting a resolving commander. The same change should add a one-line note to that asset
+     that a **commander-executed** skill step resolves the tier via the CLAUDE.md table.
+
+  The first draft's "acceptable alternative" (delete `model_tier=`, use literal ids) is WITHDRAWN — a
+  refuter showed it is strictly worse: the planner emits `model_tier: mid` by default in its shipped
+  templates, so removing the token from the commander leaves the contract gap intact on every
+  template-generated sequence. The gloss "e.g. `model_tier=mid`" on the `model=<id>` definition must go
+  either way; it is wrong under every fix.
+expected_effect: >-
+  The parse spec, the Examples and the template agree on what a model pin is, and a `model_tier=` token
+  arriving from one of the planner's shipped templates resolves to a real model alias before the
+  Workflow script is authored — instead of being written into a script the runtime cannot act on. No
+  behaviour changes for the 98 committed sequences (none carries the token); this closes the gap before
+  the first template-generated sequence hits it.
+risk: low                 # DOWNGRADED from medium after verification: 0 of 98 committed sequences carry the token, so this is a contract/doc defect on a shipped path, not an active silent drop
+status: rejected
+approved_by: null
+rejected_at: 2026-08-18T13:05:00+07:00
+rejected_by: adversarial-verification (3 independent refuters at verify_tier=high)
+rejection_reason: >-
+  0/3 — all three refuters rejected, on three independent grounds. (1) The proposal's own tier grammar is
+  one value short: it defines `model_tier=<high|mid|low>` while every upstream asset defines FOUR
+  (`top|high|mid|low` — sk-sequence-planner assets/command-sequence.template.yaml:47,
+  assets/command-sequence.inline.txt:24, sk-cli-executor SKILL.md:182/184, sk-cli-orchestrator
+  SKILL.md:284) and the artifact's OWN resolution list is four-wide. A planner-legal `model_tier: top`
+  would still hit a spec that never defines it — the exact defect this artifact is filed against.
+  (2) This is round THREE of a churn cycle, not a new fix. sk-sequence-planner/improvements/004 is
+  `status: applied`, `approved_by: auto-verified`, "VERIFIED 3-0 (none refuted)", applied 2026-06-22,
+  and it added literal `model=claude-sonnet-4-6` pins to the fan-out template's inline developer lines.
+  Those same lines now read `model_tier=mid` (parallel-fanout-sequence.template.yaml:165-167) — an
+  applied, 3-0-verified finding was overwritten by an un-propagated planner convention flip. 009 makes
+  the COMMANDER absorb the flip, which is churn, against the auditor's own "converge, don't churn" bar.
+  (3) Rule 6: `sonnet`/`opus`/`haiku` are Claude-only family names, so a baked alias is exactly as
+  meaningless as `mid` on Codex or Gemini. Making tier->id CONFIG (the sk-cli-executor registry) rather
+  than prose is precisely why that lane did it that way.
+  Also fatal to the apply as written: item 4 edits a DIFFERENT skill's asset, which the funnel cannot
+  record — `changes.files` is relative to the target skill dir, so the edit would be unrevertable from
+  its own record. And the Fallback lane's step brief carries no `model` field at all, so a parse-time
+  resolution is discarded on exactly the path the Fallback exists for.
+  ONE EMPIRICAL POINT WENT THE ARTIFACT'S WAY and is worth keeping: bare aliases DO work — a committed
+  run passed `model: 'sonnet'` and its journal records `claude-sonnet-5`, state done. But `top->fable`
+  appears in ZERO of 80 journals, and `runStep` retries the SAME model 3x, so an unsupported alias burns
+  the stage with no tier fallback.
+  SALVAGE (all three refuters agree, not filed here): the wrong gloss is real and should go regardless —
+  strike "e.g. `model_tier=mid`" from the `model=<id>` definition and change the two Examples to a
+  `model=` pin. That is net-SUBTRACTIVE. Then file the ownership question against sk-sequence-planner,
+  which is the origin of the doubled vocabulary, carries it on five surfaces, and states a falsehood
+  about it ("an unavailable tier is a validation error" — sk-cli-executor:187-192 documents the
+  opposite: no flag is passed, degrades cleanly).
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

@@ -38,7 +38,7 @@ Each step is one of two kinds:
   that skill (PM, developer, code-review, …) to completion.
 - a **CLI step** — a literal shell command (`run:` in a file, `$ …` inline) and an optional `work_dir`
   (its cwd); the subagent runs **exactly that command** and reports the exit result. CLI steps scaffold
-  structure (`sidekicks project create`, `service add <git-url>` to acquire a repo as a service) *before*
+  structure (`sidekicks project create`, `service add <name> [<git-url>]` to REGISTER a service, `service pull <name>` to acquire its code into `src/`) *before*
   the skills write into it, set up deps or run migrations, gate the pipeline on tests/lint/build, or
   commit/tag/push to finalize.
 
@@ -232,12 +232,6 @@ Things the template already encodes for you (don't re-derive them):
 - **Halt, don't fake success** — the script returns `{ status: 'halted', stage, reason, summary }` on
   any unrecoverable failure (including a missing precondition caught by `try/catch`), and
   `{ status: 'completed', summary }` only when every stage's success condition was met.
-- **Diagnose an unclear halt before surfacing it** — when a halt's cause cannot be read from the
-  journal (not a hard stop, not a missing human input), make **one bounded `sk-fable-resolver`
-  dispatch** with the failed step's brief and error tail: it root-causes and applies the smallest
-  fix, then resume the run from the halted stage. One dispatch per stage, ever — a second identical
-  halt surfaces to the user with the resolver's evidence attached.
-
 Author the `meta`, the `stages` tracking array, and the STAGES section to match the real parsed sequence;
 keep the helpers verbatim. The `stages` array must mirror `meta.phases` exactly (same titles, same count)
 so `setStatus(idx, …)` log lines stay coherent with the live progress display. Live status transitions
@@ -485,8 +479,15 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
 
    ```bash
    resolved="$(node "$ROOT/.agents/skills/sk-commander/scripts/resolve-anchor.mjs" "$SEQ" "$VALUE" "$ROOT")"
+   [ -z "$VALUE" ] || [ -n "$resolved" ] || { echo "resolve-anchor returned nothing for '$VALUE' — halt, do not bake an empty work_dir"; exit 1; }
    # bake `resolved` into the step in place of the original anchor value
    ```
+
+   The emptiness guard is not decoration: an empty anchor is indistinguishable from *no* anchor, so a
+   step that silently loses its `work_dir` re-derives scope on its own and can write into the wrong
+   service. Only a **non-empty** `$VALUE` is guarded — the helper documents that an empty/undefined
+   value returns `''` (the step omits the anchor), and `resolveAnchor` never returns `''` for a
+   non-empty input.
 
    For an **inline / pasted** sequence there is no file — a leading-dot anchor is an error: halt and
    tell the author to use a repo-relative path.
@@ -503,6 +504,15 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
    `failed`/`blocked` (no done-transition) with the halt reason — see
    [Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card). On a halt, the returned
    `stage`/`reason` and the run ID are what the user needs to fix and resume.
+
+   **Diagnose an unclear halt before surfacing it — this is YOUR job, not the template's.** The script
+   returns the halt and stops; it contains no diagnosis dispatch. So when a halt's cause cannot be read
+   from the journal (not a hard stop, not a missing human input), make **one bounded
+   `sk-fable-resolver` dispatch** with the failed step's brief and error tail: it root-causes and
+   applies the smallest fix, then resume from the halted stage with
+   `Workflow({ scriptPath, resumeFromRunId })` — the journal replays everything already done. **One
+   dispatch per stage, ever**: a second identical halt surfaces to the user with the resolver's
+   evidence attached.
 
 ---
 
@@ -666,17 +676,23 @@ Input:
 ```
 Run this sequence:
 1. $ sidekicks project use acme
-2. $ sidekicks service add git@github.com:acme/acme-foo.git acme-foo
-3. sk-bmad-pm        | work_dir=projects/acme/services/acme-foo/src | Plan from docs/plan.md
-4. sk-bmad-developer | work_dir=projects/acme/services/acme-foo/src | Implement every ready-for-dev story
-5. work_dir=projects/acme/services/acme-foo/src | $ npm test
-6. work_dir=projects/acme/services/acme-foo/src | $ git add -A && git commit -m "feat: acme-foo"
+2. $ sidekicks service add acme-foo git@github.com:acme/acme-foo.git
+3. $ sidekicks service pull acme-foo
+4. sk-bmad-pm        | work_dir=projects/acme/services/acme-foo/src | Plan from docs/plan.md
+5. sk-bmad-developer | work_dir=projects/acme/services/acme-foo/src | Implement every ready-for-dev story
+6. work_dir=projects/acme/services/acme-foo/src | $ npm test
+7. work_dir=projects/acme/services/acme-foo/src | $ git add -A && git commit -m "feat: acme-foo"
 ```
-Action: six sequential single-step stages — no wave (every step depends on the prior). Stages 1–2 are
-**CLI steps** that scaffold the service (both registry-mutating ⇒ correctly sequential and first);
-`runStep` builds each a CLI brief and runs it at the repo root. Stages 3–4 are skill steps. Stage 5 is a
-verification gate — a non-zero `npm test` exit halts the run before the commit. Stage 6 finalizes. The
-handoff threads forward (e.g. "service acme-foo acquired under acme" → PM → developer).
+Action: seven sequential single-step stages — no wave (every step depends on the prior). Stages 1–3 are
+**CLI steps** that scaffold the service — `project use` selects the scope, `service add` **registers**
+the service (name FIRST, git-url optional; it records the remote and creates `docs/`, it does **not**
+fetch code), and `service pull` is what actually populates `…/src` so the skill steps have somewhere to
+write. All three are registry-mutating, so they are correctly sequential and first — three sequential
+registry-mutating stages break no rule; only two *within one wave* would.
+`runStep` builds each a CLI brief and runs it at the repo root. Stages 4–5 are skill steps. Stage 6 is a
+verification gate — a non-zero `npm test` exit halts the run before the commit. Stage 7 finalizes. The
+handoff threads forward (e.g. "service acme-foo registered under acme, code pulled into src/" → PM →
+developer).
 
 **Example 7 — plan-centric sequence (shared docs_dir → PM stages serialize, one consolidated build)**
 

@@ -1,0 +1,88 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 012-fable-resolver-diagnosis-is-claimed-but-not-implemented
+target_skill: sk-commander
+created: 2026-08-18T10:24:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel candidate 2, re-verified by the lead at verify_tier=high). Source-verified vs SKILL.md L216 + L235-239, references/commander-workflow-template.js L200/L218 and its five halt returns (L285, L326, L329, L342, L348), and `rtk proxy grep -rn 'fable' .agents/skills/sk-commander/` → exactly one hit.
+kind: instructions
+observation: >-
+  SKILL.md places a behaviour in the "the template already does this, don't write it yourself" list
+  that the bundled template does not contain — so neither half produces it and the behaviour never
+  runs.
+
+  L216 opens the list: "Things the template already encodes for you (**don't re-derive them**):".
+  L235-239 is one of its bullets: "**Diagnose an unclear halt before surfacing it** — when a halt's
+  cause cannot be read from the journal (not a hard stop, not a missing human input), make **one
+  bounded `sk-fable-resolver` dispatch** with the failed step's brief and error tail: it root-causes
+  and applies the smallest fix, then resume the run from the halted stage. One dispatch per stage,
+  ever — a second identical halt surfaces to the user with the resolver's evidence attached."
+
+  The template contains none of it. `rtk proxy grep -rn 'fable' .agents/skills/sk-commander/` returns
+  exactly one hit — SKILL.md L236 — so the string does not appear in
+  references/commander-workflow-template.js at all. The template's only `agent()` calls are `runStep`
+  (L200) and `integrate` (L218); every halt path returns immediately with no diagnosis dispatch and no
+  per-stage dispatch counter — L285 (`if (!s1.ok) return { status: 'halted', … }`), L326 (integration
+  conflict), L329 (failed wave member), L342 (stage 3), L348 (the catch block). The Fallback section
+  (L342-431) never mentions the resolver either.
+
+  Skill-attributable and self-defeating in a specific way: because the instruction sits under
+  "**don't re-derive them**", an author following SKILL.md is explicitly told NOT to write this step —
+  so the one place it could still have appeared is closed off by the skill's own framing. The result
+  is that every unclear commander halt surfaces raw, and the bounded self-repair the skill advertises
+  (including its one-dispatch-per-stage cap, which exists precisely to keep the repair from looping)
+  is dead text. Nothing about the user's sequence affects this.
+proposal: >-
+  Pick one side and make it true. Prefer (b) — smaller, lower risk, and it keeps the dispatch cap
+  where a human can see it:
+
+  (b) **Move the claim out of the "template already encodes" list.** Delete the bullet from
+      L235-239 and restate it in Run procedure step 6 (L502-505), where the commander itself reads the
+      returned `{ status, stage, reason }`: on a halt whose cause cannot be read from the journal (not
+      a hard stop, not a missing human input), the COMMANDER makes one bounded `sk-fable-resolver`
+      dispatch with the failed step's brief and error tail, then resumes from the halted stage via
+      `Workflow({ scriptPath, resumeFromRunId })`; one dispatch per stage, ever, and a second identical
+      halt surfaces to the user with the resolver's evidence attached. Say plainly in the same place
+      that the template does NOT do this — it is the commander's post-run judgment.
+
+  (a) is the alternative if in-script self-repair is genuinely wanted: add a `diagnose(step, error,
+      phase)` helper to references/commander-workflow-template.js wrapping one `agent()` dispatch,
+      plus a `const diagnosed = new Set()` stage guard, called before each
+      `return { status: 'halted', … }`. Do NOT do both.
+
+  Either way the L216 "don't re-derive them" list must end up containing only things the template
+  actually implements. Bookkeeping: (b) touches SKILL.md only; (a) touches SKILL.md and the template.
+  Both have sha256 baselines in skill.manifest.yaml (L40/L48), so the apply must finish with
+  `sidekicks skill manifest sk-commander --apply`.
+expected_effect: >-
+  The bounded halt-diagnosis step either actually runs (because the commander is told to make it) or
+  stops being advertised — and the "don't re-derive them" list stops containing a behaviour the
+  template omits, which is the framing that guaranteed nobody wrote it.
+risk: medium
+status: applied
+approved_by: auto-verified   # 3/3 independent refuters CONFIRMED; below the safety floor. Human authorised the apply.
+applied_at: 2026-08-18T11:49:59+07:00
+applied_notes: >-
+  Applied through skill-creator as an improvement pass, option (b) ONLY — option (a) (a `diagnose()`
+  helper inside the template) was NOT taken; verification established it is dead as written, since
+  `agentType` does not exist in the template's `agent()` opts. SKILL.md only; the template is
+  unchanged by this artifact.
+  (1) The five-line resolver bullet was deleted from the 'Things the template already encodes for you
+  (don't re-derive them)' list — the framing that guaranteed nobody would ever write the step.
+  (2) It is restated in Run procedure step 6, where the commander itself reads the returned
+  `{ status, stage, reason }`, and now opens by saying plainly that this is the commander's job and
+  NOT the template's ('The script returns the halt and stops; it contains no diagnosis dispatch').
+  The bounds survive verbatim: one bounded sk-fable-resolver dispatch with the failed step's brief and
+  error tail, resume via `Workflow({ scriptPath, resumeFromRunId })`, ONE dispatch per stage ever, and
+  a second identical halt surfaces to the user with the resolver's evidence attached.
+  VERIFIED: `rtk proxy grep -rn 'fable'` over the skill now hits SKILL.md exactly once (L511, inside
+  step 6) and otherwise only the improvement artifacts — the claim no longer sits in the
+  don't-re-derive list, and that list now contains only behaviours the template actually implements.
+  Baselines re-recorded with `sidekicks skill manifest sk-commander --apply`; `skill doctor` OK.
+  Verification votes: 3/3 CONFIRMED, floor clear.
+changes:
+  files:
+    - SKILL.md
+    - VERSION.json
+    - skill.manifest.yaml
+  version_from: 1.1.0
+  version_to: 1.2.0
+  commit: 3a90a68c

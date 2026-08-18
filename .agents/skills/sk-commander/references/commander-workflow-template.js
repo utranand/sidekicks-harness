@@ -258,16 +258,20 @@ try {
   //   setStatus(0, 'inprogress')
   //   phase('Stage 0 — scaffold svc-a')
   //   const s0 = await runStep(
-  //     { run: 'sidekicks service add git@github.com:acme/svc-a.git svc-a' },  // work_dir omitted -> repo root
+  //     { run: 'sidekicks service add svc-a git@github.com:acme/svc-a.git' },  // work_dir omitted -> repo root
   //     handoffs, { phase: 'Stage 0 — scaffold svc-a' },
   //   )
-  //   summary.push({ stage: 0, kind: 'cli', run: 'sidekicks service add <git-url> svc-a', ...s0 })
+  //   summary.push({ stage: 0, kind: 'cli', run: 'sidekicks service add svc-a <git-url>', ...s0 })
   //   stages[0].startedAt = s0.startedAt || ''; stages[0].completedAt = s0.completedAt || ''
   //   setStatus(0, s0.ok ? 'done' : 'failed', s0.completedAt || '')
   //   if (!s0.ok) return { status: 'halted', stage: 0, reason: s0.error, stages, summary }
   //   handoffs.push(s0.handoff)
-  // Use the REAL CLI signature — `service add <git-url> [<name>]` (no `--project` flag); set the active
-  // project with a prior `sidekicks project use <proj>` step. Verify verbs against `node bin/sidekicks --help`.
+  // Use the REAL CLI signature — `service add <name> [<git-url>]` (no `--project` flag): the NAME comes
+  // FIRST, the opposite of `project add <git-url> [<name>]`, and a URL in the name slot is rejected by
+  // the service-name pattern, so the step hard-fails instead of mis-registering. `add` only REGISTERS —
+  // a remote-backed service needs a following `sidekicks service pull <name>` before any skill step
+  // writes into `src/`. Set the active project with a prior `sidekicks project use <proj>` step.
+  // Verify verbs against `node bin/sidekicks --help`.
   // (A verification gate is the same: { run: 'npm test', work_dir: 'projects/acme/services/svc-a/src' }.)
   // Registry-mutating CLI steps stay SEQUENTIAL — never put them in a parallel() wave.
 

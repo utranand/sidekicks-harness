@@ -1,0 +1,75 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 006-add-triggering-eval-set
+target_skill: sk-commander
+created: 2026-08-18T09:54:46+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-18, step 2b.1 (triggering benchmark, set generation). Evidence — `test -f .agents/skills/sk-commander/evals/trigger-eval.json` → MISSING; `ls .agents/skills/sk-commander/evals` → "No such file or directory"; `auditor.sh score` exits 4 ("no eval set … generate it and file it via sk-self-improve (kind: assets) first") until the set exists.'
+kind: assets
+observation: >-
+  sk-commander ships no triggering benchmark: the skill directory has SKILL.md, skill.yaml,
+  VERSION.json, skill.manifest.yaml, rules/, scripts/, references/ and improvements/ — but no
+  `evals/` directory at all (verified: `ls .agents/skills/sk-commander/evals` → "No such file or
+  directory"). Dimension 1 of the audit rubric (description triggering) is MEASURED, not eyeballed,
+  and the measurement is `scripts/trigger_eval.py` scoring the frontmatter description against a
+  committed should/should-not query set. Without that set the scorer refuses to run
+  (`auditor.sh score audit-sk-commander-2026-08-18 sk-commander` → exit 4), so this skill's
+  description has never been measured and cannot be measured on any future audit run either. The
+  gap matters more than average here because sk-commander sits in a dense neighbourhood it must NOT
+  steal from: `sk-sequence-planner` (draft/validate/lint a sequence), `sk-cli-orchestrator` (queue
+  of headless delegations), `sk-cli-executor` (single delegation), `sk-get-things-done` (task
+  queue), `sk-get-plan-done` (plan delivery) and `ralph-loop` (bare persistence). Its own
+  description spends its last three lines disclaiming two of those neighbours, which is precisely
+  the boundary a near-miss query set exists to keep honest. This is purely additive test
+  scaffolding — no behaviour of the skill changes.
+proposal: >-
+  Add `.agents/skills/sk-commander/evals/trigger-eval.json` — a flat JSON array of
+  `{ "query": <string>, "should_trigger": <bool> }` objects, the schema `trigger_eval.py` reads
+  (same shape as the committed sets under e.g. `.agents/skills/sk-agent-creator/evals/`). 20
+  entries: 10 should-trigger (varied phrasings — a bare sequence-file path plus "go", numbered
+  inline lists, fan-out/parallel wording, unattended/overnight, a mid-run resume, a mixed
+  CLI+skill chain) and 10 should-NOT near-misses that share vocabulary but belong to a neighbour
+  (draft/validate/lint → sk-sequence-planner; a tentative "what would a sequence look like" →
+  sk-sequence-planner; a resumable task queue → sk-get-things-done; "deliver the plan end to end"
+  → sk-get-plan-done; headless delegation to codex → sk-cli-orchestrator; one prompt through
+  gemini → sk-cli-executor; assign-and-await → sk-agent-master; bare "arm a ralph loop" →
+  ralph-loop). Exact content to write verbatim:
+
+  [
+    { "query": "run the command-sequence at projects/shp-sk/artifacts/command-sequence/stop-shph-prod-services-direct.yaml", "should_trigger": true },
+    { "query": "orchestrate these steps end to end: sk-bmad-pm, then sk-bmad-validate-prd, then sk-bmad-developer, all on projects/acme/services/api/src", "should_trigger": true },
+    { "query": "projects/acme/services/svc-a/src/docs/pipeline.yaml — go", "should_trigger": true },
+    { "query": "execute steps 1-5 of this sequence and fan stage 2 out across the three services in parallel", "should_trigger": true },
+    { "query": "run this pipeline overnight unattended, keep going even if the session exits: run.commander.yaml", "should_trigger": true },
+    { "query": "the prior sequence run halted in stage 2 with member 2c failed — resume it from the workflow journal", "should_trigger": true },
+    { "query": "build all three services at once from this numbered step list, each with its own work_dir", "should_trigger": true },
+    { "query": "kick off the plan in projects/acme/services/svc-a/src/docs/pipeline.yaml", "should_trigger": true },
+    { "query": "chain these: first `sidekicks service add git@github.com:acme/foo.git foo`, then plan it with sk-bmad-pm, then npm test — run the whole thing", "should_trigger": true },
+    { "query": "pipeline these work_dirs in parallel — svc-a, svc-b and svc-c each get a developer run, then review svc-a", "should_trigger": true },
+    { "query": "draft a command-sequence that plans and then builds the reporting service", "should_trigger": false },
+    { "query": "validate this sequence before we run it — does stage 2 have a dependency inside the wave?", "should_trigger": false },
+    { "query": "lint my pipeline.yaml and tell me whether any two steps share a docs_dir", "should_trigger": false },
+    { "query": "what would a sequence for this migration look like?", "should_trigger": false },
+    { "query": "queue these five tasks and work through them one at a time, resumable across sessions", "should_trigger": false },
+    { "query": "deliver the implementation plan at docs/plan.md end to end, phase by phase", "should_trigger": false },
+    { "query": "delegate this refactor to the codex CLI headlessly and collect the result when it finishes", "should_trigger": false },
+    { "query": "run this single prompt through the gemini CLI and show me its output", "should_trigger": false },
+    { "query": "assign the database drift check to dana and wait for her reply", "should_trigger": false },
+    { "query": "arm a ralph loop so this session restarts itself if it exits", "should_trigger": false }
+  ]
+
+  Do not change SKILL.md, the description, or any script as part of this artifact — it adds one new
+  file only.
+expected_effect: >-
+  sk-commander's description becomes measurable: `auditor.sh score <slug> sk-commander` runs instead
+  of exiting 4, so this and every future audit can settle rubric dimension 1 by measurement rather
+  than leaving it unmeasured, and any future description rewrite can be scored against the same set
+  before it is adopted.
+risk: low
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

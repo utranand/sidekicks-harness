@@ -1,0 +1,182 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 007-resolve-anchor-main-module-guard-not-portable
+target_skill: sk-commander
+created: 2026-08-18T09:54:46+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (lead auditor, verify_tier=high). Source-verified vs scripts/resolve-anchor.mjs L49, SKILL.md Step 3a L487, tests/skills/commander-resolve-anchor.test.mjs L52-56, and a reproduced empirical failure (below).
+kind: scripts            # scripts + prose: the guard in resolve-anchor.mjs and the consumer check in SKILL.md Step 3a
+observation: >-
+  `scripts/resolve-anchor.mjs` gates its CLI entry point on a hand-built file URL:
+
+    L49:  if (import.meta.url === `file://${process.argv[1]}`) {
+
+  That comparison is only true when the script's own absolute path happens to be identical to its
+  percent-decoded POSIX file URL. It is the only *main-module guard* in this repo built by string
+  concatenation — `grep -rn 'import.meta.url ===' --include='*.mjs' lib scripts .agents/skills`
+  returns exactly one hit, this line — while every sibling that needs a path→URL conversion uses
+  a native-path comparison (`process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)`
+  — scripts/run-notify-hook.mjs L496, scripts/artifact-liveness-hook.mjs L101, scripts/agent-office-viz.mjs
+  L1169, scripts/office-viz-hook.mjs L139, sk-test-gate/scripts/test-gate.mjs L371,
+  sk-agent-dry-run/scripts/plan.mjs L1501, sk-interaction-recorder/scripts/generate-outputs.mjs L163)
+  or `pathToFileURL` for dynamic-import conversions (scripts/run-notify-hook.mjs L41/L99,
+  sk-inherit/scripts/inherit.mjs L30/L2119-2120, sk-office-viz/scripts/run-notify-hook.mjs L41/L90).
+  Three concrete ways the guard is false when the script IS the entry point — the FIRST of which is
+  live on this machine today, no exotic environment required:
+
+  1. **Invoked through the Rule 3 exposure link — BROKEN RIGHT NOW.** `.claude/skills/` is a
+     folder-level symlink to `.agents/skills/` (CLAUDE.md Rule 3), and Claude Code reports a skill's
+     base directory under that path — this very audit session was handed
+     `…/.claude/skills/sk-skill-auditor` as its base dir. Node sets `import.meta.url` to the
+     REALPATH but leaves `process.argv[1]` as the linked path, so:
+       via .agents (canonical): `node .agents/skills/sk-commander/scripts/resolve-anchor.mjs "$SEQ" "." "$ROOT"`
+                                → stdout `projects/shp-sk/docs/sql/import-x/bundle`, exit 0
+       via .claude (exposure):  `node .claude/skills/sk-commander/scripts/resolve-anchor.mjs "$SEQ" "." "$ROOT"`
+                                → stdout EMPTY, exit 0
+     SKILL.md L487 hard-codes `$ROOT/.agents/skills/…`, so the prescribed flow escapes it — but a
+     model that resolves the helper relative to the base directory its host CLI gave it hits the
+     broken path, silently.
+  2. **A path containing a space — REPRODUCED on this machine.** `import.meta.url` percent-encodes
+     the space (`file:///…/with%20space/resolve-anchor.mjs`) while `process.argv[1]` does not
+     (`/…/with space/resolve-anchor.mjs`), so the strings differ. Copying the script unchanged into a
+     directory whose name contains a space and running it exactly as SKILL.md Step 3a prescribes:
+       control (no space):  `node …/sk-commander/scripts/resolve-anchor.mjs "$SEQ" "." "$ROOT"`
+                            → stdout `projects/shp-sk/docs/sql/import-x/bundle`, exit 0
+       spaced copy:         `node "<dir with space>/resolve-anchor.mjs" "$SEQ" "." "$ROOT"`
+                            → stdout EMPTY, exit 0
+  3. **Windows.** `import.meta.url` is `file:///C:/…/resolve-anchor.mjs` (forward slashes, drive
+     letter after three slashes) while `process.argv[1]` is `C:\…\resolve-anchor.mjs`, so
+     `file://` + argv[1] never equals it and the CLI block cannot fire at all. CLAUDE.md's
+     cross-platform rule ("primary dev machine is macOS but everything MUST also run on Windows —
+     one unified implementation") makes this a defect, not a platform choice. This repo already
+     documents the exact failure in a shared test fixture, `tests/fixtures/file-url.mjs` L3:
+     "On Windows, `file://${absolutePath}` produces an invalid URL with backslashes" — its whole
+     reason for existing is to stop code doing what L49 does, and it wraps `pathToFileURL`.
+
+  The failure mode is the dangerous one: **silent, exit 0, empty stdout.** SKILL.md Step 3a
+  (L487) consumes the output with `resolved="$(node …/resolve-anchor.mjs "$SEQ" "$VALUE" "$ROOT")"`
+  and then says "bake `resolved` into the step in place of the original anchor value" — there is no
+  emptiness check, so a leading-dot `work_dir: .` from a relocatable bundle is baked into the
+  authored Workflow script as an EMPTY anchor. Every step in that wave then loses its work_dir and
+  falls back to the sub-skill's own scope resolution, which is exactly the "writes leak into the
+  wrong service" class of failure the whole anchoring design exists to prevent — and it happens with
+  no error anywhere. The bundled test does exercise the CLI (tests/skills/commander-resolve-anchor.test.mjs
+  L52-56, `spawnSync(process.execPath, [HELPER, SEQ, '.', REPO])`) but only from this repo's own
+  space-free checkout path on POSIX, so it passes while the bug is live — the test asserts the
+  outcome under exactly the one condition where the guard happens to hold.
+
+  Reachability is high, not theoretical: `sk-safe-data-importer/scripts/generate_import.py` emits
+  `work_dir: .` five times in every bundle it generates by design, and 14 of the 33 `*.commander.yaml`
+  files committed in this repo carry a leading-dot `work_dir` (`rtk proxy grep -rln 'work_dir: \.'
+  --include='*.commander.yaml' . | wc -l` → 14), including prod SQL-import and schema-sync bundles.
+  And the empty anchor is worse for a CLI step than for a skill step: the template's `brief()` does
+  `const wd = step.work_dir || 'the repo root'` (L133), so an emptied anchor actively tells the
+  subagent to run the command at the REPO ROOT rather than in the bundle folder.
+proposal: >-
+  Two changes inside the skill, plus one mandatory bookkeeping step.
+
+  1. **scripts/resolve-anchor.mjs** — replace the string-concatenated guard with the repo's
+     native-path guard idiom, hardened with `realpathSync` so the exposure-link case is covered too:
+
+       import path from 'node:path';
+       import { realpathSync } from 'node:fs';
+       import { fileURLToPath } from 'node:url';
+       …
+       const invokedDirectly = process.argv[1]
+         && realpathSync(path.resolve(process.argv[1])) === fileURLToPath(import.meta.url);
+       if (invokedDirectly) {
+
+     `realpathSync` is what makes it correct, and the choice is MEASURED, not assumed. A probe
+     comparing four candidate guards across four invocation shapes on this machine (Node v23.7.0):
+
+       shape                     old `file://`+argv1   pathToFileURL   resolve()   realpathSync()
+       plain absolute path              true               true          true          true
+       path containing a space          FALSE              true          true          true
+       through a symlinked dir          FALSE              FALSE         FALSE         true
+       relative `./script.mjs`          true               true          true          true
+
+     Only the `realpathSync` form is true in every shape, and the symlinked-dir row is exactly the
+     `.claude/skills/` → `.agents/skills/` exposure link this repo ships on every checkout, so the
+     plain `pathToFileURL` or plain `resolve()` forms would leave failure mode 1 live. (Node's
+     `import.meta.main` is not an option here — `node --input-type=module -e "console.log('main' in
+     import.meta)"` → `false` on this repo's v23.7.0, and package.json declares engines `>=20`.) The exported
+     `isLeadingDot` / `resolveAnchor` functions and their behaviour are unchanged — only when the CLI
+     block fires changes — so the existing unit tests keep passing (verified: all six assertions in
+     tests/skills/commander-resolve-anchor.test.mjs pass against a patched copy, unchanged from
+     unpatched).
+
+  2. **SKILL.md Step 3a** — make the consumer fail loudly instead of baking an empty anchor. After
+     the invocation, add a guard so an empty result halts rather than silently dropping the anchor:
+
+       resolved="$(node "$ROOT/.agents/skills/sk-commander/scripts/resolve-anchor.mjs" "$SEQ" "$VALUE" "$ROOT")"
+       [ -z "$VALUE" ] || [ -n "$resolved" ] || { echo "resolve-anchor returned nothing for '$VALUE' — halt, do not bake an empty work_dir"; exit 1; }
+       # bake `resolved` into the step in place of the original anchor value
+
+     with one line of why: an empty anchor is indistinguishable from "no anchor", and a step that
+     loses its work_dir silently re-derives scope and can write into the wrong service. The
+     `[ -z "$VALUE" ] ||` prefix matters: the helper documents "An empty / undefined value returns ''
+     (the step omits the anchor)" (resolve-anchor.mjs L17, L37), so a bare `[ -n "$resolved" ]` would
+     contradict its own contract — but `resolveAnchor` can never return '' for a NON-empty input, so
+     guarding only the non-empty case is exactly right. The `exit 1` is safe where it sits: SKILL.md
+     L486-489 is a standalone per-anchor block whose only subshell is the command substitution, so the
+     `|| { …; exit 1; }` brace group runs in the outer shell and kills nothing it shouldn't.
+
+  3. **Re-record the bundle baseline — NOT optional.** `skill.manifest.yaml` L50 records
+     `scripts/resolve-anchor.mjs: sha256:9761a251…`. Editing the script without re-recording leaves a
+     stale baseline, and `sidekicks skill heal <name> --restore` would then put the buggy line BACK
+     from the recorded content. So the apply must finish with `sidekicks skill manifest sk-commander
+     --apply` (the re-record verb) and list `skill.manifest.yaml` in `changes.files`.
+
+  Nothing else changes; the leading-dot contract, the bare-vs-embedded split from 004, and the
+  definition from 005 all stay as they are.
+
+  OUT OF SCOPE for this artifact, recorded for the human: the bundled test
+  `tests/skills/commander-resolve-anchor.test.mjs` lives outside the skill folder, so it is not
+  changed here — but it cannot verify this fix on the platforms the fix targets, because its own
+  module load is `await import(\`file://${HELPER}\`)` (L21), the very construction that breaks on
+  Windows and spaced paths. The repo already ships the right helper for it: switch L21 to
+  `toFileUrl(HELPER)` from `tests/fixtures/file-url.mjs`, and add a CLI case that copies the script
+  into a directory whose name contains a space and asserts non-empty stdout. That is a test-coverage
+  change for a human to make; it is not part of this apply.
+expected_effect: >-
+  Step 3a's anchor resolution works on Windows and under spaced paths instead of silently emitting
+  an empty string, so a relocatable bundle carrying `work_dir: .` resolves correctly on every
+  supported platform; and if the helper ever returns nothing for any other reason, the commander
+  halts with a message instead of authoring a Workflow whose steps have lost their work_dir.
+risk: medium
+status: applied
+approved_by: auto-verified   # 3/3 independent refuters CONFIRMED; below the safety floor. Human authorised the apply.
+applied_at: 2026-08-18T11:49:59+07:00
+applied_notes: >-
+  Applied through skill-creator as an improvement pass. (1) scripts/resolve-anchor.mjs — the
+  string-concatenated guard `import.meta.url === `file://${process.argv[1]}`` replaced with the
+  native-path realpathSync form, plus a 6-line comment naming the three failure modes so the idiom is
+  not re-broken. Implementation note: the comparison is wrapped in try/catch and the resolve is
+  hoisted to `const entry`, so a `node --eval` context whose argv[1] is not a real file returns false
+  instead of throwing at import time — a hardening on top of the proposed const form, same truth table.
+  (2) SKILL.md Step 3a — added the `[ -z "$VALUE" ] || [ -n "$resolved" ] || { echo …; exit 1; }`
+  guard and a paragraph on why an empty anchor is not the same as no anchor.
+  (3) `sidekicks skill manifest sk-commander --apply` re-recorded the bundle baselines
+  (resolve-anchor.mjs 9761a251… → d8bab074…), so `skill heal --restore` can no longer put the bug back.
+  VERIFIED empirically, all three failure modes retired on this machine: canonical path, the
+  `.claude/skills` exposure symlink, and a copy under a directory named `with space` now ALL print
+  `projects/shp-sk/artifacts/command-sequence` at exit 0 (the exposure and spaced shapes printed EMPTY
+  before). An empty `$VALUE` still returns '' — the documented contract is intact.
+  tests/skills/commander-resolve-anchor.test.mjs 7/7 pass; tests/skill-config.test.mjs green
+  (25/25 combined). `sidekicks skill doctor sk-commander` → OK, 0 errors.
+  Verification votes: 3/3 CONFIRMED, floor clear. NOT done here (out of scope, left for a human):
+  tests/skills/commander-resolve-anchor.test.mjs L21 still loads via `file://${HELPER}`, the same
+  broken construction, so the test cannot verify this fix on Windows or spaced paths — switch it to
+  `toFileUrl()` from tests/fixtures/file-url.mjs and add a spaced-directory CLI case.
+  FOLLOW-UP CLOSED in 0ff774bf: tests/skills/commander-resolve-anchor.test.mjs now loads via toFileUrl()
+  from tests/fixtures/file-url.mjs and covers both broken shapes (spaced directory, symlinked directory;
+  the symlink leg skips where Windows denies symlink creation). Proven to be a real regression net, not a
+  tautology — both new shapes print EMPTY against the pre-fix helper taken from git, and the resolved path
+  after it. 8/8 pass.
+changes:
+  files:
+    - scripts/resolve-anchor.mjs
+    - SKILL.md
+    - VERSION.json
+    - skill.manifest.yaml
+  version_from: 1.1.0
+  version_to: 1.2.0
+  commit: 3a90a68c

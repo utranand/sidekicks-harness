@@ -1,0 +1,169 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 010-preflight-has-no-protected-branch-check
+target_skill: sk-commander
+created: 2026-08-18T10:20:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel, re-verified by the lead at verify_tier=high). Source-verified vs SKILL.md L451-462 (the pre-flight), references/commander-workflow-template.js L219, root CLAUDE.md "Protected branches — never implement on them (hard rule)", and .claude/settings.json (branch-safety hook matcher extracted with a JSON parse → `PreToolUse | matcher = 'Bash'`).
+kind: instructions
+observation: >-
+  The commander's Step-3 safety pre-flight (SKILL.md L451-462) has no branch check, even though the
+  repo's protected-branch hard rule names commander sequences by name and the commander is the only
+  actor that sees the whole plan before the first write.
+
+  What the pre-flight actually checks (L453-462): every `skill` is in the live skill list; every named
+  `inputs:` / plan file exists; no dependency inside a wave; no two registry-mutating CLI steps in one
+  wave; no two bmad steps sharing a `docs_dir`/`work_item` in one wave; each `run` step "isn't an
+  obviously destructive command (`rm -rf`, `git push --force`, piping a remote script to a shell)";
+  classify each wave same-scope vs cross-scope. A grep of SKILL.md for `protected` or
+  `branch --show-current` returns zero hits.
+
+  What CLAUDE.md requires: "**Protected branches — never implement on them (hard rule):** no
+  implementation work may be edited, committed, or amended directly on an integration/environment
+  branch — `main`, `sit`, `uat`, `staging`, `prod`, `release/*` — in **any** repo touched by a run …
+  Applies to every driven path equally: implementation plans, skills, workflows, BMAD stories, Jira
+  autopilot / get-jira-done, **commander sequences**, delegate agents, and hand edits. Before the
+  first file write, confirm the branch (`git -C <repo> branch --show-current`); if it is protected,
+  get onto a work branch … a run that cannot create its own branch stops and reports instead of
+  falling back to the current one."
+
+  Three places a commander run writes implementation onto whatever branch HEAD is on:
+    • a single skill step and a **same-scope** wave both run in the shared working tree — SKILL.md
+      L163-166 ("all align to the *same* scope … Run as **plain parallel agents** — no isolation") and
+      L356;
+    • references/commander-workflow-template.js L219 instructs the integrator to "Merge these git
+      branches into **the current working branch**" — i.e. onto `main` if that is HEAD;
+    • the skill's own Example 6 ends at SKILL.md L673 with
+      `6. work_dir=… | $ git add -A && git commit -m "feat: acme-foo"`, a commit with no branch gate.
+
+  And the hook CLAUDE.md leans on cannot cover any of it — verified on all four legs:
+    • `.claude/settings.json` wires `scripts/enforce-branch-safety.mjs` as `PreToolUse` with
+      `matcher: 'Bash'` (JSON parse). A skill step's writes go through Edit/Write inside a subagent,
+      and `isolation: 'worktree'` is harness-internal — neither is a Bash call.
+    • Even for a Bash call it would not fire: `classify()` in enforce-branch-safety.mjs guards only
+      `worktree add|switch|checkout|restore|reset|stash|clean` and falls through to `return null`
+      (L461-463) for everything else — there is no `commit` guard and no HEAD-branch check outside the
+      worktree path. So Example 6's `git add -A && git commit` at SKILL.md L673 is ungated even though
+      it IS a Bash call.
+    • The only non-Bash `PreToolUse` write matcher in settings.json is `Write →
+      scripts/enforce-local-memory.mjs` (memory redirection, zero `branch` references); there is no
+      `*` or Edit matcher. None of the five SessionStart hooks is branch-aware.
+    • No sub-skill covers it either: sk-bmad-developer, sk-bmad-code-review, sk-worktree and
+      sk-sequence-planner all have zero `protected` / `branch --show-current` hits. Only sk-git-ship
+      gates its own branch (SKILL.md L43-49), and neither Example 6 nor a skill step goes through it.
+  CLAUDE.md itself concedes the limit: the hook "does [is] **prompt**, not block" and only on the
+  worktree path. The pre-flight is therefore the only gate that can exist, and it is missing.
+
+  Skill-attributable, and the attribution is SHARPER than the first draft claimed. That draft hedged
+  "sibling engines sk-get-plan-done / sk-get-things-done have the same gap, so this is a convention gap
+  too" — verification showed that is wrong for gpd, and the correction cuts the other way.
+  sk-get-plan-done owns a full **Build isolation** mechanism (SKILL.md L207-215: "get-plan-done
+  **never commits to the branch you handed it** … gives **each affected service its own dedicated
+  mission branch** … created *inside that service's own git repo*", implemented at L273-277 with
+  `git -C "$SRC" checkout -b "$MISSIONBRANCH"`). So this repo's convention is that the **outermost
+  engine owns branch isolation itself**. sk-commander is an outermost engine that owns none — which
+  makes per-skill attribution correct rather than misattributed. (sk-get-things-done is the queue
+  executor gpd already isolates for and has no gate of its own; that is the only residual convention
+  gap.)
+proposal: >-
+  **NARROWED AFTER VERIFICATION — do not apply the first draft's trigger.** That draft fired on "any
+  skill step or any writing CLI step". Two independent refuters showed that is an availability
+  regression on exactly the sequences most likely to run unattended, and I confirmed it: this repo's
+  real ops sequences are a single skill step that writes NO repo files —
+  `projects/shp-sk/artifacts/command-sequence/stop-shph-sit-services.yaml` L18-19
+  (`skill: sidekicks-cluster-ops`, `work_dir: projects/shp-sk`, a pure `kubectl` bulk scale-to-0),
+  `start-shph-uat-services.yaml` L18-19, `stop-shph-prod-services.yaml` L60, and the read-only prod
+  export `data-check-baan-srichan-prod.commander.yaml` ("Safety: read-only … no write, no DDL"). None
+  edits, commits or amends anything, so none is the "implementation work" the rule forbids; halting
+  them from `main` would break the prod stop/start pair whose in-file standing authorization exists
+  precisely to let them run without a per-run gate. A reporting sequence whose only writes land under
+  `artifacts/runs/` is the same case — this very audit run wrote its own artifacts while on `main`.
+
+  1. **SKILL.md — add a sixth pre-flight bullet immediately BEFORE L462** (L462 is itself the
+     wave-classification line, so insert above it).
+     **Trigger only on a step that writes tracked repo implementation files:** a skill step whose
+     `work_dir`/`docs_dir` resolves inside a repo it will edit, or a `run` step containing
+     `git add` / `git commit`. NOT on "any skill step", and NOT on a step whose only writes land under
+     `artifacts/runs/`.
+     For such a sequence resolve the branch with `git -C <repo> branch --show-current` over the
+     **declared** anchors (`work_dir`, `docs_dir`), and say plainly that this is **best-effort**: a
+     skill's real write target can be a resolved working folder that differs from its declared anchor,
+     so the check catches the common case and does not pretend to be exhaustive.
+     Match the **same protected set the repo's own hook uses** — `scripts/enforce-branch-safety.mjs`
+     L71 `/^(?:main|master|sit|uat|staging|stage|prod|production|release\/.+)$/` — which is wider than
+     the first draft's list (it adds `master`, `stage`, `production`). On a match, **halt** and report,
+     naming the work branch to cut (`<type>/<key>-<slug>`, cut from the integration base); never fall
+     back to the current branch.
+     Say why, twice: (i) CLAUDE.md's primary instruction is to get onto a work branch FIRST and halting
+     is its explicit **fallback** — taken here because cutting a branch in a shared checkout needs the
+     user's yes, so the commander cannot self-serve it; (ii) this is the last point before the first
+     file write, and the repo's branch-safety hook cannot see a subagent's Edit/Write, cannot see a
+     harness-created worktree, and has **no `git commit` class at all**, so nothing downstream will
+     catch it.
+     State explicitly that a **cross-scope wave is NOT the hazard** — each member runs in its own
+     worktree on its own `commander/<stamp>/…` branch (SKILL.md L163-168, L356-360), so HEAD being
+     `main` is harmless there. The hazard is the post-wave merge, which item 2 covers.
+  2. **references/commander-workflow-template.js L219** — change `integrate`'s prompt so it asserts
+     the merge target is not a protected branch and stops and reports if it is, instead of merging
+     into "the current working branch" unconditionally.
+
+  Change nothing else in the pre-flight; the five existing checks and the wave classification stay
+  exactly as they are. Bookkeeping: the apply touches SKILL.md and
+  references/commander-workflow-template.js, whose sha256 baselines live in skill.manifest.yaml
+  L40/L48, so it must finish with `sidekicks skill manifest sk-commander --apply`.
+expected_effect: >-
+  A commander run that will write implementation files, started on a protected branch, halts in its
+  pre-flight and tells the user which work branch to cut — closing the one gap where the repo's
+  protected-branch hard rule has no enforcement at all (the hook matches only Bash, never sees a
+  subagent's Edit/Write or a harness worktree, and has no `git commit` class). Ops and read-only
+  reporting sequences keep running unattended from `main` exactly as they do today, because the
+  narrowed trigger does not fire on them.
+risk: medium              # the NARROWED trigger. The first draft's unnarrowed trigger was an availability regression on shp-sk ops sequences — see the proposal
+status: rejected
+approved_by: null
+rejected_at: 2026-08-18T13:05:00+07:00
+rejected_by: adversarial-verification (3 independent refuters at verify_tier=high)
+rejection_reason: >-
+  0/3 — all three refuters rejected. The DIAGNOSIS is clean and survives: a grep of the current SKILL.md
+  for `protected` / `branch --show-current` still returns zero hits, and CLAUDE.md's protected-branch
+  hard rule names "commander sequences" by name. What fails is the remedy and the attribution.
+  (1) THE NARROWING WAS AN ENGLISH QUALIFIER, NOT A PROCEDURE — and it is undecidable at pre-flight.
+  The artifact says to resolve the branch over the DECLARED anchors. Run exactly that over the four
+  sequences the artifact itself certifies as safe and all four trip: they declare `work_dir:
+  projects/shp-sk`, and `git -C projects/shp-sk branch --show-current` -> `main` (it is a submodule).
+  The only thing saving them is "...inside a repo it WILL EDIT" — a runtime property of a subagent that
+  has not run. Strip the undecidable half and it collapses back to the unnarrowed trigger already
+  refuted twice. Measured blast radius: ~66 of ~106 committed sequences would halt.
+  (2) THE artifacts/runs/ CARVE-OUT IS VOID IN THE PROJECT IT WAS WRITTEN TO PROTECT.
+  `git -C projects/shp-sk ls-files artifacts/runs | wc -l` -> 1029 TRACKED files (the `**/artifacts/runs/`
+  ignore line is commented out in that submodule's .gitignore). So the carve-out contradicts the
+  trigger's own head clause, and "implementation files" is never defined.
+  (3) IT IS LOUDEST WHERE RISK IS LOWEST. The one committed family that genuinely writes implementation
+  code — autopilot-dshph2-5586-todo-cards.yaml, six skill steps, the only anchorless skill steps in the
+  repo, target repo resolved from a Jira card at RUNTIME — is invisible to the trigger. A gate that
+  false-halts ops runs and waves through the real case trains bypass, leaving the hard rule with LESS
+  enforcement than today.
+  (4) MISATTRIBUTION. "The pre-flight is therefore the only gate that can exist" is false, and this
+  repo's own wiring disproves it: `.claude/settings.json` already carries a `PostToolUse` matcher on
+  `Write|Edit`, so an Edit/Write-matched hook is a shipped shape, not a hypothetical. 11+ skills have
+  zero branch gating (only sk-git-ship gates itself), so filing against sk-commander fixes 1 of 11.
+  (5) THE STATED RATIONALE FOR HALTING IS RETIRED. The proposal justifies a halt with "cutting a branch
+  in a shared checkout needs the user's yes". The operator's `branch-autonomy-standing-grant`
+  (confirmed operator-directed 2026-08-18) requires the opposite — cut and proceed, never block where
+  the agent can act. sk-get-plan-done and sk-git-ship both CUT rather than halt; no engine halts.
+  (6) The insertion point is actively dangerous: the artifact says insert before L462 "which is itself
+  the wave-classification line". The pre-flight is now L445-456 and L462 is mid-sentence inside the
+  sk-sequence-planner hand-off paragraph. Following it literally corrupts the document.
+  SALVAGE, filed separately as docs/implementation-plans/branch-safety-commit-class/proposal.md: add a
+  `commit`/`amend` class to `classify()` in scripts/enforce-branch-safety.mjs. Measured gap —
+  `node scripts/enforce-branch-safety.mjs --command 'git add -A && git commit -m "feat: x"'` ->
+  `{"allow":true}`, while `PROTECTED` already exists at line 71 and `classify()` falls through to
+  `return null`. Decidable, false-halts no ops sequence, covers every path CLAUDE.md names.
+  ALSO WORTH KEEPING (not filed): item 2, the `integrate()` merge-target assertion at template L219
+  ("Merge these git branches into the current working branch") — decidable at merge time, correctly
+  attributed to sk-commander, and the one piece a hook fix would NOT cover.
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

@@ -1,0 +1,75 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 013-fallback-briefs-have-drifted-from-the-template
+target_skill: sk-commander
+created: 2026-08-18T10:26:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel candidate 6 + mid-tier panel candidate 3, merged and re-verified by the lead at verify_tier=high). Source-verified vs SKILL.md L213 / L353-431 / L439-441 / L528, references/commander-workflow-template.js L112-123 / L148 / L177 / L196-206, and a grep showing `date -u`, `startedAt` and `completedAt` occur in SKILL.md at L213 only.
+kind: instructions
+observation: >-
+  The Fallback section restates the template's step briefs as prose rather than deriving from them,
+  and the copies have drifted: they are missing two things the template's briefs carry, and they
+  paraphrase a command the same file already spells out.
+
+  **(a) No timestamp capture.** The template's briefs both end with an explicit instruction —
+  references/commander-workflow-template.js L148 ("Timestamps: run `date -u +%Y-%m-%dT%H:%M:%SZ` at
+  the very start of your work … and record it in startedAt; run it again just before returning and
+  record it in completedAt") and L177 (the skill-step equivalent). The Fallback's four hand-copied
+  blocks — skill brief L366-386, CLI brief L390-403, worktree addendum L407-413, Jira addendum
+  L418-425 — carry none of it: a grep of SKILL.md for `date -u`, `startedAt` or `completedAt` returns
+  a single hit, L213, which is the Workflow-path mapping table. Yet L430-431 tells the Fallback to
+  "Report exactly as the [Run summary] describes — minus the Workflow run ID/scriptPath", and the Run
+  summary's table header at L528 is
+  `| Stage | Skill | work_dir | Status | Started | Completed | Key outputs |`. So the Fallback path is
+  required to fill Started/Completed columns it never asked any subagent to produce.
+
+  **(b) No model pin.** `runStep` honours a per-step model (template L196 `const model = opts.model ||
+  step.model`, L204 `...(model ? { model } : {})`), and SKILL.md L214 documents it. The word `model`
+  does not appear anywhere between L342 and L431 — so on the Fallback path a step's `model` (or
+  `model_tier`, see artifact 009) is silently discarded and every step runs on the session model.
+
+  **(c) The Jira addendum paraphrases a command the file already spells out.** SKILL.md L439-441 gives
+  the literal repo-root walk-up: `ROOT="$PWD"; while [ "$ROOT" != "/" ] && [ ! -d "$ROOT/.sidekicks" ];
+  do ROOT="$(dirname "$ROOT")"; done`. The Jira progress addendum at L420-421 instead says only
+  "Resolve the repo root (walk up for a `.sidekicks/` dir), then run: …" — and per
+  references/commander-workflow-template.js L112-123 that addendum is appended to EVERY step's brief
+  in a Jira-tracked run. So a fresh subagent with no memory of L440 must reconstruct the identical
+  deterministic loop on every step of every tracked run, from a paraphrase, when the exact line exists
+  40 lines away in the same file.
+
+  Skill-attributable duplication drift on all three counts: the Fallback restates the template's brief
+  text instead of pointing at it, so template additions (timestamps, the model pin) never propagated,
+  and the addendum chose prose over the snippet the same file already contains. The Fallback path is
+  precisely the nested-subagent case (no `Workflow` tool), where the user cannot compensate.
+proposal: >-
+  Fix the class, not just the instances. Replace the four duplicated blocks at SKILL.md L364-425 with
+  a pointer: the briefs ARE the template's `brief()` / `worktreeAddendum()` / `jiraAddendum()` in
+  `references/commander-workflow-template.js` — render them by hand from there; the only delta is that
+  there is no journal, so resume relies on the sub-skills being idempotent. That gives one source and
+  makes future template changes propagate automatically.
+
+  If the blocks are kept inline instead, then all three deltas must be closed explicitly:
+  (a) append the template's timestamp sentence to both Fallback briefs (after L386 and after L403);
+  (b) add one line to the Fallback's dispatch bullets (L353-362) that a step's `model` — or the tier a
+      `model_tier=` token resolved to (artifact 009) — is passed to the `Agent` spawn's `model`
+      parameter;
+  (c) inline the literal walk-up from L440 into the Jira progress addendum at L420-421, replacing the
+      paraphrase, and mirror it in `jiraAddendum()` (template L119) so both copies carry the runnable
+      command.
+
+  Bookkeeping: the apply touches SKILL.md (and the template if (c)'s mirror is done), whose sha256
+  baselines live in skill.manifest.yaml L40/L48, so it must finish with
+  `sidekicks skill manifest sk-commander --apply`.
+expected_effect: >-
+  On the Fallback path each subagent is asked for the timestamps the Run summary requires and honours a
+  step's model pin, instead of the commander being told to report columns it never collected and
+  silently dropping every model pin; and each Jira-tracked step gets the ready-to-run repo-root
+  command instead of reconstructing it from a paraphrase on every step of every run.
+risk: low
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

@@ -1,0 +1,153 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 016-cross-scope-worktrees-are-created-without-consent
+target_skill: sk-commander
+created: 2026-08-18T11:05:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel candidate 5). SPLIT out of the original artifact 011 on the explicit recommendation of two of its three refuters, because it is a design decision about unattended mode and should not ride on the same approval as 011's uncontested cleanup fix. Source-verified vs SKILL.md L70-72 / L163-168 / L210 / L294-339 / L357-360 / L466-469, references/commander-workflow-template.js L304-310, .claude/settings.json (JSON parse), scripts/enforce-branch-safety.mjs, .gitignore L39-41, and root CLAUDE.md worktree rules.
+kind: instructions
+observation: >-
+  A cross-scope wave creates git worktrees, and no consent is ever obtained — which is what CLAUDE.md's
+  worktree hard rule exists to prevent.
+
+  The skill prescribes it in all three places: SKILL.md L166-168 ("Run each member with
+  **`isolation: 'worktree'`**"), L210 and references/commander-workflow-template.js L304-310
+  (`const crossScope = true` … `isolation: 'worktree', branch: \`commander/${stamp}/stage2-m${i}\``),
+  and the Fallback at L357-358 ("spawn all members concurrently, **each with
+  `isolation: "worktree"`**"). Run procedure step 3 announces the shape and then explicitly refuses to
+  wait — L466-467: "echo the parsed plan back … (e.g. \"Stage 2 (parallel, cross-scope, 3 members in
+  isolated worktrees): …\") … and **proceed autonomously** — don't ask for confirmation between
+  stages"; L72 adds "author it and go; don't ask permission per stage". The only asks anywhere in the
+  skill are the Jira binding (L447) and the destructive-`run` confirm (L460-461).
+
+  CLAUDE.md: "**Git worktrees — never create one without asking (hard rule):** … Before any
+  `git worktree add`, say what it is for, which branch it carries, and **where it will be**, then wait
+  for a yes. … Never treat it as a free action you may take on your own initiative."
+
+  No hook can substitute. A JSON parse of `.claude/settings.json` shows the only branch-safety wiring
+  is `PreToolUse | matcher: 'Bash' | scripts/enforce-branch-safety.mjs`, and that hook reads the Bash
+  `command` string with its `git worktree add` gate — a harness-internal `isolation` parameter is never
+  a Bash call, so nothing fires. `grep -rn isolation scripts/ lib/ .claude/` finds no gate. The irony
+  is on the record: CLAUDE.md itself asserts "`hook.enforce-branch-safety` prompts on every add", which
+  is exactly the gap for this path. `sk-worktree` is never referenced by sk-commander and its own
+  description disclaims parallel-wave worktrees.
+
+  The repo has already been bitten by this shape: `.sidekicks/memory/shared-checkout-is-never-hijacked.md`
+  records "an agent created a worktree on its own initiative … and the user did not notice the work had
+  landed OUTSIDE the folder they were watching".
+
+  **Reachability — unexercised today, certain on first real use.** Of the 98 command-sequence files on
+  disk, exactly one has a `parallel:` wave and it is explicitly same-scope
+  (`projects/shp-sk/artifacts/command-sequence/start-shph-sit-uat-services.yaml` L17-25: "same active
+  scope, so no worktree isolation is needed"), so `isolation: 'worktree'` has never fired from a
+  committed sequence. But `sk-sequence-planner/assets/parallel-fanout-sequence.template.yaml` L88-98 is
+  a shipped first-class template whose canonical shape is three members with three DIFFERENT
+  `work_dir`s, and the commander template defaults `crossScope = true` (L304). This lands on the first
+  real use of the flagship fan-out template, and then on every such wave.
+
+  Skill-attributable: the "proceed autonomously" instruction is what turns worktree creation into an
+  unasked action. Nothing about the user's sequence causes it.
+proposal: >-
+  **The first draft of this half was refuted twice, and both refutations are folded in — do not apply
+  the naive "always ask" version.** It failed on two counts: it would deadlock unattended runs, and the
+  destination it told the commander to promise is factually wrong.
+
+  1. **Make the gate conditional on PRESENCE, not unconditional.** A blanket "wait for a single yes
+     before authoring or launching" breaks the skill's own unattended path (SKILL.md L294-339), whose
+     premise is "there is nobody present" — armed ralph would burn its `--max-iterations 5` re-asking,
+     unarmed it would simply never run. And a cross-scope wave is the commander's headline case, not a
+     rare exception like the destructive-`run` confirm. So:
+       • **Attended run** → ONE up-front ask when the pre-flight classifies any wave cross-scope,
+         covering the whole run (never per stage).
+       • **Unattended / `persistence: ralph`** → honour a **standing pre-authorization declared in the
+         sequence file**, the pattern this repo already uses in
+         `projects/shp-sk/artifacts/command-sequence/{stop,start}-shph-prod-services-direct.yaml`.
+       • **Unattended with no such grant** → **serialize the cross-scope wave** and say so in the run
+         summary. Serializing is the right FALLBACK (the skill already serializes a hazardous wave for
+         shared `docs_dir`/`work_item`, L181-196) but the wrong DEFAULT — blanket serialization would
+         delete the skill's stated reason to exist ("fanning a stage out to MANY subagents in
+         parallel") for exactly the multi-service case.
+  2. **Do NOT promise a worktree location the commander does not control.** The first draft required
+     the ask to state the worktrees land at "a sibling of the repo, `../worktrees/…`, never nested".
+     That is the convention for *Bash* `git worktree add`, owned by
+     `scripts/enforce-branch-safety.mjs`; a harness `isolation: 'worktree'` path is chosen by the
+     harness, and this repo's evidence is that it lands INSIDE the repo — `.gitignore` L39 ignores
+     `.claude/worktrees/`, added by commit `f86f6f0e` ("complete 9 ready-for-dev stories …
+     sidekicks-bmad-developer"), i.e. during a real `isolation:worktree` fan-out, alongside L41
+     `worktrees/`. Applying the first draft verbatim would make the commander state a false path — and
+     assert the one layout the hook denies outright — inside the very ask CLAUDE.md requires to be
+     accurate. So the ask must say: how many members, each branch name
+     (`commander/<stamp>/stageN-mI`), that **the harness chooses the location and it is inside this
+     checkout**, and that the run will report the resolved paths (`git worktree list`) when the wave
+     completes. The observation that the skill never states the location stands; naming
+     `../worktrees/…` is not the fix.
+  3. **Mirror it in the Fallback (L357-358)** and add a line to the Execution-model caveat block
+     (L260-264): the repo's branch-safety hook only matches Bash calls and therefore never sees a
+     harness-created worktree, so this ask is the only gate that exists.
+
+  Leaving a worktree behind is only disk/branch clutter, not a collision risk: branches are
+  stamp-namespaced, and the nested-worktree DENY in `enforce-branch-safety.mjs` fires only on a Bash
+  `worktree add`. The cleanup/reporting half of this defect is artifact **011**; apply that one
+  independently of this.
+
+  Bookkeeping: the apply touches SKILL.md (and the template if item 3's caveat is mirrored there),
+  whose sha256 baselines live in skill.manifest.yaml L40/L48, so it must finish with
+  `sidekicks skill manifest sk-commander --apply`.
+expected_effect: >-
+  An attended cross-scope run asks once — naming member count, branch names, and truthfully that the
+  harness places the worktrees inside this checkout — instead of creating them silently, which is what
+  CLAUDE.md requires and what no hook can supply for a harness-created worktree. An unattended run
+  either carries the sequence-file grant and proceeds, or serializes the wave and says so — so the gate
+  never turns an overnight run into a stall.
+risk: medium
+status: rejected
+approved_by: null
+rejected_at: 2026-08-18T13:05:00+07:00
+rejected_by: adversarial-verification (3 independent refuters at verify_tier=high)
+rejection_reason: >-
+  0/3 — all three refuters rejected, and the premise is now SUPERSEDED by operator decision.
+  The operator confirmed (2026-08-18) that `.sidekicks/memory/branch-autonomy-standing-grant.md`
+  (commit 7e78674a, `rule: true`) is operator-directed: "Agents MUST cut/switch to <type>/<key>-<slug>
+  and create sibling worktrees WITHOUT asking, dirty tree included … Never ask the operator to choose
+  between equivalent mechanisms (worktree vs branch) — pick one, state it in one line, proceed." This
+  artifact's entire expected_effect is "an attended cross-scope run asks once". That ask is exactly what
+  the grant withdraws, so the fix is retired at the source. Worktree-ADD consent is not a floor id
+  (floor.mjs carries only `rule.worktree-force-consent`, for `--force` removal), so the grant is a
+  legitimate override, not a floor breach.
+  Independent of the grant, the proposal failed on its own terms:
+  (1) THE DISCRIMINATOR DOES NOT EXIST. No mechanism in this repo lets a skill detect whether a human is
+  present — no env var, no TTY probe, no queryable harness flag. The only declarative proxy,
+  `persistence: ralph`, appears in ZERO of 103 command-sequence files. And it inverts presence: the skill
+  makes unattended reachable by PHRASING ("ralph this", "run it overnight"), so a human at the keyboard
+  routes to the never-ask branch, while genuine ralph re-entry re-runs the whole pre-flight and would
+  re-ask on every resume — the artifact specifies no ledger field to persist the yes.
+  (2) THE SEQUENCE-FILE GRANT IS NOT A MECHANISM. The shp-sk precedent it cites is a `#` YAML COMMENT
+  header — no key, no schema, parsed by nothing — which self-scopes to "THIS file and its start
+  counterpart only", and AGENTS.md scopes it identically. The artifact never names the key, its shape,
+  or where it validates, and a generalized version would sit in a file sk-sequence-planner AUTHORS:
+  self-granted consent, which is what CLAUDE.md forbids for the branch-safety escape hatch.
+  (3) THE SERIALIZE FALLBACK IS UNSAFE. Worktree isolation is the ONLY thing putting cross-scope member
+  work on a dedicated branch. Serializing in the shared checkout lands every member's commits on
+  whatever branch HEAD is on, with no branch check in the pre-flight — reaching the frozen-floor
+  `rule.protected-branches`. It also falsifies the skill's own guarantee that it "does not run a
+  cross-scope wave on shared state".
+  (4) ITEM 2 LAUNDERS A DENIED LAYOUT. It has the commander state and proceed with a NESTED worktree
+  location, which `enforce-branch-safety.mjs` DENIES outright and `worktrees-must-be-sibling-never-nested`
+  forbids. The location claim itself is true but not for the reason given — proof is the harness tool
+  contract, not the .gitignore inference, and `.gitignore` L41 `worktrees/` already matches L39 at any
+  depth, so the pair is redundant defence, not a record of an observed path.
+  (5) `risk: medium` understated: coherence needs ~13 SKILL.md sites plus a cross-skill planner change.
+  WHAT SURVIVES: the OBSERVATION is fully verified and worth keeping on the record — no hook can see a
+  harness-created worktree (`.claude/settings.json` wires branch-safety as `PreToolUse|Bash` only; the
+  script reads `tool_input.command`; no gate anywhere keys on `isolation`), and CLAUDE.md's own claim
+  that the hook "prompts on every add" is inaccurate for this path. Under the grant the residual duty is
+  the grant's own: report where the worktrees landed. That is artifact 011's reporting half, not a gate.
+  A METHOD FINDING WORTH MORE THAN THIS ARTIFACT: three of the twelve refuters treated the grant as
+  decisive, and two asserted it was legitimate because "only `sidekicks memory` verbs write the store" —
+  those verbs are agent-invocable. The provenance was settled by asking the operator, not by inspection.
+  A `rule: true` entry cannot be distinguished from an agent-authored one by reading the store.
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

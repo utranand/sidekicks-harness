@@ -1,0 +1,90 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 017-integrate-misdiagnoses-a-stale-base-conflict
+target_skill: sk-commander
+created: 2026-08-18T11:10:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18 — raised by a refuter DURING the verification of artifact 011, not by the discovery panel. Source-verified by the lead vs .sidekicks/memory/bmad-dev-worktree-merge-gotcha.md, SKILL.md L226-231 / L537-538, and references/commander-workflow-template.js L213-229 / L326.
+verification: NOT YET VERIFIED — 0 of 3 adversarial refuters have run on this artifact. It is filed so the observation is not lost; treat it as a lead-verified proposal awaiting the same gate the others passed.
+kind: instructions
+observation: >-
+  The commander asserts a causal claim about worktree merge conflicts that this repo has already
+  recorded as false, and it converts that wrong claim into a halt reason the user is shown.
+
+  What the skill claims:
+    • SKILL.md L226-228: "one `integrate` agent merges those branches into the working tree
+      (**disjoint subtrees ⇒ no conflict**) … A merge conflict there is **proof the wave wasn't
+      independent** → the script halts and reports it rather than forcing a resolution."
+    • references/commander-workflow-template.js L213-215: "Branches touch DISJOINT service subtrees,
+      so a conflict here is **proof the wave wasn't independent** — surface it."
+    • L221-222: "touches a DISJOINT service subtree, so the merges **must not conflict**."
+    • L326 turns it into the user-visible halt reason:
+      `reason: 'worktree integration conflicted — wave was not independent'`.
+
+  What the repo has recorded: `.sidekicks/memory/bmad-dev-worktree-merge-gotcha.md` (type: convention,
+  2026-06-26) — "When running parallel-worktree waves (Agent tool `isolation:worktree`),
+  `git merge <worktree-branch>` is **unreliable**: the harness seeds each worktree's *working tree*
+  from the current snapshot (incl. uncommitted edits) but its recorded committed **base can be a
+  stale/divergent commit** (saw one worktree based 3 commits behind on `4325cfd` while siblings were at
+  HEAD), so untracked shared files like `docs/sprint-status.yaml` / `docs/stories/` show as add/add and
+  merges hit **avoidable** conflicts." And: "**Why:** the skill's documented merge recipe assumes all
+  worktrees branch from the same base; that assumption broke here."
+
+  So the commander's "disjoint subtrees ⇒ no conflict" premise is known-unreliable in this repo, and
+  the failure is a **misdiagnosis**, not just a missed conflict: a wave that WAS genuinely independent
+  gets halted, and the run tells the user the opposite of the truth — "wave was not independent" —
+  pointing them at their own sequence instead of at the stale base. That is worse than a bare halt,
+  because it sends the fix in the wrong direction. It also fires exactly where the recorded incident
+  fired: shared untracked artifact files (`sprint-status.yaml`, `docs/stories/`), which every bmad
+  fan-out wave writes.
+
+  Skill-attributable: the premise and the halt-reason string are the skill's own authored text, and the
+  memory entry names "the skill's documented merge recipe" as the thing that broke. The recorded
+  incident was under `sidekicks-bmad-developer` driving `isolation:worktree` directly rather than
+  through the commander, so the commander has not been observed failing this way — but it ships the
+  same recipe and the same premise, so the same base-divergence applies to its `integrate` step
+  unchanged.
+
+  Reachability matches 011/016: no committed sequence has yet triggered a cross-scope wave (1 of 98
+  sequences has a `parallel:` wave and it is same-scope), but the shipped fan-out template
+  (`sk-sequence-planner/assets/parallel-fanout-sequence.template.yaml` L88-98) is cross-scope by
+  construction and the commander template defaults `crossScope = true` (L304).
+proposal: >-
+  Stop asserting the premise as proof, and give the integrator the one diagnostic that separates the two
+  causes.
+
+  1. **references/commander-workflow-template.js L213-229** — before concluding "the wave was not
+     independent", have `integrate` check the bases: for each branch, compare
+     `git merge-base <branch> HEAD` against the run's start commit (or `git rev-list --count
+     <branch>..HEAD`). If a branch's base is behind HEAD, report the conflict as a **stale worktree
+     base**, name the branch and how far behind it is, and say the wave's independence is NOT what
+     failed. Only when every base matches may the conflict be reported as proof of a non-independent
+     wave.
+  2. **L326's halt reason** — replace the unconditional
+     `'worktree integration conflicted — wave was not independent'` with the diagnosed reason, so the
+     user is told which of the two causes actually fired.
+  3. **SKILL.md L226-231** — soften the premise to what is true: disjoint subtrees *should* not
+     conflict, and a conflict is evidence of EITHER a non-independent wave OR a diverged worktree base
+     (cite the recorded incident). Keep the halt — do not weaken it to a forced resolution; only the
+     attributed cause changes.
+  4. Point the reader at the recorded recovery for the stale-base case rather than re-deriving it: the
+     memory entry's surgical-copy procedure (copy verified-disjoint deliverables out, set statuses by
+     hand, stage explicitly — never `git add -A` — then remove the worktree).
+
+  Do NOT change the retry/halt semantics, the classification rules, or the integration barrier. This
+  artifact is independent of 011 (cleanup scope) and 016 (consent gate) and can be applied on its own.
+  Bookkeeping: the apply touches SKILL.md and references/commander-workflow-template.js, whose sha256
+  baselines live in skill.manifest.yaml L40/L48, so it must finish with
+  `sidekicks skill manifest sk-commander --apply`.
+expected_effect: >-
+  When a cross-scope wave's integration conflicts, the run names the cause it can actually distinguish —
+  a stale worktree base versus a genuinely non-independent wave — instead of always asserting the
+  latter, so the user is not sent to rewrite a sequence that was correct.
+risk: medium
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

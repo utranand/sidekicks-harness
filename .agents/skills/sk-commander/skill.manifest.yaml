@@ -37,15 +37,27 @@ requires:
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:34acc5142305b36f2e1abf10ed967e6fe25b1745803961e53791c1e40961e1c2
-  VERSION.json: sha256:fdc9e7cf663085477c50138c550c904e8565ba700ae23d025f3cb1d316272ab1
+  SKILL.md: sha256:d2506c1cbb52295569b4cdf1d92454096bb797cb19d27ce0191d4c6990b3a259
+  VERSION.json: sha256:5e822180aff8bb85af1d4fc66b879877060c59693d7e061be01e665b95777c9f
   improvements/001-ralph-arm-guard-when-plugin-absent.yaml: sha256:66bffe4608f7057143e85870b9ebee9c3f327236dfcd9f8928ae085e6b6b877c
   improvements/002-service-pull-is-registry-mutating.yaml: sha256:5ae24c5b633ed24f27592234fe7362661008806ef0aab131da8753383219c02a
   improvements/003-set-remote-is-registry-mutating.yaml: sha256:28f353b5a752d4b4ee76370622dd7c03393479dd39377d085be5103f76f0d55c
   improvements/004-step3a-extract-embedded-anchor-before-helper.yaml: sha256:35fa6a84eb6baf5571775b1c654435ec9a88b99a14cad5de8fc739889ed06dfe
   improvements/005-leading-dot-definition-omits-bare-dotdot.yaml: sha256:baca1e072ab7a5f35e652e0b6cf072deafff9473543609b4e722b18edb607542
-  improvements/INDEX.md: sha256:1cd45355806ec41188fb590cc5a9d7181bb29d4aafa2243adb720296021fc310
-  references/commander-workflow-template.js: sha256:c781cfb88fb2bbf55433fd54b8437e7f13808c929f8a16848eb84366ce1ae014
+  improvements/006-add-triggering-eval-set.yaml: sha256:f54d666769283b7246c2699e7c9fd34b4acf861f28bdcfbb46b162692e832bf3
+  improvements/007-resolve-anchor-main-module-guard-not-portable.yaml: sha256:bfc1dee04d6a498d0f97ae423ad6eba1e5a13d4ad461f78a0f6f94481e075f44
+  improvements/008-service-add-scaffolding-is-wrong-three-ways.yaml: sha256:cc88712675ab631460e0b1ad1bbe71a21210d16df7696df89b9de2692b3c01df
+  improvements/009-model-tier-token-is-undefined.yaml: sha256:53c4cf2a58bbdde24ac14421d84a9f38dd8ee92ffa80a3fafe5ae71c94fa4c91
+  improvements/010-preflight-has-no-protected-branch-check.yaml: sha256:ca95e180eddada04a787995009aa5d2e1db209d0e199588e73ac068228ec215a
+  improvements/011-integrate-cleanup-is-wider-than-the-merge.yaml: sha256:a9091fc09b0a0ba0eb8cef723887aea89dbc2e8b2f42c9dfeea88196ad758ab1
+  improvements/012-fable-resolver-diagnosis-is-claimed-but-not-implemented.yaml: sha256:bd8ccacf24cf66e109805a7cf11eb4f73c0d9e5773fa3668ef2441c6e222fc25
+  improvements/013-fallback-briefs-have-drifted-from-the-template.yaml: sha256:6d3d1731515134c8002f3181091e84c06034d9fdd4cac5b5faabc1b0349f00c1
+  improvements/014-skill-md-is-714-lines-with-two-conditional-blocks-inline.yaml: sha256:c627d88560cbb339abc81ff7de7146bad2bc0969dd36f1e415e42d872c8401ca
+  improvements/015-manifest-comment-cites-the-wrong-skill-md-line.yaml: sha256:4925a400166f0f29b50668b774c363494b8121c997322a7b1ec276e884c77552
+  improvements/016-cross-scope-worktrees-are-created-without-consent.yaml: sha256:eabd2ffb8ced390a2fcd20fa886a71891954f3266f2a67f06dcd1f7f80e4e2b7
+  improvements/017-integrate-misdiagnoses-a-stale-base-conflict.yaml: sha256:4e80e8d0dab53287b261a67534431b678a16aaba178356c55ed40362f967a832
+  improvements/INDEX.md: sha256:5f3490849873d11325a9057d5c55ff8055ecf987fab75d482247937b7223a8bd
+  references/commander-workflow-template.js: sha256:3993a910d444fd330787e2c3ececb9ef2f5e078bbed9069784247cf1ab946da2
   rules/criterion.command-sequences.md: sha256:356c6cf64ed6dae24caa5f2b47d211317a2212f3cceb7b4b2fc376e45600e51d
-  scripts/resolve-anchor.mjs: sha256:9761a251f30243853ca0d713601bc119ef954d9f3079e544f8c6150166d8f1c3
+  scripts/resolve-anchor.mjs: sha256:d8bab074b6b57094ccedad740eb65c14426f1a81086616ba40ef434c1e21e83d
   skill.yaml: sha256:1442293ff64b10a42fd05ef0b4654b3d8f79cdc235ce5e7dbd66f4286af72828

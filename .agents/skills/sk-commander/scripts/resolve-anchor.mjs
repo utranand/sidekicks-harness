@@ -20,6 +20,8 @@
 // baked YAML/brief reads the same on macOS and Windows.
 
 import path from 'node:path';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /** True iff `value` is a leading-dot relative path (`.`, `..`, `./…`, `../…`, `.\…`, `..\…`). */
 export function isLeadingDot(value) {
@@ -46,7 +48,18 @@ export function resolveAnchor(value, seqFile, repoRoot) {
 
 // --- CLI: `node resolve-anchor.mjs <seqFile> <value> [<repoRoot>]` → prints the resolved value -------
 // repoRoot defaults to the nearest ancestor of seqFile containing a .sidekicks/ directory.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Main-module guard: compare NATIVE paths, never a hand-built `file://` + argv[1] string. That string
+// form is false whenever the path is percent-encoded (a space), separated with `\` (Windows), or
+// reached through a symlink — including the `.claude/skills` -> `.agents/skills` exposure link this repo
+// ships (Rule 3), where node sets import.meta.url to the REALPATH but leaves argv[1] linked. `realpathSync`
+// is the only form true across all four invocation shapes, and a false guard here prints NOTHING at exit 0,
+// which the caller would bake into a step as an empty anchor.
+const entry = process.argv[1] ? path.resolve(process.argv[1]) : '';
+let invokedDirectly = false;
+try {
+  invokedDirectly = Boolean(entry) && realpathSync(entry) === fileURLToPath(import.meta.url);
+} catch { /* argv[1] is not a real file (e.g. `node --eval`) — not a direct invocation */ }
+if (invokedDirectly) {
   const [seqFile, value, repoRootArg] = process.argv.slice(2);
   if (!seqFile || value === undefined) {
     process.stderr.write('usage: resolve-anchor.mjs <seqFile> <value> [<repoRoot>]\n');

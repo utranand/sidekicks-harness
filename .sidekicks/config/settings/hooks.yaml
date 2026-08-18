@@ -16,7 +16,7 @@
 # validation error, not a silent no-op.
 artifact-autotrigger: true
 artifact-liveness: true
-enforce-branch-safety: true
+enforce-branch-safety: false
 enhance-prompt: true
 fable-escalation: true
 gtd-orphan-watch: true

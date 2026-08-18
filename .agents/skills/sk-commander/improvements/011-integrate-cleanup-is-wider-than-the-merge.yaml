@@ -1,0 +1,142 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 011-integrate-cleanup-is-wider-than-the-merge
+target_skill: sk-commander
+created: 2026-08-18T10:22:00+07:00
+amended: 2026-08-18T11:05:00+07:00     # SPLIT out of the original 011 after adversarial verification; the consent-gate half is now 016
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel candidate 4), then amended by 3 independent refuters at verify_tier=high. Source-verified vs references/commander-workflow-template.js L216-229 / L300-310 / L325, SKILL.md L230-231 / L407-413 / L431 / L537-538, root CLAUDE.md worktree rules, and .sidekicks/memory/bmad-dev-worktree-merge-gotcha.md.
+kind: assets
+observation: >-
+  ORIGINALLY FILED WITH A SECOND HALF (worktree consent). Verification recommended splitting: this
+  half is low-risk and uncontested, the other is a design decision about unattended mode. That half is
+  now artifact **016**; bundling them would have forced a reviewer to accept the harder call to get
+  this fix.
+
+  `integrate`'s cleanup instruction is scoped wider than the merge it just performed. It is called with
+  only the SUCCEEDED members' branches — references/commander-workflow-template.js L325:
+  `integrate(done.map((r) => r.branch).filter(Boolean), STAGE2)` — but its prompt broadens at cleanup
+  time, L223-224: "After all merge cleanly, remove the now-merged worktrees: `git worktree list` then
+  `git worktree remove <path>` for **each commander worktree**." `git worktree list` enumerates ALL
+  worktrees, and a failed member's worktree is a commander worktree that was never merged. The failed
+  path does reach `integrate` — SKILL.md L230-231: "a failed wave member lets its siblings finish,
+  integrates the ones that succeeded, then halts **before** crossing the barrier". ("now-merged" is a
+  genuine mitigating qualifier, but it sits in the same sentence as "each commander worktree", and
+  `git worktree list` is what the prompt tells the agent to enumerate from.)
+
+  Worse, each retry spawns a FRESH isolated agent (template L300-310, inside the 3-attempt `runStep`
+  loop), so a member that exhausts its retries can leave up to three worktrees behind — and the harness
+  auto-cleans only worktrees it finds *unchanged*.
+
+  **Two harms, stated at their real strength.** The first draft said this "points at unrecoverable
+  loss"; verification showed that framing is inferential and it is corrected here.
+    (a) **The removal instruction is objectively wider than the merge set.** A plain
+        `git worktree remove` on a dirty worktree just errors, so the immediate outcome is a failed
+        command, not destruction. The risk is that an agent obeying "remove each commander worktree"
+        reaches for `--force` to satisfy the instruction — and CLAUDE.md says of exactly that:
+        "Uncommitted work there is invisible to `git log`, survives no `git worktree remove --force`,
+        and cannot be recovered once the folder is gone", with "`--force` removal only after the user
+        OKs unmerged loss". Nothing in the skill forbids `--force` (zero hits). So: the instruction
+        **invites** a `--force` an agent may reach for; it does not command one. Loss needs three legs
+        — failed member, no commit reached, and `--force` escalation. The middle leg is likely (the
+        worktree addendum's commit is the last action before returning, so a member that exhausts three
+        retries usually never commits); the third is speculative.
+    (b) **The leftover is never reported, and that harm stands on its own.** The Workflow path's Run
+        summary (SKILL.md L509-546) never requires citing a leftover worktree or branch — its halt
+        example at L537-538 says only "Members 2a/2b are complete and merged". The Fallback path, for
+        the same situation, IS told to "cite the worktree paths of any un-integrated members" (L431).
+        So the two paths disagree, and on the Workflow path the user is never told a worktree holding
+        their failed member's work exists. That breaches CLAUDE.md's "**Close a worktree out when the
+        work is done — never just walk away**" on its own, with no `--force` needed.
+
+  Skill-attributable: both are the wording of the skill's own bundled template prompt and its own Run
+  summary contract. Nothing depends on what the user supplied.
+
+  **Reachability — unexercised today, certain on first real use.** Of the 98 command-sequence files on
+  disk, exactly ONE contains a `parallel:` wave —
+  `projects/shp-sk/artifacts/command-sequence/start-shph-sit-uat-services.yaml` L25 — and it is
+  explicitly same-scope, self-documented at L17-20: "both target work_dir projects/shp-sk (same active
+  scope, so no worktree isolation is needed)". So no committed sequence has ever triggered
+  `isolation: 'worktree'`. But `sk-sequence-planner/assets/parallel-fanout-sequence.template.yaml`
+  L88-98 is a shipped first-class template whose canonical shape is a three-member wave with three
+  DIFFERENT `work_dir`s, and the commander template's own stage-2 example defaults
+  `const crossScope = true` (template L304). Read the severity as "unexercised path, certain on the
+  first use of the flagship fan-out template" — not as "medium/likely today".
+proposal: >-
+  1. **Narrow the cleanup — references/commander-workflow-template.js L223-224.** Replace "for each
+     commander worktree" with: remove ONLY the worktrees whose branch is in the merged list passed into
+     this call; leave every other commander worktree in place and report its path and branch.
+  2. **Bound `--force` rather than banning the flag outright.** The first draft said "never use
+     `--force`"; that collides with a committed convention —
+     `.sidekicks/memory/bmad-dev-worktree-merge-gotcha.md` prescribes `git worktree remove --force` as
+     the closing step AFTER verified-disjoint deliverables have been surgically copied out. So word it
+     as the rule actually is: never `--force` a worktree whose work has **not** been captured, and
+     defer to the user per CLAUDE.md ("`--force` removal only after the user OKs unmerged loss").
+  3. **A failed removal must not fail the integration.** State that a `git worktree remove` which
+     refuses (untracked files, dirty tree) is REPORTED but does **not** set `ok=false` — the prompt's
+     success condition stays "every branch merged cleanly" (template L225). Without this, narrowing the
+     cleanup would turn a clean integration into a spurious halt.
+  4. **Report the leftover, and close it out — SKILL.md.** Mirror the narrowing at L227-228, and add to
+     the Run summary contract (L544-546) that a halt with a failed wave member MUST cite that member's
+     worktree path and branch — resolvable with `git worktree list` — and MUST ask the user to merge or
+     remove it. Reporting alone is not enough: CLAUDE.md's "never just walk away" makes closing it out
+     the run's own obligation. This brings the Workflow path level with the Fallback path (L431).
+
+  Change nothing about the wave classification rules (L163-168), the retry/halt semantics, or the
+  branch-naming scheme. Bookkeeping: the apply touches SKILL.md and
+  references/commander-workflow-template.js, whose sha256 baselines live in skill.manifest.yaml
+  L40/L48, so it must finish with `sidekicks skill manifest sk-commander --apply`.
+expected_effect: >-
+  After a wave with a failed member, only the merged worktrees are removed, a removal that refuses is
+  reported instead of halting the run, `--force` is bounded to work that has already been captured, and
+  the user is told the leftover worktree's path and branch and asked to merge or remove it — instead of
+  a halt report that mentions only the members that succeeded while their sibling's work sits in a
+  folder nobody named.
+risk: low
+status: rejected
+approved_by: null
+rejected_at: 2026-08-18T13:05:00+07:00
+rejected_by: adversarial-verification (3 independent refuters at verify_tier=high)
+rejection_reason: >-
+  1/3 — one refuter CONFIRMED the diagnosis in full after re-verifying every quote against the current
+  files; two rejected the proposal. The defect is real: `integrate` is called with only the SUCCEEDED
+  branches (template L329) while its prompt says to enumerate with `git worktree list` and remove "each
+  commander worktree" (L223-224), and the failed path does reach it.
+  Why the apply is rejected anyway:
+  (1) ITEMS 1 AND 4 HAVE NO DATA PATH. `integrate` ends `return !!(r && r.ok)` (L228) — the whole STEP
+  payload is discarded and integrate's result is never `summary.push`ed. The failed member's STEP
+  hardcodes `branch: ''` (L210). So "report its path and branch" has one boolean to travel on, the Run
+  summary has an empty branch to cite, and the Workflow script has no filesystem access to run
+  `git worktree list` itself. Item 3 makes it worse by design: `ok=true` on a refused removal means the
+  only surviving bit says "fine".
+  (2) A MATERIALLY DANGEROUS COORDINATE. Item 4 targets "SKILL.md L544-546"; those lines are now inside
+  the example stage table (`| 2c | sk-bmad-developer …`). A line-addressed edit corrupts the table. The
+  real target is L555-557. Every citation must be re-derived by text search.
+  (3) MY OWN WARRANT WAS OVERSTATED. "The two paths disagree" is wrong: SKILL.md:425 says cite worktree
+  paths INSTEAD of the scriptPath/runId, i.e. a resume-handle SUBSTITUTION, because the Fallback has no
+  run ID. There is no policy inconsistency to "bring level"; item 4 is a genuinely NEW requirement.
+  (4) KIND MIS-DECLARED. `kind: assets` + `risk: low` satisfies two of the three additive auto-apply
+  predicates while the artifact edits two EXISTING files, neither under `assets/`. Should be
+  `kind: instructions` / `risk: medium`.
+  FLOOR: flagged by 1 of 3, and the other two rejected the flag with the better argument — the shipped
+  skill has NO worktree-`--force` guidance at all (the single `--force` hit is `git push --force` at
+  SKILL.md:454, non-worktree), so item 2 is net-TIGHTENING. The wording defect is real though: it makes
+  "has the work been captured?" the operative test with the user gate trailing. Repair is to state the
+  floor verbatim first, then the narrow no-loss carve-out.
+  REACHABILITY, and this weakens 011/016/017 together: `git log --all -S'  - parallel:'` returns three
+  commits ever, all touching only template assets. NO generated sequence with a `parallel:` wave has
+  ever been committed, ~3 months back. `isolation: 'worktree'` is dead in all of git history, not merely
+  unexercised — so "certain on first use of the flagship template" is a forecast about a template with a
+  zero-instance record.
+  NEW DEFECT FOUND WHILE VERIFYING, not covered here and not filed: the retry branch name is computed
+  ONCE per member (template L309-313) and re-passed to all three attempts, so if attempt 1 created the
+  branch, attempt 2 cannot check it out — a retry cascade unrelated to the work. 011 explicitly declines
+  to touch branch naming.
+  SALVAGE: fold 011 into ONE `integrate()` change together with 017 (they edit the same 14-line literal
+  and the same six SKILL.md lines), after 017 has its own verification round. If anything is applied
+  alone, item 1 only.
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

@@ -1,0 +1,155 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 008-service-add-scaffolding-is-wrong-three-ways
+target_skill: sk-commander
+created: 2026-08-18T10:05:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (mid-tier panel, re-verified by the lead at verify_tier=high). Source-verified vs `node bin/sidekicks service --help`, lib/service-lifecycle/add.mjs L35/L39-49, SKILL.md L41 + L669, references/commander-workflow-template.js L261/L264/L269-270, and the paired sk-sequence-planner SKILL.md L141-172 ("Scaffolding a service correctly").
+kind: instructions
+observation: >-
+  The commander's `service add` guidance is wrong in three linked ways, and its own bundled template
+  asserts the wrong form while telling the reader it is "the REAL CLI signature".
+
+  Ground truth (verified twice):
+    `node bin/sidekicks service --help` →
+      "add <name> [<git-url>]    Register a service (creates docs/, records remote; does NOT pull code)"
+      "pull [<service-name>] [<branch>] Acquire a registered service's code into src/ on demand"
+    lib/service-lifecycle/add.mjs L35 docstring: "Execute the `service add <name> [<git-url>]` verb",
+    L39-49: `args.name` = first positional, REQUIRED; `args.rest[0]` = optional git-url.
+
+  What the skill says:
+    (a) **Argument order inverted.** SKILL.md L669 (Example 6, step 2):
+        `2. $ sidekicks service add git@github.com:acme/acme-foo.git acme-foo`
+        and references/commander-workflow-template.js L261:
+        `{ run: 'sidekicks service add git@github.com:acme/svc-a.git svc-a' }`, L264:
+        `run: 'sidekicks service add <git-url> svc-a'`. Run as written, the CLI takes the URL as the
+        `<name>` positional and `deriveName` rejects it: lib/manifest-schema/service.mjs L16
+        `NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$|^[a-z0-9]$/`, L74-79 throws
+        `SidekicksError("service name 'git@github.com:acme/acme-foo.git' is invalid — must match
+        [a-z0-9-] (no leading/trailing dashes)", EXIT_VALIDATION)`. So the step does not
+        mis-register — it HARD-FAILS every time, burns all three `runStep` retries (the
+        "already exists is a benign success" clause at SKILL.md L223 / template L144 cannot rescue a
+        validation error), and halts the run at stage 2 before any planning or code happens.
+    (b) **The template asserts the wrong signature as authoritative.** L269-270:
+        "Use the REAL CLI signature — `service add <git-url> [<name>]` (no `--project` flag) … Verify
+        verbs against `node bin/sidekicks --help`." The comment that exists to prevent this error is
+        itself the error, and it discourages the reader from checking.
+    (c) **Wrong semantics + a missing step.** SKILL.md L41 describes CLI steps as scaffolding
+        "(`sidekicks project create`, `service add <git-url>` to acquire a repo as a service)". `add`
+        does NOT acquire code — `--help` says it "does NOT pull code"; acquiring is `service pull`.
+        Example 6 acts on that misunderstanding: stages 1-2 are `project use` then `service add`, and
+        stage 3 immediately runs `sk-bmad-pm | work_dir=projects/acme/services/acme-foo/src` — a `src/`
+        that `service add` never created. The example's own narration ("Stages 1–2 are CLI steps that
+        scaffold the service", L675-677) claims a scaffold that did not happen.
+
+  Skill-attributable, not input-caused: these are the skill's OWN authored example and its own bundled
+  template comment, both of which a caller is invited to copy verbatim (Example 6 is presented as a
+  working pipeline; the template says "A CLI step looks IDENTICAL to a skill step … e.g.:" right above
+  L261). The paired authoring skill gets all three right and names both of the commander's mistakes as
+  the known traps — sk-sequence-planner SKILL.md L144 "name FIRST, git-url optional"; L147-149
+  "`service add` is a **registration** step … it **does not fetch code and does not create `src/`**";
+  L156-158 register-then-`service pull` with "REQUIRED before any skill step"; L169-172 "The classic
+  error is `sidekicks service add <git-url> <name>` (URL first) … The other classic error is omitting
+  `service pull` after registering a remote, which hands the first skill an empty `src/`." The
+  commander commits both classic errors the planner warns about.
+
+  Two accuracy notes established while verifying. (1) The URL-first form is NOT unique to these two
+  commander files — `git grep 'service add <git-url>'` also hits `.sidekicks/memory/commander-cli-steps.md`
+  L30 ("`service add <git-url> [<name>]` ACQUIRES an existing repo"), docs/architecture.md L643/L718,
+  docs/architecture/api-contracts.md L13 and docs/architecture/development-environment.md L18. The
+  memory entry is the one that matters operationally: it is loaded as framework context, so it will
+  keep re-teaching the inverted signature to future agents and this fix will regress unless it is
+  corrected too — a separate `sidekicks memory` change, outside this artifact's two-file scope, and
+  the apply must say so. (2) The skill was not careless so much as STALE: `git log --follow` shows no
+  fix-and-revert cycle, and the same memory entry records the URL-first form as "verified … do NOT
+  guess" on 2026-05-30, i.e. it was correct against the then-current CLI signature and the CLI has
+  since changed. That does not make it less of a defect — a copied Example 6 halts at stage 2 every
+  time — but it does explain how it got here, and it is why the memory entry must move with the fix.
+proposal: >-
+  Correct all three, in the two files that carry them; change nothing else.
+
+  1. **SKILL.md L669** (Example 6, step 2) → name first, and add the missing pull as its own stage:
+       2. $ sidekicks service add acme-foo git@github.com:acme/acme-foo.git
+       3. $ sidekicks service pull acme-foo
+     Renumber the following steps and update the Action narration at L675-679 with these exact
+     edits: "six sequential single-step stages" → seven; "Stage 5 is a verification gate" → Stage 6;
+     "Stage 6 finalizes" → Stage 7; and the handoff prose at L679 "service acme-foo acquired under
+     acme" → registered, then pulled. Say that stages 1–3 are the CLI scaffold (`project use` →
+     `service add` registers → `service pull` populates `src/`), that all three are
+     registry-mutating and therefore correctly sequential and first (three sequential
+     registry-mutating stages break no rule — L174 and the pre-flight at L457-459 forbid two only
+     *within one wave*), and that `service pull` is what makes `…/src` exist for the skill steps that
+     follow. No other part of the skill references Example 6's stage numbers (SKILL.md L537/L541/L661
+     belong to Example 5).
+  2. **SKILL.md L41** → stop calling `add` an acquisition: "(`sidekicks project create`,
+     `service add <name> [<git-url>]` to REGISTER a service, `service pull <name>` to acquire its code
+     into `src/`)".
+  3. **references/commander-workflow-template.js L261, L264, L269-270** → swap the order in both
+     runnable comment examples (`'sidekicks service add svc-a git@github.com:acme/svc-a.git'`), and
+     fix the asserted signature at L269 to `service add <name> [<git-url>]` — adding the one-line why
+     that makes it stick: name FIRST (the opposite of `project add <git-url> [<name>]`), and `add`
+     only registers, so a remote-backed service needs a following `service pull` before any skill
+     step writes into `src/`.
+
+  Do not touch the registry-mutating verb lists (L174 already lists `service add/pull/remove/use`
+  correctly per artifacts 002/003), do not touch the idempotency notes at SKILL.md L223/L399 or
+  template L144 (those are correct), and do not restructure the Examples section.
+
+  Bookkeeping: the apply edits SKILL.md and references/commander-workflow-template.js, whose sha256
+  baselines are recorded in skill.manifest.yaml L40/L48, so it must finish with
+  `sidekicks skill manifest sk-commander --apply` and list `skill.manifest.yaml` in `changes.files`.
+expected_effect: >-
+  A caller who copies Example 6 or the template's CLI-step snippet gets a sequence that actually
+  scaffolds the service instead of hard-failing at the `service add` stage after three retries, and
+  `src/` exists before the first skill step writes into it — and the template's "REAL CLI signature"
+  comment stops asserting the exact inversion the paired planner documents as the classic error.
+risk: medium
+status: applied
+approved_by: auto-verified   # 3/3 independent refuters CONFIRMED; below the safety floor. Human authorised the apply.
+applied_at: 2026-08-18T11:49:59+07:00
+applied_notes: >-
+  Applied through skill-creator as an improvement pass; all three defects corrected in the two files
+  that carried them. (1) SKILL.md Example 6 — step 2 flipped to name-first
+  (`service add acme-foo git@github.com:acme/acme-foo.git`) and the missing `service pull acme-foo`
+  added as its own stage 3; steps renumbered 4-7 and the Action narration rewritten (six → seven
+  stages, stages 1-3 are the CLI scaffold, Stage 5 → 6 verification gate, Stage 6 → 7 finalize, and
+  the handoff prose now says registered-then-pulled). Added the one line that makes three sequential
+  registry-mutating stages legible as legal: only two *within one wave* break the rule.
+  (2) SKILL.md L41 — `service add <git-url>` to acquire a repo → `service add <name> [<git-url>]` to
+  REGISTER, `service pull <name>` to acquire code into `src/`.
+  (3) references/commander-workflow-template.js — both runnable comment examples swapped to name-first
+  and the asserted 'REAL CLI signature' corrected to `service add <name> [<git-url>]`, with the why
+  attached (name first, the OPPOSITE of `project add <git-url> [<name>]`; a URL in the name slot is
+  rejected by the service-name pattern; `add` only registers, so a `service pull` must follow).
+  All three template edits are comment-only — no executable line changed.
+  VERIFIED: `rtk proxy grep -rn 'service add <git-url>|service add git@'` over the skill now returns
+  hits ONLY inside improvements/*.yaml (the historical records, correctly untouched) — zero in SKILL.md
+  or the template. Registry-mutating verb lists, the idempotency notes (SKILL.md L223/L399, template
+  L144) and the Examples structure were left exactly as they were, per the proposal.
+  Baselines re-recorded with `sidekicks skill manifest sk-commander --apply`; `skill doctor` OK.
+  Verification votes: 3/3 CONFIRMED, floor clear. OUT OF SCOPE and still open — this fix REGRESSES
+  unless `.sidekicks/memory/commander-cli-steps.md` L30 is corrected too: it is loaded as framework
+  context and re-teaches the inverted signature to every future agent. That is a `sidekicks memory`
+  change for a human. Same wrong parenthetical also sits in sk-sequence-planner SKILL.md L169-170.
+  FOLLOW-UP CLOSED in 3b9318a0: the stale signature in .sidekicks/memory/commander-cli-steps.md is
+  corrected by `memory append`, and — because that entry carries no category and so resolves to `general`,
+  which nothing triggers — the signature is ALSO registered as a rule, `service-add-registers-name-first`,
+  in the `implementation` category, whose trigger includes the `service` CLI verb. So it now loads in full
+  immediately before the command that would fail.
+  SECOND FOLLOW-UP ALSO CLOSED, in 04a4e4f7: sk-sequence-planner and the whole live architecture doc set
+  (architecture.md + its shards api-contracts, decision-summary, novel-pattern-designs, data-architecture,
+  project-structure, technology-stack-details, security-architecture, performance-considerations,
+  deployment-architecture, development-environment, executive-summary, implementation-patterns, the three
+  authoring guides and GETTING_STARTED) now attribute acquisition to `service pull`. D16 gained a D16a
+  amendment row, the NP-3 sequence was split into REGISTER + ACQUIRE, and a `service pull` row was added to
+  the normative API-contracts table beside the corrected `service add` row. The planner's claim that the
+  inverted form makes the CLI "read the URL as the service name" was corrected too — it hard-fails on the
+  service-name pattern instead. Deliberately left as dated records: docs-history/**, the architecture
+  validation-history appendix, and ADR-005's decision text (annotated, not rewritten).
+changes:
+  files:
+    - SKILL.md
+    - references/commander-workflow-template.js
+    - VERSION.json
+    - skill.manifest.yaml
+  version_from: 1.1.0
+  version_to: 1.2.0
+  commit: 3a90a68c

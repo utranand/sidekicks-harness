@@ -1,0 +1,63 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 014-skill-md-is-714-lines-with-two-conditional-blocks-inline
+target_skill: sk-commander
+created: 2026-08-18T10:28:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel candidate 7 + mid-tier panel candidate 4, merged and re-verified by the lead at verify_tier=high). Measured signal `skill_md_lines=714` from `auditor.sh evidence sk-commander`; section boundaries read from SKILL.md.
+kind: instructions
+observation: >-
+  SKILL.md is 714 lines and every one of them loads on every invocation, but four blocks are
+  load-bearing only on paths most runs never take. The rubric's dimension-5 signal is `skill_md_lines`
+  well over ~500; this is 714, and the skill has no `references/*.md` at all — its only `references/`
+  file is the Workflow template.
+
+  The conditional blocks, with their real trigger conditions:
+    • **Fallback — manual dispatch, L342-431 (90 lines).** Applies ONLY when the session has no
+      `Workflow` tool — a condition the skill itself tests up front (L74-78, L443-444). It is also
+      long verbatim duplication of content that already lives in
+      references/commander-workflow-template.js L128-178 / L88-100 / L112-123, which is the rubric's
+      named signal for this dimension — and that duplication has demonstrably DRIFTED (see artifact
+      013: the Fallback briefs lost the template's timestamp instruction and its model pin). The drift
+      is the concrete cost, not a hypothetical one.
+    • **Examples, L613-695 (83 lines).** Seven worked examples. Illustrative, not needed per run.
+    • **Unattended runs — ralph persistence, L294-339 (46 lines).** Applies only on an explicit
+      overnight/ralph request or a `persistence: ralph` key.
+    • **Jira tracking, L566-611 (46 lines).** Applies only when a `jira:` block is bound — and Run
+      procedure step 2 (L446-450) explicitly offers "or say none".
+
+  That is ~265 of 714 lines (~37%) that a plain sequential run with no card and no persistence never
+  needs. Skill-attributable: this is the skill's own file layout, nothing input-dependent.
+proposal: >-
+  Move the conditional material into `references/` and leave pointers, keeping every trigger-time
+  essential in SKILL.md. Do it in this priority order, and stop wherever the reviewer is comfortable —
+  each step stands alone:
+
+  1. **Fallback → `references/fallback-manual-dispatch.md`** (highest value: biggest block AND the one
+     that has already drifted). Leave in SKILL.md the `Workflow`-tool precondition check that already
+     exists at L74-78 / L443-444 plus one line: "no `Workflow` tool → read
+     `references/fallback-manual-dispatch.md` and execute the same plan by hand". Have the extracted
+     file DERIVE its briefs from the template rather than restating them, which closes artifact 013's
+     drift class at the same time.
+  2. **Examples → `references/examples.md`**, with a two-line pointer naming what each example
+     demonstrates so a reader knows when to open it.
+  3. **Ralph persistence → `references/ralph-persistence.md`** and **Jira tracking →
+     `references/jira-tracking.md`**, each with a one-line pointer stating the trigger condition
+     ("if the user asks for an unattended/overnight run, read …"; "if a `jira:` block is bound, read …").
+
+  MUST stay in SKILL.md regardless of how far this goes: the description and trigger guidance, the
+  input/parse spec, the scope-race classification rules (L155-196), the Execution-model mapping table,
+  the Run procedure including the whole safety pre-flight, and the Run summary contract. Steps 1+2
+  alone bring SKILL.md to roughly 550 lines; all four to roughly 460.
+expected_effect: >-
+  Every commander invocation stops paying context for a manual-dispatch path it is not on, a
+  seven-example gallery, and two opt-in integrations — and the Fallback's brief text stops being a
+  second copy of the template's, which is what let it drift out of sync in the first place.
+risk: medium
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

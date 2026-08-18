@@ -1,0 +1,42 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 015-manifest-comment-cites-the-wrong-skill-md-line
+target_skill: sk-commander
+created: 2026-08-18T10:29:00+07:00
+source: sk-skill-auditor run audit-sk-commander-2026-08-18, round 0 (high-tier panel candidate 8, re-verified by the lead at verify_tier=high). Source-verified vs skill.manifest.yaml L31 and L40, and SKILL.md L405 / L422 / L570 / L574 / L576.
+kind: assets
+observation: >-
+  `skill.manifest.yaml` L31 carries the comment `# documented, seen at SKILL.md:405`, attached to the
+  `sk-jira-footprint` sibling-dependency entry. SKILL.md L405 is
+  `**Worktree addendum** (append for cross-scope members):` — unrelated content. The first actual
+  `sk-jira-footprint` reference is L422
+  (`"$ROOT/.agents/skills/sk-jira-footprint/scripts/footprint.py"`), with the rest at L570, L574 and
+  L576.
+
+  This is not staleness from an un-recorded edit: the manifest's own baseline matches the current file.
+  `skill.manifest.yaml` L40 records
+  `SKILL.md: sha256:34acc5142305b36f2e1abf10ed967e6fe25b1745803961e53791c1e40961e1c2`, and the
+  LF-normalized sha256 of the committed SKILL.md is identical — so the citation was simply wrong when
+  it was written, against the very file the manifest baselines. Skill-attributable: it is an authored
+  comment in the skill's own manifest, and a reader following it lands on unrelated content.
+
+  Lowest-value finding of this audit. Filed because it is cheap, certain, and verifiable — not because
+  it matters much.
+proposal: >-
+  Replace the brittle line number at skill.manifest.yaml L31 with a stable anchor:
+  `# documented in SKILL.md → "Jira tracking — mirror each step to the bound card" (and the Fallback's
+  Jira progress addendum)`. A heading reference survives every future edit that a line number does
+  not — which is why the citation broke in the first place. Change nothing else in the manifest; the
+  `bundle:` hashes and the DERIVED sections are CLI-owned and must not be hand-edited.
+expected_effect: >-
+  The manifest's sibling-dependency note points at the section that actually documents the
+  `sk-jira-footprint` dependency, and does so in a form that cannot drift when line numbers move.
+risk: low
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

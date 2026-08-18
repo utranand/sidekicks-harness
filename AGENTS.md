@@ -1,9 +1,12 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `c27168e1` on 2026-08-18T00:41:03+07:00 (Asia/Bangkok). It is regenerated on every
+> `a5e56e67` on 2026-08-18T16:02:54+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
-> instructions in `CLAUDE.local.md` and reference it from here if you need them to survive.
+> instructions in `AGENTS.local.md` and reference it from here — add a line reading
+> `@AGENTS.local.md` below. That reference is what makes them survive, and it works on every CLI:
+> `CLAUDE.md` and `GEMINI.md` mirror this file, so all of them follow the pointer (Rule 6). A
+> `CLAUDE.local.md` would be auto-loaded by Claude Code alone and invisible to the rest.
 
 ## What this runtime is
 
@@ -144,6 +147,22 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
   never nested inside the repo root. Never check a protected branch out into a worktree — git locks
   the branch to that worktree, so the primary checkout can no longer return to it; branch *off* it
   instead. `--force` removal only after the user OKs losing unmerged work.
+- **Landing already-tested work on `main` — leanest safe path (hard rule):** when the operator asks
+  for an already-tested commit to be merged to remote `main`, that request is the approval the
+  protected-branch rule requires, and it authorises the merge **and nothing else**. Treat the
+  existing test results as accepted: run no tests, builds, linters or audits, and re-verify nothing
+  that was already green. **Create nothing** — no plan, no documentation, no subagent, no branch, no
+  commit, no worktree; the commit to land already exists. **Include nothing else** — never modify
+  unrelated working-tree changes and never let them ride along in the push. The only permitted work
+  is three read-only checks: the target commit is the intended one (`git log -1 <ref>`), the source
+  branch is clean (`git status --porcelain` empty), and `main` fast-forwards to it
+  (`git merge-base --is-ancestor origin/main <target>`). Then push **without `--force`**, ever. Where
+  policy forbids a direct push to `main` — the default assumption, since a protected branch receives
+  work only through an approved merge or PR — push the existing branch as-is and open the smallest
+  possible PR into `main`, then merge that. Close by confirming remote `main` actually contains the
+  target commit (`git merge-base --is-ancestor <target> origin/main`) and stop there. Report only the
+  target commit, the push or merge result, the remote `main` SHA, and any blocker — never a summary
+  of the work itself, and never any follow-up beyond the merge.
 - **Production access — direct allowed, Teleport as fallback (hard rule):** production Kubernetes
   and production PostgreSQL MAY be reached directly through the registered non-Teleport target
   (`sk-cluster-ops` or raw `kubectl` for Kubernetes, `sk-database-connector` for PostgreSQL). When
