@@ -1,0 +1,17 @@
+{
+  "name": "catalog-lifecycle",
+  "version": "1.0.0",
+  "description": "Generated framework catalog: derive, render, and gate the substrate's own inventories",
+  "files": [
+    "VERSION.json",
+    "_shared.mjs",
+    "check.mjs",
+    "commands.mjs",
+    "durable-formats.mjs",
+    "framework-catalog.generated.json",
+    "model.mjs",
+    "rebuild.mjs",
+    "render.mjs",
+    "show.mjs"
+  ]
+}

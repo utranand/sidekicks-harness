@@ -1,0 +1,23 @@
+.DS_Store
+Thumbs.db
+
+# Host-level agent CLI exposure directories — folder links, never committed. A committed folder link
+# checks out as a plain-text stub on Windows and silently breaks skill discovery.
+#
+# `.agents/skills` is deliberately ABSENT. Under layout 1 it was a fourth exposure link and belonged
+# here; layout 2 publishes the skill folders THERE, so listing it would ignore every skill in the
+# repository — a publish would commit an empty tree while all three links still resolved into it. That
+# is not hypothetical: this file was lifted byte-exact from the layout-1 repo, and the first export
+# staged 0 of 100 skill folders.
+.claude/skills
+.agent/skills
+.gemini/skills
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Run state and scratch
+artifacts/runs/
+*.log

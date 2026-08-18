@@ -1,7 +1,7 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `a5e56e67` on 2026-08-18T16:02:54+07:00 (Asia/Bangkok). It is regenerated on every
+> `7a010e67` on 2026-08-19T04:55:23+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
 > instructions in `AGENTS.local.md` and reference it from here — add a line reading
 > `@AGENTS.local.md` below. That reference is what makes them survive, and it works on every CLI:
@@ -10,7 +10,7 @@
 
 ## What this runtime is
 
-A standalone, self-contained Sidekicks runtime carrying **5 skill(s)** and the core
+A standalone, self-contained Sidekicks runtime carrying **6 skill(s)** and the core
 substrate needed to run them — the `sidekicks` CLI (`bin/` + `lib/`), the boundary contract, and the
 hook scripts. It is a **complete copy**: nothing here links back to the repo it was inherited from,
 so this runtime works on a fresh clone with no other repo present. Whether it also carries a Python
@@ -38,6 +38,7 @@ never out of it:
 | `sk-commander` | RUN a multi-step Sidekicks command-sequence — chain skill A, then a `sidekicks` CLI command, then skill B, each in its own subagent anchored to its own work_dir, fanni… |
 | `sk-scope-switch` | Switch the active Sidekicks project/service scope so edits, new files, and downstream skills land in the correct working folder. |
 | `sk-config-doctor` | VALIDATE, LINT, and SCAFFOLD the per-scope Sidekicks project config — the git-ignored config.yaml (root .sidekicks/config.yaml, user project projects/name/config.yaml)… |
+| `sk-skill-manager` | Front door for a skill's whole life in Sidekicks: CREATE one (via skill-creator), ARCHITECT its work_dir=/docs_dir= anchors, VALIDATE one (skill doctor/verify/manifest… |
 
 Skills are canonical at `.agents/skills/`. The per-CLI exposure directories
 (`.claude/skills/`, `.agent/skills/`, `.agents/skills/`, `.gemini/skills/`) are git-ignored

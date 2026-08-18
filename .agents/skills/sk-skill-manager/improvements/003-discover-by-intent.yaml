@@ -1,0 +1,103 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 003-discover-by-intent
+target_skill: sk-skill-manager
+created: 2026-08-14T13:40:00+07:00
+source: >-
+  User session 2026-08-14 — "add a DISCOVER mode to sk-skill-manager": when the user wants
+  something no locally-installed skill covers, search the configured skills repositories by intent,
+  rank the candidates, and advise an import. Applied through skill-creator per the funnel.
+kind: script
+observation: >-
+  Every existing path from "I need X done" to a skill that does X requires already knowing the
+  skill's NAME. `skill advise <name>` takes names; `skill import <name>` takes names; `skill
+  destinations` reports status per known skill. Nothing accepts a task description, so a skill that
+  exists in a configured destination but is not installed here is unreachable unless somebody
+  remembers it exists. Measured on this repo: 18 such skills, all in the `private` destination —
+  compile-mobile-apk, deep-thinker, deploy-android-wireless, and the cinema / shorts / flow / image
+  / storyboard / trend-scout / watermark / youtube family. The two existing safety nets do not cover
+  this and cannot: ADVISE reports a PRESENT skill's declared-but-missing siblings, and HEAL surfaces
+  the same siblings as non-installable residue — both are manifest-driven, so they only ever see
+  dependencies of something already installed, never a standalone skill nobody imported.
+  Two facts a naive implementation gets wrong, both verified live:
+  (1) `destination-only` is ZERO on this repo, so sourcing candidates from that status alone finds
+  nothing. All 18 are also parked under `.sidekicks/skill-offloaded/` locally, which the
+  destinations verb reads as a local copy, so the working source is "in a destination catalog.yaml
+  with no `.agents/skills/<name>/` directory here".
+  (2) A destination holds TWO trees — `.agents/skills/<name>/` and
+  `.sidekicks/skill-offloaded/<name>/` — and `meta/<name>/origin.yaml` records which in its `tree:`
+  field. Reading only `skills/` finds zero bodies for all 18 candidates.
+  Separately: the skill's own `description` measured 1161 characters, 137 OVER the 1024-character
+  host cap, so its tail was already being silently truncated before this change — the REVIEW
+  triggers added in 53316a5 pushed it over and nothing in the repo checks the cap for this skill
+  (the only 1024 assertion in tests/ is sk-database-schema-sync's, which covers only itself).
+proposal: >-
+  (A) scripts/skill-search.mjs with two subcommands. `index` unions the `destination-only` rows with
+  every destination catalog.yaml entry that has no local skills/ directory, resolves each body
+  through origin.yaml's `tree:`, captures name + description frontmatter, version, destination and
+  exported_at, and writes search-index.json under
+  <artifacts-base>/artifacts/runs/skill-manager/skill-search-<stamp>/ (--out honoured). `find
+  "<intent>"` tokenizes the intent, drops stopwords, folds crude suffixes, and scores each candidate
+  on whole-phrase and per-term hits weighted name-over-description, printing the matched terms and
+  the exact import command per row. Exit 3 for no candidates / nothing above the floor.
+  (B) A DISCOVER mode in SKILL.md — routing row, five steps (confirm nothing local covers it,
+  search, READ the top candidate's SKILL.md, advise with the import cost stated, hand over the
+  command and walk the apply plan), the absence-does-not-trigger limitation stated plainly, and an
+  explicit split from ADVISE and HEAL so the three do not overlap.
+  (C) DISCOVER triggers in the description frontmatter, within the 1024 cap.
+expected_effect: >-
+  "Is there a skill for X?" becomes answerable without knowing X's skill name, over a candidate pool
+  the repo can already enumerate, with a ranking that prints its own reasons so a wrong hit is
+  correctable rather than mysterious.
+risk: low                         # additive: one new script plus a new SKILL.md mode; no CLI, config or schema change
+status: applied
+approved_by: 'Puttipong Utranand (chat: "add a DISCOVER mode to sk-skill-manager", 2026-08-14)'
+applied_at: 2026-08-14T13:55:00+07:00
+applied_notes: >-
+  Landed as proposed, with two decisions the task left open resolved against live evidence.
+  DEFAULT DESTINATION SCOPE: both subcommands search EVERY configured destination, not public only.
+  Public-only is not a conservative default here, it is an empty one — `index --destination public`
+  exits 3 with zero candidates because the public catalog's 83 skills are all installed locally,
+  while all 18 real candidates live in `private`. Narrowing stays available via --destination.
+  VERIFICATION INTENT: "turn a script into a short vertical video for youtube" — ranks
+  sk-shorts-director (24), sk-shorts-pipeline (18), sk-trend-scout (14),
+  sk-cinema-director, sk-youtube-automator, each printing its matched terms.
+  Scoring: phrase-in-name 12, phrase-in-description 6, term-in-name 4, term-in-description 2, plus
+  1 per 3 repeats capped at 3, plus coverage x4. Floor is two rules rather than one number — score
+  >= 6 AND, for an intent of 3+ terms, at least 2 distinct terms matched, because a single common
+  term hitting a long description is the classic false positive.
+  DESCRIPTION: rewritten from 1161 to 1013 characters WITH the four DISCOVER trigger phrases added.
+  The casualties were verbose restatements ("then wire its audit group and manifest", "install
+  declared deps, restore recorded bundle", "and whether it is current", "which skills changed since
+  I last published", "parking a skill in-repo" and the other five NOT-for clauses compressed to
+  their nouns) — no trigger was dropped, and the six NOT-for disambiguations all survive.
+  Checks run against the real configured checkouts, never a fixture: index (18 candidates, private
+  18 / public 0), find with the verification intent (5 ranked rows), find "compile an android app
+  and install it on a phone" (deploy-android-wireless 19, compile-mobile-apk 13), and two
+  no-match intents — "provision a kubernetes cluster on azure and rotate its secrets" and
+  "reconcile invoices against a general ledger" — both exit 3 with "No candidate matched" in both
+  the human and --json forms, rather than returning a least-bad row.
+  skill manifest --apply then a second --apply reporting nothing to do; skill doctor OK, skill
+  verify OK, framework doctor OK.
+  Full `npm test`: 2380 tests, 2371 pass, 6 fail — ALL SIX are sk-inherit, uncommitted
+  in-flight work from another session, the same root cause recorded in 002 and now larger because
+  that session added files and a test file since. Four are its stale bundle failing skill doctor,
+  skill verify, `manifest --all --check` and the framework-preset export dry-run; a fifth is heal
+  planning restore-file actions for its unrecorded improvements/009-013; the sixth is inside its own
+  tests/skills/inherit-delegate-agents.test.mjs. Confirmed not ours three ways: `manifest --all
+  --check` names sk-inherit and nothing else, this skill's own doctor/verify are OK, and
+  tests/skill-config.test.mjs plus tests/skills/skill-modular-category.test.mjs are 26/26 green.
+  Deliberately not "fixed" here — running `manifest --apply` on sk-inherit would record
+  somebody's half-finished state as the baseline.
+  NOT committed — left in the working tree for the operator.
+changes:
+  files:
+    - SKILL.md
+    - VERSION.json
+    - scripts/skill-search.mjs
+    - skill.manifest.yaml
+  version_from: 1.2.0
+  version_to: 1.3.0
+  commit: null

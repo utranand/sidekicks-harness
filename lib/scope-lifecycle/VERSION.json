@@ -1,9 +1,15 @@
 {
   "name": "scope-lifecycle",
-  "version": "1.0.0",
-  "description": "scope-lifecycle library component",
+  "version": "1.1.0",
+  "description": "Active-scope anchors (working folder, artifacts base, v2 run base), the git-derived scope inventory, and `scope explain` — the read-only effective-composition report",
   "files": [
+    "VERSION.json",
+    "_shared.mjs",
+    "artifacts-base.mjs",
+    "explain-model.mjs",
+    "explain.mjs",
     "inventory.mjs",
+    "run-base.mjs",
     "working-folder.mjs"
   ]
 }

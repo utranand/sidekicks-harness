@@ -1,0 +1,84 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 002-export-picklist-selection
+target_skill: sk-skill-manager
+created: 2026-08-14T12:55:00+07:00
+source: >-
+  User session 2026-08-14 — REVIEW was run for real ("list of skill changes"), then:
+  "enhance the skill to create a selection for the user to pick which to be export to the skill
+  repository". Applied directly through skill-creator, which the user invoked; the funnel's
+  never-hand-edit-the-target rule is satisfied because skill-creator is the applier.
+kind: script
+observation: >-
+  REVIEW told the agent to "present the picks" and "ask which to export" but gave it no mechanism,
+  so the selection was re-derived by hand every time and the reading was done inconsistently.
+  Measured on the live repo during that run: `skill destinations --json` returns 58.6KB across 139
+  skills x 2 destinations — 1 stale row, 56 public never-exported, 115 private never-exported. The
+  answer nobody can act on is those 171 never-exported rows: 24 of them are private-resident skills
+  with no local folder at all, and offering them as public candidates is noise that buries the one
+  row that mattered. Three further defects in the by-hand path, each observed in that same run:
+  (1) the version delta, the dirty-tree check and the left-behind-files check are three separate
+  manual lookups per candidate, so they get skipped; (2) the dirty check was run as
+  `git status --short <skill-path>` and came back EMPTY for sk-cluster-ops, which the agent
+  reported as "tree clean, no uncommitted work" — `git status --porcelain` on the same path lists
+  three modified files plus two untracked scripts, so a wrong all-clear was published into the
+  review; (3) turning the picks into commands means retyping `--destination`, `--with-deps` and the
+  `--source-repo` provenance URL by hand, and that URL is published bytes.
+proposal: >-
+  Add scripts/export-picklist.mjs with two verbs and rewrite REVIEW steps 1-4 to drive it.
+  `plan` wraps `skill destinations --json` plus `framework config`, classifies rows into
+  §1 re-export candidates and §2 never-published, enriches each with the local VERSION.json delta,
+  a repo-wide `git status --porcelain` dirty flag and the left-behind file list, prints the exact
+  `diff -ru` command per row, and writes picklist.md (checkboxes) + picklist.json (machine record)
+  under <artifacts-base>/artifacts/runs/skill-manager/export-review-<stamp>/.
+  `resolve <folder>` parses the ticks and prints grouped export commands, dry-run first, with the
+  flags and the source_repo already filled from config, plus a warning per picked row that is
+  dirty, version-stale or leaving files behind.
+  Suppress a never-exported row when the skill is already in-sync at another destination, when its
+  `skill_repo:` intent points elsewhere, or when it has no local folder — each listed with its
+  reason under Suppressed, `--all` to see them inline.
+expected_effect: >-
+  The selection becomes an artifact the operator ticks instead of a conversation the agent
+  reconstructs, and the three decision-changing facts arrive on the row rather than depending on
+  the agent remembering to look them up. On this repo the offered set drops from 171 never-exported
+  rows to 65 (public 56 -> 32), with the 106 suppressed rows still listed and reasoned.
+risk: low                         # additive: one new script + a rewritten SKILL.md section; no CLI, config or schema change
+status: applied
+approved_by: 'Puttipong Utranand (chat: /skill-creator "enhance the skill to create a selection…", 2026-08-14)'
+applied_at: 2026-08-14T13:05:00+07:00
+applied_notes: >-
+  Landed as proposed. Three deliberate refusals are recorded in the script header rather than left
+  implicit, because each is a thing a generator would be tempted to do and each would be wrong:
+  it never summarises a diff (that is the agent's judgement and a generated summary would be a
+  file-name list wearing a conclusion's clothes), it never runs an export (writing into another
+  repository stays an explicit act), and it never writes a skill's `skill_repo:` intent (withholding
+  a skill is a skill edit and belongs in the funnel, not a checkbox).
+  Portability: node:* only, repo root by walking up for .sidekicks/ + bin/sidekicks, fileURLToPath
+  rather than URL.pathname (which keeps the Windows "/C:/…" slash and leaves %20 in a path with a
+  space), spawnSync with argv arrays, timestamps formatted from the UTC epoch at a fixed +07:00 so
+  no ICU data is needed. Paths written into the artifact are repo-relative when inside the repo and
+  absolute only when the --out target is outside it.
+  Exit contract: 0 wrote/read a pick list, 3 nothing to pick or nothing ticked (both forms,
+  --json included), 1 usage/IO.
+  Checks run: plan + resolve exercised end-to-end against the live repo (1 stale row picked, correct
+  commands emitted, unticked run exits 3, unknown --destination refused, --stale-only / --all /
+  --destination filters verified); skill manifest --apply then a second --apply reporting nothing to
+  do; skill doctor OK, skill verify OK, framework doctor OK.
+  Full `npm test`: 2376 tests, 2369 pass, 4 fail — ALL FOUR are sk-inherit's stale bundle
+  (uncommitted in-flight work by another session: improvements/007 mismatch plus 009/010/011/012/013
+  unrecorded), which fails skill doctor, skill verify, manifest --check and the framework-preset
+  export dry-run. Not caused by and not related to this change, and deliberately not "fixed" here:
+  running `manifest --apply` on sk-inherit would record somebody's half-finished state as the
+  baseline.
+  NOT committed — left in the working tree for the operator.
+changes:
+  files:
+    - SKILL.md
+    - VERSION.json
+    - scripts/export-picklist.mjs
+    - skill.manifest.yaml
+  version_from: 1.1.0
+  version_to: 1.2.0
+  commit: null

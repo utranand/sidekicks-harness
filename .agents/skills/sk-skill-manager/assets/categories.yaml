@@ -1,0 +1,103 @@
+# categories.yaml — the PUBLICATION taxonomy of a layout-1 skills repository.
+#
+# One family per skill, used for the `category` column of a destination's catalog.yaml and for the
+# categories/<family>/README.md browse pages. Read by `lib/skill-lifecycle/export.mjs` (categoryOf)
+# and by this skill's scripts/skill-repo-readmes-{public,private}.mjs.
+#
+# NOT THE SAME THING AS AN AUDIT GROUP, and that is the entire reason this file exists.
+# `.agents/skills/sk-skill-auditor/assets/audit-groups.yaml` answers "which skills does the
+# auditor sweep together"; this file answers "which skills does a reader browse together". They agree
+# for almost every skill — which is why membership below is OPTIONAL and the audit group is the
+# default — but they cannot be forced to agree everywhere: the framework's own skills are spread
+# across core, skill-improvement, ops and jira for auditing, and must still browse as one family.
+# Overloading `group` would have made the auditor and the publisher move each other silently.
+#
+# FORMAT (deliberately narrow — two independent readers parse it, and neither is a general YAML
+# parser): a family name at column 0 ending in ':', then an indented `blurb: '<one line>'`, then an
+# optional indented `members:` list of `- <skill-name>` items. Comments and blank lines are ignored.
+#
+# RESOLUTION per skill: an explicit `members:` entry here wins; otherwise the skill's audit group is
+# its family; a skill with neither is Ungrouped and the READMEs say so. A name may appear under at
+# most ONE family — `tests/skills/skill-categories.test.mjs` fails on a duplicate.
+#
+# ADDING A FAMILY means adding it here AND creating categories/<name>/README.md in each destination
+# repo (the generators write between the markers of a README that already exists; they do not
+# scaffold one). Removing a family is the reverse, and leaves an orphaned folder until you delete it.
+
+# THE FRAMEWORK ITSELF — the skills that ARE Sidekicks rather than skills that use it: the CLI verb
+# surface, scope, config, the knowledge store, and the whole skill lifecycle (author, audit, improve,
+# offload, package, inherit, publish).
+#
+# Membership is listed explicitly because it cannot be derived. These sit in four different audit
+# groups, and no rule over `audit-groups.yaml` produces this set.
+#
+# Two deliberate differences from `sk-inherit`'s `framework` PRESET, which is a runtime
+# question rather than a publication one:
+#
+#   - `skill-creator` is in the preset but NOT here. It is vendor-authored (see
+#     docs/skill-modular-category.md's classification rule, which lists it as external alongside
+#     `caveman`), and republishing someone else's skill under our name is the objection that removed
+#     `caveman` from the preset. It still TRAVELS into a runtime; it is just not ours to publish.
+#     The refusal is enforced, not just written down: its skill.yaml declares `skill_repo: none`.
+#   - `sk-framework-core` is here but NOT in the preset. It drives the publish pipeline by
+#     forging a runtime with sk-inherit, and inherit hard-refuses to run from inside one — so
+#     a core carrying it could never use it. It is still framework machinery, and a reader looking
+#     for "how does a framework release get cut" should find it in this family.
+framework:
+  blurb: 'The framework itself: CLI substrate, scope, config, knowledge, and the skill lifecycle'
+  members:
+    - fable-mind
+    - skill-nickname
+    - sk-auto-improve
+    - sk-cli
+    # Audits as `delivery`, browses as `framework`: it is a member of the required floor
+    # (sk-inherit's `required:` block), and tests/skills/skill-categories.test.mjs requires
+    # every floor member to be published in this family. Its author half,
+    # sk-sequence-planner, is not floor and stays in `planning`.
+    - sk-commander
+    - sk-config-doctor
+    - sk-framework-core
+    - sk-hello
+    - sk-inherit
+    - sk-jira-connector
+    - sk-knowledge
+    - sk-scope-switch
+    - sk-self-improve
+    - sk-skill-auditor
+    - sk-skill-description-trimmer
+    - sk-skill-manager
+    - sk-skill-offload
+    - sk-packager
+
+# The remaining families carry a blurb only: their membership IS their audit group, so listing it
+# here would be a second copy to keep in step for no gain. Blurbs are the canonical wording — they
+# were duplicated across both README generators and every destination's LAYOUT.md until this file.
+#
+# `core` and `skill-improvement` stay defined and near-empty on purpose: the framework family took
+# most of their members, and a family that exists with nothing in it reads as "nothing published
+# here yet", which is true and useful. Deleting them would instead make an export of a future
+# non-framework member fail against an unknown family.
+agents:
+  blurb: 'Persistent delegate agents: creation, standby loops, mailbox bridge, journals, scheduling'
+architecture:
+  blurb: 'Architecture authoring, rules documents, API cartography, validation gates'
+bmad:
+  blurb: 'The BMAD delivery pipeline: PRD, architecture, epic tech context, stories, dev, code review'
+core:
+  blurb: 'CLI substrate, scope, config, knowledge store, communication modes'
+database:
+  blurb: 'PostgreSQL connectors, analysis, transfer, import, drift and schema sync'
+delivery:
+  blurb: 'Autonomous delivery engines, orchestrators, executors, test gates'
+git:
+  blurb: 'Branches, worktrees, shipping, sweeps, release notes'
+integrations:
+  blurb: 'Outward connectors: Confluence, Slack, run reporting'
+jira:
+  blurb: 'Jira card lifecycle: read/write, readiness gates, subtasks, autopilot, verification'
+ops:
+  blurb: 'Cluster ops, security remediation, packaging, UI capture, run and artifact doctors'
+planning:
+  blurb: 'Implementation, sequence and task planning, feasibility probes, advisory councils'
+skill-improvement:
+  blurb: 'The skill lifecycle itself: improvement funnel, offload, inherit, manager'

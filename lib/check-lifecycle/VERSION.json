@@ -1,0 +1,16 @@
+{
+  "name": "check-lifecycle",
+  "version": "1.0.0",
+  "description": "Unified verification runner: one static gate registry, named profiles, and a versioned result contract",
+  "files": [
+    "VERSION.json",
+    "_shared.mjs",
+    "commands.mjs",
+    "gates/core-mounted.mjs",
+    "gates/golden-replay.mjs",
+    "gates/package-clean.mjs",
+    "registry.mjs",
+    "run.mjs",
+    "runner.mjs"
+  ]
+}

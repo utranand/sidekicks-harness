@@ -1,0 +1,11 @@
+{
+  "name": "run-events",
+  "version": "1.0.0",
+  "description": "The versioned durable run-event contract: the append-only <run-dir>/events.v1.jsonl diagnostic sidecar, its exclusive lock and tail recovery, and the `artifacts events` CLI every engine (including Python) calls",
+  "files": [
+    "VERSION.json",
+    "commands.mjs",
+    "schema.mjs",
+    "store.mjs"
+  ]
+}

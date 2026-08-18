@@ -1,0 +1,10 @@
+{
+  "name": "sk-skill-manager",
+  "version": "1.6.0",
+  "description": ">-",
+  "files": [
+    "SKILL.md",
+    "config.defaults.yaml",
+    "skill.yaml"
+  ]
+}

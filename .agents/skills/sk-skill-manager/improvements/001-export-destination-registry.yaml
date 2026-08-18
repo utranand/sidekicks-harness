@@ -1,0 +1,125 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 001-export-destination-registry
+target_skill: sk-skill-manager
+created: 2026-08-14T02:16:56+07:00
+source: >-
+  User session 2026-08-14 — "most of skills already been export to both sidekicks-skills and
+  sidekicks-skills-private, do you have a list of them registered on the skill-manager?".
+  Evidence read live: .agents/skills/sk-skill-manager/config.defaults.yaml,
+  lib/skill-lifecycle/export.mjs, .sidekicks/config.yaml, and the two local clones under
+  projects/global/services/sidekicks-skills{,-private}/src.
+kind: instructions
+observation: >-
+  The skill supports exactly ONE export destination and keeps NO source-side record of what has
+  been published where, so "which skills are already in which skills repo, and are they current?"
+  cannot be answered from this repo at all. Four concrete pieces of evidence:
+  (1) config.defaults.yaml declares a single `skill_manager.skill_repo:` object
+  (remote: https://github.com/utranand/sidekicks-skills.git, layout: 1, checkout: '') — the schema
+  has no room for a second destination, so the operator's SECOND, already-populated repository
+  `sidekicks-skills-private` is unknown to the skill; grep for "sidekicks-skills-private" across
+  the repo returns nothing outside projects/.
+  (2) The root .sidekicks/config.yaml carries no `skill_manager:` block at all, so `checkout` stays
+  '' even though BOTH clones already exist in-repo at
+  projects/global/services/sidekicks-skills/src and projects/global/services/sidekicks-skills-private/src.
+  (3) lib/skill-lifecycle/export.mjs never reads the destination — all six existsSync calls
+  (lines 43, 63, 79, 280, 383 plus the import) are source-side, and copyBundle
+  (lib/skill-package/portable.mjs:95) writes every bundle file unconditionally. Export is one-way;
+  only IMPORT reconciles (up-to-date / ff / conflict / local-only / unversioned). Provenance is
+  written ONLY at the destination: meta/<skill>/origin.yaml (source_repo, source_commit,
+  source_branch, exported_at) and catalog.yaml. Nothing lands back in the source repo.
+  (4) The resulting blind spot, measured this session: local .agents/skills = 123 skills; public
+  clone = 84 (84 meta/ dirs); private clone = 6 (sk-safe-data-importer + 5x sk-shp-*);
+  33 local skills are in NEITHER tree. Most of those 33 are external/plugin skills where that is
+  correct, but 15 are first-party sidekicks-*: auto-improve, cli, config-doctor, hello, inherit,
+  jira-connector, knowledge, packager, scope-switch, self-improve, shp-data-importer,
+  skill-auditor, skill-description-trimmer, skill-manager, skill-offload. sk-jira-connector
+  being absent while the rest of the jira family shipped reads as an unnoticed gap rather than a
+  decision — and today there is no artifact anywhere that distinguishes "deliberately withheld"
+  from "never exported". NOT-CARRIED.md in the public clone documents unshipped EDGES
+  (framework_files, hooks, host_paths, binaries), not unshipped skills, so it does not cover this.
+proposal: >-
+  Three coordinated changes; the first is skill-owned, the second and third need framework work
+  alongside (flag them in the apply, they are not skill-creator-only edits).
+  (A) SKILL.md + config.defaults.yaml — make destinations PLURAL. Turn
+  `skill_manager.skill_repo:` into a map of named destinations, each with `remote` and `checkout`,
+  e.g. `skill_repo: { public: {remote: .../sidekicks-skills.git, checkout: projects/global/services/sidekicks-skills/src},
+  private: {remote: .../sidekicks-skills-private.git, checkout: projects/global/services/sidekicks-skills-private/src} }`,
+  keeping `layout: 1` at the block level. Preserve backward compatibility by accepting the current
+  flat single-repo shape as destination name `default`. Update the EXPORT and IMPORT sections of
+  SKILL.md to take a destination name instead of assuming one repo, and record in EXPORT that
+  --output still wins as the explicit override.
+  (B) A read-only `sidekicks skill destinations [<skill>] [--json]` verb (new
+  lib/skill-lifecycle/destinations.mjs, registered in the skill verb table) that DERIVES the answer
+  instead of maintaining new state: for each configured checkout, read its catalog.yaml and
+  meta/<skill>/origin.yaml, compare the recorded export against the local skill's bundle baseline,
+  and print one row per skill: destination, exported version, exported_at, source_commit, and a
+  status of in-sync | stale | never-exported | destination-only. Add a VALIDATE-adjacent routing
+  line in SKILL.md ("which skills are published, and where?" -> the new verb) and state plainly in
+  EXPORT that the source repo holds no registry — the destinations verb reads the destinations.
+  (C) Per-skill destination intent in the skill's own skill.yaml, e.g.
+  `sidekicks: { skill_repo: public | private | none }`, defaulting to unset. EXPORT reads it and
+  refuses to write a `private`-marked skill into a public destination (and reports `none` as
+  deliberately withheld, which is what separates a withheld skill from a forgotten one). Document
+  the key in SKILL.md CREATE's wiring table so new skills declare it from day one, and have the
+  destinations verb surface intent alongside status.
+expected_effect: >-
+  "What is published where, and is it current?" becomes answerable from this repo in one read-only
+  command, with zero new hand-maintained state — every fact already exists in the destination's
+  catalog.yaml / origin.yaml. A private-only skill can no longer be exported into the public tree
+  by accident, and a never-exported first-party skill (today: 15 of them, including
+  sk-jira-connector) stops being invisible.
+risk: medium                      # config schema change + new CLI verb + new skill.yaml key; not purely additive
+status: applied
+approved_by: 'Puttipong Utranand (chat: approve and apply it, 2026-08-14)'
+applied_at: 2026-08-14T02:39:28+07:00
+applied_notes: >-
+  All three parts landed. (A) config.defaults.yaml `skill_repo:` is now a map of named destinations
+  — `public` and `private`, each with remote + checkout, both wired to the in-repo clones under
+  projects/global/services/; `layout: 1` stays block-level. The flat single-repo shape still
+  resolves, as one destination named `default`, so a lifted copy carrying the old config is not a
+  misconfiguration (normalizeDestinations, covered by a test).
+  (B) New verb `sidekicks skill destinations [<skill>] [--destination <name>] [--json]` —
+  lib/skill-lifecycle/destinations.mjs, registered in lib/sk-cli/help.mjs. It stores nothing:
+  statuses are derived by byte-comparing each destination copy against the local bundle baseline and
+  reading catalog.yaml / meta/<skill>/origin.yaml. Statuses: in-sync, stale, never-exported,
+  destination-only, unreachable. `stale` counts files LEFT BEHIND at the destination too, since
+  copyBundle only writes and a deleted file otherwise lingers unnoticed.
+  (C) Per-skill intent `skill_repo: <name>|none` in a skill's own skill.yaml, enforced in
+  lib/skill-lifecycle/export.mjs. Export also gained `--destination <name>` (mutually exclusive with
+  --output); an --output that resolves onto a configured checkout is recognised as that destination,
+  so the gate cannot be bypassed by typing the path. Unset intent stays permissive — unset is not
+  `none`, which is the distinction the observation was about. No skill was marked as part of this
+  apply; the mechanism is in place and marking is a separate, per-skill decision.
+  DEVIATION FROM THE PROPOSAL, deliberate: the description had to be trimmed as well. It measured
+  1084 chars before this change and the new DESTINATIONS triggering pushed it to 1194, over the
+  1024 host cap the funnel re-checks at apply. It now measures 1000 chars with the new triggers
+  ("what's published where / is the skills repo up to date") included; the casualties were verbose
+  restatements ("and framework registration", "QUALITY", "reinstall its dependencies"), not
+  triggers.
+  Checks run: node --test on the new tests/skills/skill-destinations.test.mjs (14 tests, all pass —
+  covers the legacy flat shape, intent vs unset, the three drift shapes, unreachable checkouts, and
+  all four export-gate refusals); full `npm test` green (2376 tests, 0 fail; tests/sk-cli's
+  VERBS count assertion updated 110 -> 111 / 9 -> 10 skill verbs, with the reason recorded in its
+  comment ledger). skill manifest --apply then --check (idempotent), skill doctor OK, skill verify
+  OK, framework doctor OK. Verified against the real repo: public 83 in-sync / 56 never-exported,
+  private 24 in-sync / 115 never-exported, 0 stale, 0 destination-only.
+  NOT committed — left in the working tree for the operator, on branch
+  chore/publish-framework-core-url alongside that branch's own uncommitted --source-repo work.
+changes:
+  files:
+    - SKILL.md
+    - config.defaults.yaml
+    - skill.manifest.yaml
+  # Outside the target skill (framework work this apply required, recorded here because
+  # skill-creator's remit stops at the skill folder):
+  #   lib/skill-lifecycle/destinations.mjs   (new)
+  #   lib/skill-lifecycle/export.mjs         (--destination, intent gate, sameDir/real helpers)
+  #   lib/sk-cli/help.mjs             (VERBS: destinations + export flags)
+  #   tests/skills/skill-destinations.test.mjs (new)
+  #   tests/sk-cli/cli.test.mjs       (VERBS count 110 -> 111)
+  version_from: 0.1.0
+  version_to: 0.2.0
+  commit: null

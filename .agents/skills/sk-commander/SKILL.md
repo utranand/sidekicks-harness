@@ -212,6 +212,7 @@ mechanical:
 | Per-step success/failure | the `STEP` schema's `ok` flag — `runStep` retries 3× then returns `ok:false` |
 | Per-step timestamps | the `STEP` schema's `startedAt`/`completedAt` ISO strings (each subagent runs `date -u` before/after work); `setStatus` logs them to `/workflows` live; wave timestamps are min/max across members |
 | A step pinned to a model | the step's optional `model` flows through `runStep` into the `agent()` spawn; pass `{ model }` in opts to pin a whole wave from the call site (omit → session model) |
+| A stage's status transition | `await transition(idx, next, ts, { event, status, step, detail })` — `setStatus` (the legacy mutation) **then** the run event, in that order. See [Run events](#run-events--the-diagnostic-sidecar) |
 
 Things the template already encodes for you (don't re-derive them):
 
@@ -232,6 +233,9 @@ Things the template already encodes for you (don't re-derive them):
 - **Halt, don't fake success** — the script returns `{ status: 'halted', stage, reason, summary }` on
   any unrecoverable failure (including a missing precondition caught by `try/catch`), and
   `{ status: 'completed', summary }` only when every stage's success condition was met.
+- **The run-event sidecar** — `transition()`, `emit()`, `emitFinal()` and `reconcileOnResume()` are the
+  dual-write legs, already in the right order. You only pass `args.events`; see
+  [Run events](#run-events--the-diagnostic-sidecar).
 Author the `meta`, the `stages` tracking array, and the STAGES section to match the real parsed sequence;
 keep the helpers verbatim. The `stages` array must mirror `meta.phases` exactly (same titles, same count)
 so `setStatus(idx, …)` log lines stay coherent with the live progress display. Live status transitions
@@ -277,11 +281,93 @@ prior run is still alive, stop it first (the tool will tell you). Resume replays
 the script is unchanged — if the user edits the plan, author a fresh script and run it new (announce that
 the plan changed, so stale cache isn't silently mapped onto different steps).
 
+**Reconcile the event sidecar on every resume** (when events are on). Pass `args` again — the same
+`runStamp`/`jira`/`events` — with `events.reconcile` filled in from the halted run's returned `stages`,
+so the script's `reconcileOnResume()` fires before its first transition:
+
+```
+Workflow({ scriptPath: "<path>", resumeFromRunId: "<wf_id>", args: { runStamp: "<same stamp>",
+  events: { runDir: "<repo-relative run dir>", runId: "<same run id>", workItem: "<slug>",
+            reconcile: { currentState: "stage-1:done|stage-2:failed", legacyJson: "<the stages array as JSON>",
+                         expectEvent: "step.failed", expectStep: "stage-2" } } } })
+```
+
+Resume replays cached `agent()` calls, and that includes the event emitters — so a transition whose
+event *was* recorded is not re-appended, and one whose emitter never completed re-runs live and lands
+under the same deterministic id. Reconciliation covers the case replay cannot: the run that halted
+**because** the append failed, or a fresh launch of the same script in a new session. It appends
+`run.reconciled` with the legacy-state digest and never back-fills the events that were missed.
+
 Re-running a step always restarts it from scratch — we can't resume *inside* a sub-skill, and a step that
 died mid-run may have written partial artifacts. The sub-skills are idempotent enough to re-enter (they
 re-read `work_dir` and reconcile), so re-running a half-done step is safe; resuming into its middle is
 not. (`resumeFromRunId` is same-session; across sessions the script file persists on disk — re-run it and
 the idempotent sub-skills reconcile, skipping work that's already complete.)
+
+---
+
+## Run events — the diagnostic sidecar
+
+Every stage transition is also appended to a versioned append-only sidecar,
+`<run-dir>/events.v1.jsonl`, through the framework CLI (`sidekicks artifacts events`, contract:
+[docs/guide/v1.5/run-events.md](../../../docs/guide/v1.5/run-events.md)). The commander is the **pilot
+engine** for it.
+
+> **It changes nothing about resume.** The Workflow journal plus the `stages` array remain the source of
+> truth; no code path reads an event back to decide where a run continues, and no legacy state is
+> rewritten, replayed from, or deleted. The sidecar answers *"what happened, in order, and who did it"*
+> for a human or a doctor reading a finished run — and it is **not** memory, the journal, the transcript,
+> the agent inbox, or conversation history.
+
+**The run dir and the run id** — resolved once, in your shell, at [step 1](#run-procedure-do-this):
+
+```bash
+RUNDIR="$(node "$ROOT/bin/sidekicks" scope run-base sk-commander ${WORK_ITEM:+"$WORK_ITEM"})"
+RUNREL="${RUNDIR#"$ROOT"/}"          # repo-relative — never bake a machine-absolute path into the script
+RUNID="commander-$STAMP"             # portable, stable across resumes of the same run
+```
+
+**The five legs, in the order the framework fixes them** (`lib/run-events/schema.mjs`
+`DUAL_WRITE_STEPS`). All of them go through the skill's own helper, which builds the intent and hands
+the write to the CLI:
+
+| Leg | Who runs it | Command |
+|---|---|---|
+| 1. preflight | you, in your shell, **before** the first transition | `run-event.mjs preflight --run-dir "$RUNDIR" --json` |
+| 2. mutate legacy first | the script | `setStatus(...)`, inside `transition()` |
+| 3. append with a deterministic id | the script | `transition(...)` → `emit()` → `run-event.mjs append …` |
+| 4. halt on divergence | the script | `transition()` throws; the run halts as `event-sidecar-diverged` |
+| 5. reconcile before resume | the script on a resume launch (you, in the [Fallback](#fallback--when-the-workflow-tool-isnt-available)) | `run-event.mjs reconcile --expect-event … --legacy-json …` |
+
+```bash
+RE="$ROOT/.agents/skills/sk-commander/scripts/run-event.mjs"
+node "$RE" preflight --run-dir "$RUNDIR" --json     # exit 0 = on; exit 4 = OFF for this run
+node "$RE" append --run-dir "$RUNDIR" --run-id "$RUNID" --event run.created --status pending \
+  --work-item "$WORK_ITEM" --detail stages=<n> --json
+node "$RE" append --run-dir "$RUNDIR" --run-id "$RUNID" --event run.started --status running --json
+```
+
+Then pass the binding into the Workflow and the template does the rest:
+
+```
+args: { runStamp, jira: { card, env }, events: { runDir: "<RUNREL>", runId: "<RUNID>", workItem: "<slug>" } }
+```
+
+**The two failure modes are answered differently, and the difference is the whole design:**
+
+- **Preflight exits 4 — the subsystem is not available here** (an older CLI, a lifted skill copy in a
+  repo without `lib/run-events`, or a pre-existing corrupt sidecar). **Omit `args.events` entirely, run
+  the sequence normally, and say so in the report.** A missing *diagnostic* never blocks real work.
+- **An append fails after a successful preflight — `event-sidecar-diverged` (exit 3).** The script
+  halts **before its next transition** and reports it. Legacy state is authoritative and the run is
+  resumable; diagnose with `sidekicks artifacts events check <run-dir>`, then resume — the resume
+  reconciles. Never "carry on and catch up later": a trail with an unrecorded gap that nobody noticed
+  is worse than a halt, because it reads as complete.
+
+`run.approved` is **not** emitted: the commander has no separate approval gate (it proceeds
+autonomously once the pre-flight passes), and inventing the event would put a decision in the trail
+that nobody made. Terminal events map `completed` → `run.completed`, a retry-exhausted or
+integration-conflict halt → `run.failed`, and a wave barrier that was never crossed → `run.blocked`.
 
 ---
 
@@ -421,6 +507,21 @@ If it errors (exit 3 or anything), ignore it and proceed — the step's real res
 The commander still posts the `started`/`done` bookends itself, around the whole fallback run — see
 [Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card).
 
+**Run events in the fallback path — you run all five legs yourself** (there is no script and no journal,
+so nothing can do it for you). Same helper, same order, same meanings as
+[Run events](#run-events--the-diagnostic-sidecar): preflight before the first stage; for each stage,
+record the transition in your own head/notes **first** and then append `step.started` /
+`step.completed` / `step.failed` with `--step stage-<n>`; on an append failing (exit 3) **stop before the
+next stage** and report `event-sidecar-diverged`; and because re-invoking on the same sequence re-runs
+from the start, **reconcile first** whenever a sidecar already exists for this run dir:
+
+```bash
+node "$RE" reconcile --run-dir "$RUNDIR" --run-id "$RUNID" --current-state "<stage-n:status|…>" \
+  --legacy-json '<the stage-status array as JSON>' --expect-event <the transition you are about to make> --json
+```
+
+Close with `run.completed` / `run.failed` / `run.blocked` exactly as the Workflow path does.
+
 Report exactly as the [Run summary](#run-summary-always-end-with-this) describes — minus the Workflow
 run ID/scriptPath (there is none); cite the worktree paths of any un-integrated members instead.
 
@@ -432,7 +533,12 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
 
    ```bash
    ROOT="$PWD"; while [ "$ROOT" != "/" ] && [ ! -d "$ROOT/.sidekicks" ]; do ROOT="$(dirname "$ROOT")"; done
+   STAMP="$(date '+%Y%m%d-%H%M%S')"
    ```
+
+   Then open the **run-event sidecar** — [preflight and `run.created`](#run-events--the-diagnostic-sidecar),
+   *before* any stage transitions. `preflight` exiting **4** means the subsystem is unavailable here:
+   run with recording OFF (omit `args.events`) and note it in the report; never halt over it.
 
    **Check whether you have a `Workflow` tool** — if not, switch to the
    [Fallback](#fallback--when-the-workflow-tool-isnt-available) for steps 4–6 (everything else is identical).
@@ -496,10 +602,14 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
    `work_dir`/`docs_dir` baked into the script is now repo-relative or absolute (step 3a already
    resolved any leading-dot anchors) — never write a literal `.`/`./…`/`../…` into the script.
 5. **If a card is bound, post the `started` bookend** (card → in-progress) *before* launching — see
-   [Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card) — then **run it** via the
-   `Workflow` tool with `args: { runStamp, jira: { card, env } }` (omit `jira` when unbound). It runs in
-   the background and notifies you on completion; the user can watch live with `/workflows`.
-6. **On completion**, read the workflow's returned `{ status, summary, … }` and report (below). **If a
+   [Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card) — **append `run.started`** when
+   events are on, then **run it** via the `Workflow` tool with
+   `args: { runStamp, jira: { card, env }, events: { runDir, runId, workItem } }` (omit `jira` when
+   unbound, omit `events` when preflight said the sidecar is unavailable). It runs in the background and
+   notifies you on completion; the user can watch live with `/workflows`.
+6. **On completion**, read the workflow's returned `{ status, summary, event_sidecar, … }` and report
+   (below). `event_sidecar: 'diverged'` means the trail has a gap — say so, and name
+   `sidekicks artifacts events check <run-dir>`; a resume reconciles it. **If a
    card is bound, post the closing bookend**: `done` + transition when `status: completed`, else
    `failed`/`blocked` (no done-transition) with the halt reason — see
    [Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card). On a halt, the returned
@@ -554,6 +664,11 @@ cache, only 2c re-runs, then stage 3.
 If every stage succeeded, say so plainly and list what landed where (and which waves ran in parallel).
 Always cite the **scriptPath + run ID** (so the user can inspect or resume) and the **final active
 scope**, since the last step left `settings.json` pointing at its `work_dir`.
+
+Add one line for the **run-event sidecar**: its run dir and whether recording was `on`, `off`
+(preflight said unavailable — name the reason) or `diverged` (a gap the next resume reconciles). Read it
+back with `sidekicks artifacts events show <run-dir>`. Never present it as the resume handle — the
+scriptPath and run ID are.
 
 **Run reporting (when commander is on the opt-in list).** Run reporting is triggered *externally* by
 `CLAUDE.md`, not wired into this skill — but when `sk-commander` is on the run-reporting opt-in
@@ -728,3 +843,7 @@ passed through to each skill verbatim.
 - It does not invent or improvise steps. A CLI step runs *exactly* the command the sequence names; if a
   skill is unknown, an input is missing, or a worktree merge conflicts (proof the wave wasn't
   independent), it halts and reports rather than guessing. It won't silently run destructive commands.
+- It does not resume from the run-event sidecar, and never makes it authoritative. `events.v1.jsonl` is
+  a diagnostic audit trail written *alongside* the Workflow journal; the journal and the `stages` array
+  decide where a run continues. It also never rewrites, replays from, or deletes a prior run's events —
+  a missing transition is recorded as `run.reconciled`, never back-filled.

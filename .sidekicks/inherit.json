@@ -4,8 +4,8 @@
   "direction": "one-way: sidekicks source -> this runtime",
   "source": {
     "repo": "sidekicks",
-    "commit": "a5e56e67",
-    "inherited_at": "2026-08-18T16:02:48+07:00",
+    "commit": "7a010e67",
+    "inherited_at": "2026-08-19T04:55:21+07:00",
     "tool": "sk-inherit"
   },
   "options": {
@@ -17,16 +17,16 @@
       "origin": "active",
       "version": "1.7.0",
       "source_path": ".agents/skills/sk-hello",
-      "source_commit": "a5e56e67",
-      "inherited_at": "2026-08-18T16:02:48+07:00",
+      "source_commit": "7a010e67",
+      "inherited_at": "2026-08-19T04:55:21+07:00",
       "files": {
         "SKILL.md": "f11c1febd69326b4bd14465a1387dcee48be7db8f25f7be5b6a4127489318ad2",
         "VERSION.json": "9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af",
         "improvements/001-trim-description-under-cap.yaml": "d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599",
         "improvements/INDEX.md": "a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5",
         "scripts/capability.mjs": "f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3",
-        "scripts/readiness.mjs": "69995a9706f1a48a1d07d9d099fc17d1d3f0fcc99a970228971919f07f9f0de6",
-        "skill.manifest.yaml": "fb28f2fcd969f5755aeed1166fab8034bcec278a3eb3bfddace88c6b6c18a76f"
+        "scripts/readiness.mjs": "38f297db6481b27c09ac8207970d86b7befce611dc19bf2e83a37b967c984419",
+        "skill.manifest.yaml": "258bdf5edb54bd7d4f5b113fcfe572a12d6f1b4d4527354d030ddcaef6b43e9d"
       }
     },
     "skills/sk-cli": {
@@ -34,8 +34,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-cli",
-      "source_commit": "a5e56e67",
-      "inherited_at": "2026-08-18T16:02:49+07:00",
+      "source_commit": "7a010e67",
+      "inherited_at": "2026-08-19T04:55:21+07:00",
       "files": {
         "SKILL.md": "339bbc3ed4999dc91550811ea86f99d994dba6d5d1bf71f04c06b8092d7f95d8",
         "VERSION.json": "23ae847800c72cb55557e9a52d3d9e1f5f5650f218db63c1b8ab7ade771c1646",
@@ -46,13 +46,13 @@
     "skills/sk-commander": {
       "kind": "skill",
       "origin": "active",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "source_path": ".agents/skills/sk-commander",
-      "source_commit": "a5e56e67",
-      "inherited_at": "2026-08-18T16:02:49+07:00",
+      "source_commit": "7a010e67",
+      "inherited_at": "2026-08-19T04:55:21+07:00",
       "files": {
-        "SKILL.md": "d2506c1cbb52295569b4cdf1d92454096bb797cb19d27ce0191d4c6990b3a259",
-        "VERSION.json": "5e822180aff8bb85af1d4fc66b879877060c59693d7e061be01e665b95777c9f",
+        "SKILL.md": "a200b261f1bb6b09ed4cf786950fffe72c3fc4b568068c698dce398971a8ae0b",
+        "VERSION.json": "85b1f5ecb6b3bd25813f7f84960ef7037dffafcb263b2e2b151747b7f007ff84",
         "improvements/001-ralph-arm-guard-when-plugin-absent.yaml": "66bffe4608f7057143e85870b9ebee9c3f327236dfcd9f8928ae085e6b6b877c",
         "improvements/002-service-pull-is-registry-mutating.yaml": "5ae24c5b633ed24f27592234fe7362661008806ef0aab131da8753383219c02a",
         "improvements/003-set-remote-is-registry-mutating.yaml": "28f353b5a752d4b4ee76370622dd7c03393479dd39377d085be5103f76f0d55c",
@@ -71,10 +71,11 @@
         "improvements/016-cross-scope-worktrees-are-created-without-consent.yaml": "eabd2ffb8ced390a2fcd20fa886a71891954f3266f2a67f06dcd1f7f80e4e2b7",
         "improvements/017-integrate-misdiagnoses-a-stale-base-conflict.yaml": "4e80e8d0dab53287b261a67534431b678a16aaba178356c55ed40362f967a832",
         "improvements/INDEX.md": "5f3490849873d11325a9057d5c55ff8055ecf987fab75d482247937b7223a8bd",
-        "references/commander-workflow-template.js": "3993a910d444fd330787e2c3ececb9ef2f5e078bbed9069784247cf1ab946da2",
+        "references/commander-workflow-template.js": "f709ef883c3444a9d58e54e848dd971e0cfcad9b99b784f30af260e12e2e0f1d",
         "rules/criterion.command-sequences.md": "356c6cf64ed6dae24caa5f2b47d211317a2212f3cceb7b4b2fc376e45600e51d",
         "scripts/resolve-anchor.mjs": "d8bab074b6b57094ccedad740eb65c14426f1a81086616ba40ef434c1e21e83d",
-        "skill.manifest.yaml": "31975a05b0552d2162e78888bb3b9381d0abf2a7f1863281b472262f0b45a250",
+        "scripts/run-event.mjs": "dad2caaadc4e23f9f8d7c528e6623ec093adc7ebf40dd15d302250341de55ba3",
+        "skill.manifest.yaml": "9afb99d3d50d2350b839a05a2e5fc12c02d8ddace508a088cd5737d9ae141a72",
         "skill.yaml": "1442293ff64b10a42fd05ef0b4654b3d8f79cdc235ce5e7dbd66f4286af72828"
       }
     },
@@ -83,8 +84,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-scope-switch",
-      "source_commit": "a5e56e67",
-      "inherited_at": "2026-08-18T16:02:49+07:00",
+      "source_commit": "7a010e67",
+      "inherited_at": "2026-08-19T04:55:21+07:00",
       "files": {
         "SKILL.md": "0c429429f6d535e538680bd0d701a954c4737260a85b72d18d5dbbd7a1a60d17",
         "VERSION.json": "2f8fffddaf0f59c6711434d2b4477beb3d19f847fdb02f09826ce348b3a4e405"
@@ -95,12 +96,60 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-config-doctor",
-      "source_commit": "a5e56e67",
-      "inherited_at": "2026-08-18T16:02:49+07:00",
+      "source_commit": "7a010e67",
+      "inherited_at": "2026-08-19T04:55:21+07:00",
       "files": {
         "SKILL.md": "198908336a007135039fa971f60708ebebc5dd30e779afd01b4e822b964ece46",
         "VERSION.json": "86a579f1dc8a18d070e0e6a1f68488a04c94d19384c9f2c25888ce11f82fdf72",
         "skill.manifest.yaml": "ec21b02d57f754e39c3cc249adb505bfbf421b3c1aeed082a18f3d55b84679bd"
+      }
+    },
+    "skills/sk-skill-manager": {
+      "kind": "skill",
+      "origin": "active",
+      "version": "1.6.0",
+      "source_path": ".agents/skills/sk-skill-manager",
+      "source_commit": "7a010e67",
+      "inherited_at": "2026-08-19T04:55:21+07:00",
+      "files": {
+        "SKILL.md": "e271724e0f7ab5fa4bc90c9b84a940774781d07832dcbd54d0f83be6acf2d47e",
+        "VERSION.json": "206f32a6bb6d3831419e5bd2c515c43ac61081e04987da07d8d028fdaf2e13e2",
+        "assets/categories.yaml": "713bf1feee06f3b48101391212afdffe917ecf40a708303e330d20a8c6c37257",
+        "assets/not-carried-withholding.md": "2b2ef8582cede5c7eb2ebeaa3f24a169869911d9e45ee1774890f4ab83177e25",
+        "assets/repo-templates/LAYOUT.private.md": "e112f53c9c8d1e48608befb46884968165f52d9db7cd2689147da4dfeb109983",
+        "assets/repo-templates/LAYOUT.public.md": "d347308d4a8cf04bf964e812d93b7bb8a6656d85ef35bbb6adbb58b3407b74d9",
+        "assets/repo-templates/LICENSE.private": "cdaa1c1a0bd979748be79650b7b538370c36546e0bfe41399a4b73a26190e145",
+        "assets/repo-templates/LICENSE.public": "8a149eab12bcc8091d1116adc8b4870a56e5fa47dc1ff126db59ebf0bce28991",
+        "assets/repo-templates/README.private.md": "246907bd390ccf333e90cd9829c5d67186933357bf68b9f60d24c5b95c8ef4d6",
+        "assets/repo-templates/README.public.md": "0fdada3e2404cde7035c242e6e47b031eba9abedbf574551057f4d75de25bc83",
+        "assets/repo-templates/categories/agents.md": "fcc712d429b27d3232f35c1cf7cd067e88c0056d0448584c18297f50961e3fd2",
+        "assets/repo-templates/categories/architecture.md": "82e96486264065076b842fd577c6fb5a0c84939f13d7ad2776c704f5fabf489a",
+        "assets/repo-templates/categories/bmad.md": "a5a8d313af2ca07e8c9367dd32e2491cd51ebb77db52d0d94fe355cf4bbc3bd8",
+        "assets/repo-templates/categories/core.md": "9bc15e41b48e120271c3ad549f426a167d38b0360dcbeee9983fcc34abc90f1e",
+        "assets/repo-templates/categories/database.md": "de5cd2bf2f6a3fb1aae56d8200b40354c118024fabd5e52ab27603d2da72a7ae",
+        "assets/repo-templates/categories/delivery.md": "73bf91f20ea5ee9a92cac1bc72e31b1b977e948d7be4b40eeadee81bf96c5f56",
+        "assets/repo-templates/categories/git.md": "ed87137ed30a6162bc36d55bb1549a34ec193a3b1e0a149082e33fd3585e668f",
+        "assets/repo-templates/categories/integrations.md": "60629b8e54d64adc0ba0c72e960882480283b62ab91860080eb9984a95f8ca7f",
+        "assets/repo-templates/categories/jira.md": "aee3f819d79d7fa792106f7848e4c773e75888c8c5df3d1f037eb5915074d9d5",
+        "assets/repo-templates/categories/ops.md": "812c13f1e720a1a1000e709c29f091a4672e9d5bc6e99dc80efe50376bcef9d3",
+        "assets/repo-templates/categories/planning.md": "6c69a5d1999e3b02b278bcfb2c302d72c700a2fe695e2a111fb125ee31061674",
+        "assets/repo-templates/categories/skill-improvement.md": "5dcc813f12bfc42791082eae50b296bc895c570bcad57a391a757a89130c5df4",
+        "assets/repo-templates/gitignore": "336142e039f27ceb9193cb08a27f4585f5c40084d7b8d9ccc758c1b8464ae9cf",
+        "config.defaults.yaml": "ef7da9bae7a6b000b67f9356515c375bf218a64876827867c4cdb13891e82725",
+        "improvements/001-export-destination-registry.yaml": "a0fef4adc949db07c59239e892b296b1a1881903cf821b248f734742327c0c1c",
+        "improvements/002-export-picklist-selection.yaml": "a25e3425ae576dfa8e91d6fddb7611c50e552d5d3c1385fb103fd33f94b4f260",
+        "improvements/003-discover-by-intent.yaml": "0146084a6303928ad8c4ca3c145b3d027492517c222c38a5791b1c60dabc42da",
+        "improvements/INDEX.md": "6baa5ab71715b970c643d6942a988adc98ad9c3a2325073cc8505fa20cc3f328",
+        "references/publication-split.md": "e86d7b693e3afceccb6454a4d91e519d9966217cc967a1fe85ad4fe8d67b38ce",
+        "references/skill-repo-layout.md": "6b958be2fd0f9f8bfaba286f4d9572dea9a49b6591de47d65d2e239585520b86",
+        "scripts/category-doc.mjs": "6c51394559d322d0d0b90ceff84c7f2fc05ccff4c723f97cc11ab649554a7cf0",
+        "scripts/export-picklist.mjs": "06e777533b2729466f0403ab25ca5d64da280a9f462ee345dabd0e5e4c51770f",
+        "scripts/skill-repo-not-carried.mjs": "6fe2e48442b9386e583ef3d035b0bc0deac0e7d07bd36da8d1add1696aadf51b",
+        "scripts/skill-repo-readmes-private.mjs": "2c32ac9860640dec9be2218dee7a3ed94dba0c1748d462f847889ed60d6f9271",
+        "scripts/skill-repo-readmes-public.mjs": "913942b4f25eab31890ba728553838349477629823afcdce8360e22b623d6862",
+        "scripts/skill-search.mjs": "63daac8ee2709c8d2fd00faae31d942e7b526c58cce2e9d1fb8a0138f3f01aeb",
+        "skill.manifest.yaml": "9097779eb53427efebf71c04ce499ac89795962f87302c63dc118505e1c83907",
+        "skill.yaml": "54e6ae0288bab42e1a3f7309fea10170f342d74e960c2dc6e9bf9bd7eb422cba"
       }
     }
   }

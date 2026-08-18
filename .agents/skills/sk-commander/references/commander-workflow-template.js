@@ -22,6 +22,20 @@
 //   • A stage is a global BARRIER. Stages run in order; a wave is parallel() inside
 //     that order. This is sequential-stages-with-waves — NOT pipeline() (pipeline is
 //     for per-item independent chains, which is not the commander's model).
+//   • NO filesystem and NO subprocess from the script itself. Anything that has to
+//     touch disk — including the run-event sidecar below — goes through an agent()
+//     call, which is also what makes it journaled and therefore resume-safe.
+//
+// RUN EVENTS (the diagnostic sidecar). When the commander passes `args.events`, every
+// stage transition is mirrored to `<run-dir>/events.v1.jsonl` through the framework's
+// `artifacts events` CLI, in the dual-write order the framework fixes
+// (lib/run-events/schema.mjs DUAL_WRITE_STEPS): the commander PREFLIGHTS the CLI before
+// the run, `setStatus()` mutates the legacy state FIRST, then the event is appended with
+// a DETERMINISTIC id, and a failed append HALTS this script before its next transition
+// with `event-sidecar-diverged`. The sidecar changes NOTHING about resume: the Workflow
+// journal plus the `stages` array remain the source of truth, and no code path reads an
+// event back to decide where to continue. Omit `args.events` and every helper below is a
+// no-op — a runtime whose CLI has no `artifacts events` verb runs exactly as before.
 // =============================================================================
 
 export const meta = {
@@ -56,6 +70,150 @@ function setStatus(idx, next, ts) {
   const prev = stages[idx].status
   stages[idx].status = next
   log(`[${stages[idx].title}] ${prev} → ${next}${ts ? '  @ ' + ts : ''}`)
+}
+
+// -----------------------------------------------------------------------------
+// Run events — the diagnostic sidecar (keep verbatim)
+// -----------------------------------------------------------------------------
+// args.events, when the commander's preflight succeeded:
+//   { runDir: '<REPO-RELATIVE run dir>', runId: '<portable run id>', workItem: '<slug>|null',
+//     model: '<optional low-tier model id>',
+//     reconcile: { currentState, legacyJson, expectEvent, expectStep } | undefined }
+// Absent (or preflight failed → the commander deliberately omits it) ⇒ recording is OFF and every
+// helper here returns immediately. A missing DIAGNOSTIC never halts a sequence; only a failed append
+// after a SUCCESSFUL preflight does, because that one means the trail has a gap nobody recorded.
+const EV = (typeof args !== 'undefined' && args && args.events) || null
+
+// A LOW-tier model is the right lane for an event emitter (it runs one literal command and reports the
+// exit code). The commander passes an id it has verified exists in this runtime; absent, the agent
+// inherits the session model rather than naming a model that may not resolve.
+const EVENT_MODEL = (EV && EV.model) || ''
+
+// The idempotency key, mirroring lib/run-events/schema.mjs deterministicEventId EXACTLY. Built only
+// from facts that identify the TRANSITION — never a clock, a pid, or a random value — so a retried or
+// journal-replayed append answers `duplicate` instead of writing the transition twice. (Mirrored
+// rather than imported because a Workflow script cannot import from disk; the id is only used in the
+// LOG line here — run-event.mjs recomputes the authoritative one from the same inputs.)
+function eventId(parts) {
+  const segs = [parts.engine || 'commander', parts.runId, parts.event]
+  if (parts.step) segs.push(String(parts.step))
+  if (parts.attempt) segs.push('a' + parts.attempt)
+  return segs
+    .map((x) => String(x).trim().replace(/[^A-Za-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, ''))
+    .filter((x) => x !== '')
+    .join('|')
+}
+
+// The emitter's report shape — deliberately smaller than STEP: this agent produces no artifacts.
+const EVENT_ACK = {
+  type: 'object',
+  properties: {
+    ok:    { type: 'boolean', description: 'true ONLY if the command exited 0' },
+    error: { type: 'string',  description: 'the exit code and the reason line when ok=false (empty otherwise)' },
+  },
+  required: ['ok'],
+}
+
+// One literal command, no judgement: resolve the repo root, run the skill's own run-event helper.
+function eventBrief(subcommand, flagLine) {
+  return `Run EXACTLY this command and report its exit code. Do NOT improvise, retry with different
+arguments, edit any file, or do anything else. It records ONE diagnostic run event; it is not the
+sequence's work.
+
+Resolve the repo root first (walk up from the working directory for a .sidekicks/ directory), then run:
+    ROOT="$PWD"; while [ "$ROOT" != "/" ] && [ ! -d "$ROOT/.sidekicks" ]; do ROOT="$(dirname "$ROOT")"; done
+    node "$ROOT/.agents/skills/sk-commander/scripts/run-event.mjs" ${subcommand} \
+      --run-dir "$ROOT/${EV.runDir}" ${flagLine} --json
+
+Set ok=true ONLY if it exited 0 (both "appended" and "duplicate" are exit 0 — duplicate is the correct
+answer for a replayed or retried transition, not a failure). On any non-zero exit set ok=false and put
+the exit code plus the reason line in "error" verbatim — exit 3 is event-sidecar-diverged, and the run
+halts on it deliberately.`
+}
+
+// Append the event for a transition the script has ALREADY made (dual-write step 3). Two attempts,
+// because the append is idempotent by event_id and a flaked subagent is not evidence of divergence.
+async function emit(ev) {
+  if (!EV || !EV.runDir || !EV.runId) return true
+  const flags = [
+    `--run-id "${EV.runId}"`,
+    `--event ${ev.event}`,
+    `--status ${ev.status}`,
+    ...(ev.step ? [`--step "${ev.step}"`] : []),
+    ...(ev.attempt ? [`--attempt ${ev.attempt}`] : []),
+    ...(EV.workItem ? [`--work-item "${EV.workItem}"`] : []),
+    ...Object.keys(ev.detail || {}).map((k) => `--detail "${k}=${String(ev.detail[k]).replace(/"/g, "'")}"`),
+    ...(ev.refs || []).map((r) => `--ref "${r}"`),
+  ].join(' ')
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const r = await agent(eventBrief('append', flags), {
+      label: `event ${ev.event}${ev.step ? ' ' + ev.step : ''}${attempt > 1 ? ` (try ${attempt})` : ''}`,
+      phase: ev.phase,
+      schema: EVENT_ACK,
+      ...(EVENT_MODEL ? { model: EVENT_MODEL } : {}),
+    })
+    if (r && r.ok) return true
+    if (attempt === 2) {
+      log(`! event-sidecar-diverged on ${ev.event} (${eventId({ runId: EV.runId, event: ev.event, step: ev.step, attempt: ev.attempt })}): ${(r && r.error) || 'no reason reported'}`)
+      return false
+    }
+  }
+  return false
+}
+
+// A stage transition: LEGACY STATE FIRST (it is the resume authority and is never rolled back to
+// match the sidecar), then the event. A failed append THROWS — the existing try/catch turns that into
+// `{ status: 'halted', reason: 'event-sidecar-diverged: …' }`, which is exactly "halt before the next
+// transition" with legacy state left authoritative and resumable.
+async function transition(idx, next, ts, ev) {
+  setStatus(idx, next, ts)
+  if (!ev) return
+  const ok = await emit({ ...ev, phase: ev.phase || stages[idx].title })
+  if (!ok) {
+    throw new Error(
+      `event-sidecar-diverged: the run event for "${stages[idx].title}" → ${next} (${ev.event}) could not be `
+      + 'appended. Legacy state (the Workflow journal + stages) is authoritative and this run is resumable; '
+      + 'diagnose with `sidekicks artifacts events check <run-dir>` and resume — the resume reconciles.',
+    )
+  }
+}
+
+// A TERMINAL event (run.completed / run.failed / run.blocked) is best-effort on purpose: the run is
+// already ending, so halting over a missing final row would only replace one gap with another. The
+// gap is reported in the result and closed by the next resume's reconciliation.
+async function emitFinal(event, status, detail, phase) {
+  if (!EV || !EV.runDir || !EV.runId) return 'off'
+  const ok = await emit({ event, status, detail: detail || {}, phase })
+  return ok ? 'recorded' : 'diverged'
+}
+
+// Dual-write step 5 — reconcile BEFORE resuming. The legacy state compared against is the one the
+// COMMANDER hands in (the halted run's returned `stages`), never this script's own tracker: at this
+// point in a replay every stage still reads 'todo', which would digest a state the run is not in.
+// Only `run.reconciled` is ever written; the events that were never appended stay missing, because a
+// fabricated history reads as evidence.
+async function reconcileOnResume() {
+  if (!EV || !EV.reconcile) return true          // a fresh run has no history to disagree with
+  const rc = EV.reconcile
+  const flags = [
+    `--run-id "${EV.runId}"`,
+    `--current-state "${rc.currentState}"`,
+    `--legacy-json '${rc.legacyJson}'`,
+    ...(rc.expectEvent ? [`--expect-event ${rc.expectEvent}`] : []),
+    ...(rc.expectStep ? [`--expect-step "${rc.expectStep}"`] : []),
+    ...(EV.workItem ? [`--work-item "${EV.workItem}"`] : []),
+  ].join(' ')
+  const r = await agent(eventBrief('reconcile', flags), {
+    label: 'event reconcile (resume)',
+    schema: EVENT_ACK,
+    ...(EVENT_MODEL ? { model: EVENT_MODEL } : {}),
+  })
+  if (r && r.ok) return true
+  throw new Error(
+    'event-sidecar-diverged: the resume could not reconcile the run-event sidecar against current legacy '
+    + `state (${(r && r.error) || 'no reason reported'}). Legacy state is authoritative and unharmed; `
+    + 'check the sidecar with `sidekicks artifacts events check <run-dir>` before resuming again.',
+  )
 }
 
 // -----------------------------------------------------------------------------
@@ -251,11 +409,21 @@ const summary = []                                    // per-stage report the co
 // args.jira ({ card, env }) — when the sequence carried a top-level `jira:` block, the commander
 // passes it here and each step posts a per-step progress comment (see JIRA / jiraAddendum above).
 // The commander posts the started/done bookends + transitions itself, OUTSIDE this script.
+// args.events ({ runDir, runId, workItem, model?, reconcile? }) — the run-event sidecar (see EV
+// above). The commander preflights the CLI and appends run.created/run.started BEFORE launching this
+// script, so by the time a stage transitions here the trail is already open. Every stage transition
+// below therefore goes through `transition(...)` rather than `setStatus(...)` directly: setStatus is
+// the legacy mutation, and transition is setStatus PLUS the append, in that order.
 
 try {
+  // ---- RESUME RECONCILIATION comes before the first transition (dual-write step 5). ----
+  // No-op on a fresh run; on a resume the commander passes args.events.reconcile and this appends
+  // run.reconciled when the sidecar is missing the transition the legacy state is actually in.
+  await reconcileOnResume()
+
   // ---- A CLI step looks IDENTICAL to a skill step — just `run` instead of `skill`. ----
   // Use one as an early scaffolding stage or a late verification/commit gate, e.g.:
-  //   setStatus(0, 'inprogress')
+  //   await transition(0, 'inprogress', '', { event: 'step.started', status: 'running', step: 'stage-0' })
   //   phase('Stage 0 — scaffold svc-a')
   //   const s0 = await runStep(
   //     { run: 'sidekicks service add svc-a git@github.com:acme/svc-a.git' },  // work_dir omitted -> repo root
@@ -263,7 +431,9 @@ try {
   //   )
   //   summary.push({ stage: 0, kind: 'cli', run: 'sidekicks service add svc-a <git-url>', ...s0 })
   //   stages[0].startedAt = s0.startedAt || ''; stages[0].completedAt = s0.completedAt || ''
-  //   setStatus(0, s0.ok ? 'done' : 'failed', s0.completedAt || '')
+  //   await transition(0, s0.ok ? 'done' : 'failed', s0.completedAt || '',
+  //     { event: s0.ok ? 'step.completed' : 'step.failed', status: s0.ok ? 'succeeded' : 'failed',
+  //       step: 'stage-0', detail: { title: stages[0].title, kind: 'cli' } })
   //   if (!s0.ok) return { status: 'halted', stage: 0, reason: s0.error, stages, summary }
   //   handoffs.push(s0.handoff)
   // Use the REAL CLI signature — `service add <name> [<git-url>]` (no `--project` flag): the NAME comes
@@ -276,7 +446,10 @@ try {
   // Registry-mutating CLI steps stay SEQUENTIAL — never put them in a parallel() wave.
 
   // ---- Stage 1: a single step (barrier by definition) ----
-  setStatus(0, 'inprogress')
+  await transition(0, 'inprogress', '',
+    { event: 'step.started', status: 'running', step: 'stage-1',
+      detail: { title: stages[0].title, skill: 'sk-bmad-pm' },
+      refs: ['kind=skill,id=sk-bmad-pm', 'kind=work_dir,path=projects/acme/services/svc-a/src'] })
   phase('Stage 1 — sk-bmad-pm')
   const s1 = await runStep(
     { skill: 'sk-bmad-pm', work_dir: 'projects/acme/services/svc-a/src',
@@ -285,8 +458,13 @@ try {
   )
   summary.push({ stage: 1, kind: 'step', skill: 'sk-bmad-pm', ...s1 })
   stages[0].startedAt = s1.startedAt || ''; stages[0].completedAt = s1.completedAt || ''
-  setStatus(0, s1.ok ? 'done' : 'failed', s1.completedAt || '')
-  if (!s1.ok) return { status: 'halted', stage: 1, reason: s1.error, stages, summary }
+  await transition(0, s1.ok ? 'done' : 'failed', s1.completedAt || '',
+    { event: s1.ok ? 'step.completed' : 'step.failed', status: s1.ok ? 'succeeded' : 'failed',
+      step: 'stage-1', detail: { title: stages[0].title, skill: 'sk-bmad-pm', reason: s1.ok ? '' : s1.error } })
+  if (!s1.ok) {
+    const ev = await emitFinal('run.failed', 'failed', { stage: 1, reason: s1.error }, stages[0].title)
+    return { status: 'halted', stage: 1, reason: s1.error, stages, summary, event_sidecar: ev }
+  }
   handoffs.push(s1.handoff)
 
   // ---- Stage 2: a parallel WAVE ----
@@ -298,7 +476,9 @@ try {
   //     diverged copy of the same files -> integrate conflicts). Serialize those steps instead.
   // Below is the cross-scope case (three different services).
   const STAGE2 = 'Stage 2 — wave (3 services)'
-  setStatus(1, 'inprogress')
+  await transition(1, 'inprogress', '',
+    { event: 'step.started', status: 'running', step: 'stage-2', phase: STAGE2,
+      detail: { title: stages[1].title, members: 3, kind: 'wave' } })
   phase(STAGE2)
   const wave = [
     { skill: 'sk-bmad-developer', work_dir: 'projects/acme/services/svc-a/src', instruction: 'Implement every ready-for-dev story.' },
@@ -322,18 +502,36 @@ try {
   const waveStartedAt = waveResults.reduce((min, r) => (r && r.startedAt && (!min || r.startedAt < min) ? r.startedAt : min), '')
   const waveCompletedAt = waveResults.reduce((max, r) => (r && r.completedAt && (!max || r.completedAt > max) ? r.completedAt : max), '')
   stages[1].startedAt = waveStartedAt; stages[1].completedAt = waveCompletedAt
-  setStatus(1, failedMember ? 'failed' : 'done', waveCompletedAt || '')
+  // ONE event per STAGE, not per wave member: a stage is the commander's transition unit, and the
+  // per-member detail is already in `summary`. Emitting synthetic per-member rows would put facts in
+  // the trail that no single transition produced.
+  await transition(1, failedMember ? 'failed' : 'done', waveCompletedAt || '',
+    { event: failedMember ? 'step.failed' : 'step.completed', status: failedMember ? 'failed' : 'succeeded',
+      step: 'stage-2', phase: STAGE2,
+      detail: { title: stages[1].title, kind: 'wave', members: waveResults.length, succeeded: done.length } })
 
   // Integrate the SUCCEEDED members regardless (don't waste good work)...
   if (crossScope) {
     const ok = await integrate(done.map((r) => r.branch).filter(Boolean), STAGE2)
-    if (!ok) return { status: 'halted', stage: 2, reason: 'worktree integration conflicted — wave was not independent', stages, summary }
+    if (!ok) {
+      const reason = 'worktree integration conflicted — wave was not independent'
+      const ev = await emitFinal('run.failed', 'failed', { stage: 2, reason }, STAGE2)
+      return { status: 'halted', stage: 2, reason, stages, summary, event_sidecar: ev }
+    }
   }
   // ...then halt BEFORE the barrier if any member failed (next stage depends on the whole wave).
-  if (failedMember) return { status: 'halted', stage: 2, reason: 'a wave member failed after 3 attempts; barrier not crossed', stages, summary }
+  // A barrier that was not crossed is `run.blocked`, not `run.failed`: the run stopped waiting on the
+  // wave, and that distinction is the whole reason both types exist in the schema.
+  if (failedMember) {
+    const reason = 'a wave member failed after 3 attempts; barrier not crossed'
+    const ev = await emitFinal('run.blocked', 'blocked', { stage: 2, reason }, STAGE2)
+    return { status: 'halted', stage: 2, reason, stages, summary, event_sidecar: ev }
+  }
 
   // ---- Stage 3: single step, runs only after the whole wave integrated ----
-  setStatus(2, 'inprogress')
+  await transition(2, 'inprogress', '',
+    { event: 'step.started', status: 'running', step: 'stage-3',
+      detail: { title: stages[2].title, skill: 'sk-bmad-code-review' } })
   phase('Stage 3 — sk-bmad-code-review')
   const s3 = await runStep(
     { skill: 'sk-bmad-code-review', work_dir: 'projects/acme/services/svc-a/src',
@@ -342,12 +540,24 @@ try {
   )
   summary.push({ stage: 3, kind: 'step', skill: 'sk-bmad-code-review', ...s3 })
   stages[2].startedAt = s3.startedAt || ''; stages[2].completedAt = s3.completedAt || ''
-  setStatus(2, s3.ok ? 'done' : 'failed', s3.completedAt || '')
-  if (!s3.ok) return { status: 'halted', stage: 3, reason: s3.error, stages, summary }
+  await transition(2, s3.ok ? 'done' : 'failed', s3.completedAt || '',
+    { event: s3.ok ? 'step.completed' : 'step.failed', status: s3.ok ? 'succeeded' : 'failed',
+      step: 'stage-3', detail: { title: stages[2].title, skill: 'sk-bmad-code-review', reason: s3.ok ? '' : s3.error } })
+  if (!s3.ok) {
+    const ev = await emitFinal('run.failed', 'failed', { stage: 3, reason: s3.error }, stages[2].title)
+    return { status: 'halted', stage: 3, reason: s3.error, stages, summary, event_sidecar: ev }
+  }
   handoffs.push(s3.handoff)
 
-  return { status: 'completed', summary, stages, handoffs }
+  const ev = await emitFinal('run.completed', 'succeeded', { stages: stages.length })
+  return { status: 'completed', summary, stages, handoffs, event_sidecar: ev }
 } catch (e) {
   // A genuinely missing precondition or runtime error: surface it, don't pretend success.
-  return { status: 'halted', reason: String((e && e.message) || e), stages, summary }
+  const reason = String((e && e.message) || e)
+  // The sidecar's OWN failure arrives here as a throw. Emitting again would just fail again, so the
+  // divergence is reported as-is and the next resume's reconciliation closes the gap.
+  const ev = reason.startsWith('event-sidecar-diverged')
+    ? 'diverged'
+    : await emitFinal('run.failed', 'failed', { reason })
+  return { status: 'halted', reason, stages, summary, event_sidecar: ev }
 }

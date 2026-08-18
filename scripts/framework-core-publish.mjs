@@ -133,6 +133,7 @@ const NO_MOUNT_CHECK = has("no-mount-check");
 const NO_COMMIT = has("no-commit");
 const ALLOW_PROTECTED = has("allow-protected");
 const RELAND = has("reland");
+const ALLOW_UNPUSHED = has("allow-unpushed");
 
 // ── Small helpers ───────────────────────────────────────────────────────────
 function git(args, cwd = ROOT) {
@@ -1513,6 +1514,43 @@ function doVerify() {
   process.exit(0);
 }
 
+// ── GATE: the PREVIOUS release must already be SERVED by the core's remote ──
+// A release is not finished when it is tagged; it is finished when the remote serves the tag,
+// because the core's README pins installs to `--ref v<version>`. v1.1.0 and v1.1.1 both landed
+// on the remote's `main` with NO tag — a bare `git push` instead of the printed
+// `push origin HEAD --tags` — so both releases were uninstallable by the only name they
+// document, and the first thing to notice was an installer falling back to a commit pin.
+//
+// Nothing caught it because the one verb that can (`verify-remote`) is a separate command
+// nobody ran, so each unpushed release was buried under the next one. Cutting a new version is
+// the moment that matters: it is the last point where the previous tag can still be pushed
+// without archaeology, so the check goes HERE rather than in a report.
+//
+// Only the TAG is scored. The per-release core branch may legitimately be absent from the
+// remote, and treating that as a failure is the false negative that
+// `memory show verify-remote-checks-the-core-branch` records.
+//
+// It never fails for the network: an unreachable remote, a missing `origin`, or a target that is
+// not its own repository all WARN and continue, because a connectivity-shaped problem must not
+// be able to block a release. Only a reachable remote that demonstrably does not serve the
+// previous tag is a stop, and `--allow-unpushed` is the operator's explicit yes.
+//
+// @returns {{ok: boolean, version: string, detail: string, blocking: boolean}|null} null when
+// there is nothing to check (first release, or the target has no repo of its own).
+function previousReleaseServed() {
+  if (!targetIsOwnRepo()) return null;
+  const last = lastRelease(readJson(STATE_REL));
+  if (!last) return null;
+  const res = verifyRemote();
+  const tag = res.checks.find((c) => c.ref.startsWith("refs/tags/"));
+  // No tag check at all means verifyRemote returned early — no origin, or ls-remote failed.
+  if (!tag) {
+    const why = res.checks[0] ? res.checks[0].detail : "the remote could not be queried";
+    return { ok: false, version: String(last.version), detail: why, blocking: false };
+  }
+  return { ok: tag.ok, version: String(last.version), detail: tag.detail, blocking: !tag.ok };
+}
+
 async function doPublish() {
   const ver = publishedVersion();
   const { paths, skills, source } = corePaths();
@@ -1544,6 +1582,43 @@ async function doPublish() {
         `the tree. Reconcile, or pass --version X.Y.Z explicitly.\n`
     );
     process.exit(3);
+  }
+
+  // The previous release must be on the remote before a new one buries it (see the gate above).
+  const served = previousReleaseServed();
+  if (served && !served.ok) {
+    const push = [
+      `  git -C ${portable(SRC_REL)} push origin v${served.version}`,
+      `  node scripts/framework-core-publish.mjs verify-remote`,
+    ].join("\n");
+    if (!served.blocking) {
+      process.stdout.write(
+        `NOTE: could not confirm that v${served.version} is served by the core's remote — ` +
+          `${served.detail}. Continuing; run verify-remote once the remote is reachable.\n\n`
+      );
+    } else if (ALLOW_UNPUSHED) {
+      process.stdout.write(
+        `--allow-unpushed: cutting v${version} while v${served.version} is unpushed ` +
+          `(${served.detail}).\n\n`
+      );
+    } else if (DRY) {
+      process.stdout.write(
+        `WOULD REFUSE: v${served.version} is a LOCAL release only — ${served.detail}. ` +
+          `Push it before cutting v${version}:\n${push}\n\n`
+      );
+    } else {
+      process.stderr.write(
+        `v${served.version} was released locally but the remote does not serve its tag: ` +
+          `${served.detail}.\n\n` +
+          `  The core's README pins installs to \`--ref v<version>\`, so a tag the remote does not\n` +
+          `  carry makes that release uninstallable by the name it documents — an installer silently\n` +
+          `  falls back to pinning a commit. Cutting v${version} now buries the problem one release\n` +
+          `  deeper, so it is refused here instead.\n\n` +
+          `  Push the previous release first:\n${push}\n\n` +
+          `  Or cut this one deliberately anyway:  --allow-unpushed\n`
+      );
+      process.exit(5);
+    }
   }
 
   // ── Already released? ─────────────────────────────────────────────────────
@@ -1880,7 +1955,14 @@ async function doPublish() {
     steps.push(`git -C ${portable(SRC_REL)} commit -m "chore(release): framework core v${version}"`);
     steps.push(`git -C ${portable(SRC_REL)} tag -a v${version} -m "framework core v${version}"`);
   }
-  steps.push(`git -C ${portable(SRC_REL)} push origin HEAD --tags`);
+  // ONE `push origin HEAD --tags` line was too easy to shorten to a bare `git push`, and that is
+  // exactly how v1.1.0 and v1.1.1 reached the remote with no tag. The tag is its own step, says
+  // why it is not optional, and the verification that proves it landed is printed with it.
+  steps.push(`git -C ${portable(SRC_REL)} push origin HEAD`);
+  steps.push(
+    `git -C ${portable(SRC_REL)} push origin v${version}   ` +
+      `# NOT optional — the README pins installs to --ref v${version}`
+  );
   if (!pushOnly) {
     steps.push("");
     steps.push(`# 2) register the service state in this repo`);
@@ -1891,6 +1973,9 @@ async function doPublish() {
     steps.push(`git add ${portable(SRC_REL)} ${portable(RUN_REL)}`);
     steps.push(`git commit -m "chore(framework): bump ${RUNTIME_NAME} core gitlink to v${version}"`);
   }
+  steps.push("");
+  steps.push(`# ${pushOnly ? "2" : "4"}) prove the remote actually serves it`);
+  steps.push(`node scripts/framework-core-publish.mjs verify-remote`);
   steps.push("```");
   process.stdout.write(steps.join("\n") + "\n");
   // A blocked or failed local commit is not a failed release — the core is forged, verified
@@ -2064,7 +2149,7 @@ switch (VERB) {
       `unknown verb '${VERB}'. Use: status | publish | verify | verify-remote | log  ` +
         `(flags: --target DIR, --name NAME, --preset NAME, --remote URL, ` +
         `--bump patch|minor|major, --version X.Y.Z, --ref REF, --no-tests, --no-mount-check, ` +
-        `--no-commit, --allow-protected, --dry-run, --json)\n`
+        `--no-commit, --allow-protected, --allow-unpushed, --dry-run, --json)\n`
     );
     process.exit(2);
 }

@@ -44,14 +44,43 @@ if [ -z "$node_bin" ]; then
   exit 1
 fi
 
-"$node_bin" --test "$repo_root/tests/agent-context-mirror.test.mjs" >/dev/null 2>&1 || {
+mirror_test="$repo_root/tests/agent-context-mirror.test.mjs"
+
+mirror_failed() {
   echo "✖ pre-commit: agent-context mirror is broken." >&2
   echo "  CLAUDE.md / GEMINI.md must be symlinks to AGENTS.md (do not edit them directly)." >&2
   echo "  If you meant to change agent instructions, edit AGENTS.md instead, then:" >&2
   echo "      ln -sf AGENTS.md CLAUDE.md && ln -sf AGENTS.md GEMINI.md" >&2
-  echo "  Details: $node_bin --test tests/agent-context-mirror.test.mjs" >&2
+  if [ -f "$mirror_test" ]; then
+    echo "  Details: $node_bin --test tests/agent-context-mirror.test.mjs" >&2
+  fi
   exit 1
 }
+
+# This hook TRAVELS. sk-inherit copies .githooks/ into every forged runtime and into the framework
+# core a workspace mounts at .sidekicks-core/, and none of those carry tests/ — so invoking the
+# mirror test unconditionally made `install-hooks` a commit-breaker everywhere except this repo.
+# Where the test exists it stays the authority; where it does not, check the invariant directly.
+if [ -f "$mirror_test" ]; then
+  "$node_bin" --test "$mirror_test" >/dev/null 2>&1 || mirror_failed
+elif [ -f "$repo_root/AGENTS.md" ]; then
+  # `set -e` is on, so every test here is written as an `if` — a bare `[ ... ] && continue` that
+  # evaluates false is a failing statement, which would abort the commit with no message at all.
+  for mirror in CLAUDE.md GEMINI.md; do
+    path="$repo_root/$mirror"
+    if [ ! -e "$path" ]; then
+      continue                          # a runtime need not carry every CLI's mirror
+    fi
+    if [ -L "$path" ]; then
+      continue                          # POSIX symlink — in sync by construction
+    fi
+    # Windows checkouts (core.symlinks=false) materialise mirrors as regular files; a byte-equal
+    # copy is the supported form there, a divergent one is the drift this hook exists to stop.
+    if ! cmp -s "$path" "$repo_root/AGENTS.md"; then
+      mirror_failed
+    fi
+  done
+fi
 
 # --- Never commit a scope config.yaml (it holds the image-generation api_key) ---
 # The Sidekicks project config lives at .sidekicks/config.yaml and projects/<name>/config.yaml.

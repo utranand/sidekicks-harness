@@ -58,21 +58,47 @@ import {
   chmodSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { homedir } from "node:os";
 
-// Resolve the repo root by walking up from cwd until a .sidekicks/ dir appears.
+// A workspace can CONSUME the framework as a git submodule mounted at <root>/.sidekicks-core/.
+// That checkout is itself a forged runtime, so it carries its own .sidekicks/ — which makes a naive
+// "nearest ancestor with .sidekicks/" walk stop inside the core and report the CORE's state as the
+// workspace's. Mirrors the CLI's own core-mount contract; the marker file is the whole test.
+const CORE_DIR = ".sidekicks-core";
+const CORE_MARKER = ".sidekicks-core.json";
+
+// Case-insensitively on Windows, exactly like the filesystem compares path components.
+function isMountedCore(dir) {
+  const base = basename(dir);
+  const same =
+    process.platform === "win32" ? base.toLowerCase() === CORE_DIR : base === CORE_DIR;
+  return same && existsSync(join(dir, CORE_MARKER));
+}
+
+// Resolve the repo root by walking up from cwd until a .sidekicks/ dir appears, skipping any
+// MOUNTED core on the way up. A STANDALONE core clone is still its own root — it is kept as a
+// last-resort answer rather than dropped, so running this inside one reports that clone.
 function resolveRepoRoot() {
   let cur = process.cwd();
+  let coreFallback = null;
   while (true) {
-    if (existsSync(join(cur, ".sidekicks"))) return cur;
+    if (existsSync(join(cur, ".sidekicks"))) {
+      if (isMountedCore(cur)) {
+        if (!coreFallback) coreFallback = cur;
+      } else {
+        return cur;
+      }
+    }
     const parent = dirname(cur);
-    if (parent === cur) return process.cwd(); // fallback: best-effort
+    if (parent === cur) return coreFallback || process.cwd(); // fallback: best-effort
     cur = parent;
   }
 }
 
 const ROOT = resolveRepoRoot();
+// Path of the core this workspace mounts, or null when the framework is the repo itself.
+const MOUNTED_CORE = isMountedCore(join(ROOT, CORE_DIR)) ? join(ROOT, CORE_DIR) : null;
 const isWindows = process.platform === "win32";
 const APPLY = process.argv.includes("--apply");
 
@@ -483,33 +509,61 @@ function buildChecks() {
   const checks = [];
   pluginSetupNotes = []; // recomputed each pass so --apply's re-detect reflects truth
 
+  // Framework-repo helper scripts are absent in a workspace that MOUNTS the framework, and the
+  // core's copies resolve their own repo root — so a row may only name one that is really here.
+  const hasSetupWindows = existsSync(join(ROOT, "scripts", "setup-windows.mjs"));
+
   // 1) Git hooks — committed hooks live in .githooks and only run once
   //    core.hooksPath points there. A fresh clone does NOT set this, so the
   //    CLAUDE.md-mirror guard (and any other committed hook) silently does
   //    nothing until install-hooks runs.
+  //
+  //    Both halves must EXIST here before this is a fixable gap, because this
+  //    check travels to layouts that carry neither. A mounted-core workspace is
+  //    the one that bites: the framework's .githooks/ and scripts/ live inside
+  //    .sidekicks-core/, `core init` leaves core.hooksPath alone on purpose, and
+  //    the old unconditional row told the operator to run a root-level script
+  //    that is not there. Pointing at the core's copy is not the fix either —
+  //    install-hooks.mjs resolves its repo root from its OWN location, so it
+  //    would set the hooks path of the core rather than of the workspace.
   {
-    const res = spawnSync("git", ["config", "--get", "core.hooksPath"], {
-      cwd: ROOT,
-      encoding: "utf8",
-    });
-    const value = (res.stdout || "").trim();
-    const ok = value === ".githooks";
-    checks.push({
-      ok,
-      label: "Git hooks",
-      detail: ok ? "core.hooksPath=.githooks" : `core.hooksPath=${value || "(unset)"}`,
-      fix: "node scripts/install-hooks.mjs",
-      apply: () => {
-        const r = spawnSync("node", ["scripts/install-hooks.mjs"], {
-          cwd: ROOT,
-          encoding: "utf8",
-        });
-        return {
-          ok: r.status === 0,
-          msg: r.status === 0 ? "core.hooksPath → .githooks" : (r.stderr || r.stdout || "").trim(),
-        };
-      },
-    });
+    const hookScript = join(ROOT, "scripts", "install-hooks.mjs");
+    const preCommit = join(ROOT, ".githooks", "pre-commit");
+    const installable = existsSync(hookScript) && existsSync(preCommit);
+    if (!installable) {
+      checks.push({
+        ok: true,
+        label: "Git hooks",
+        detail: MOUNTED_CORE
+          ? "mounted-core workspace — the framework's hooks live in .sidekicks-core/ and `core init` leaves core.hooksPath alone on purpose (N/A)"
+          : "no .githooks/pre-commit + scripts/install-hooks.mjs pair in this repo — nothing to install (N/A)",
+        fix: null,
+        apply: null,
+      });
+    } else {
+      const res = spawnSync("git", ["config", "--get", "core.hooksPath"], {
+        cwd: ROOT,
+        encoding: "utf8",
+      });
+      const value = (res.stdout || "").trim();
+      const ok = value === ".githooks";
+      checks.push({
+        ok,
+        label: "Git hooks",
+        detail: ok ? "core.hooksPath=.githooks" : `core.hooksPath=${value || "(unset)"}`,
+        fix: "node scripts/install-hooks.mjs",
+        apply: () => {
+          const r = spawnSync("node", ["scripts/install-hooks.mjs"], {
+            cwd: ROOT,
+            encoding: "utf8",
+          });
+          return {
+            ok: r.status === 0,
+            msg: r.status === 0 ? "core.hooksPath → .githooks" : (r.stderr || r.stdout || "").trim(),
+          };
+        },
+      });
+    }
   }
 
   // 2) Agent-context mirrors — CLAUDE.md and GEMINI.md must equal AGENTS.md.
@@ -533,14 +587,20 @@ function buildChecks() {
       ok,
       label: "Agent-context mirrors (CLAUDE.md, GEMINI.md ↔ AGENTS.md)",
       detail: ok ? "in sync" : "stale or text-stub placeholders",
-      fix: isWindows
+      // setup-windows.mjs is the Windows implementation, but it only exists in a repo that IS the
+      // framework. A mounted-core workspace has no scripts/ of its own, and the core's copy is the
+      // wrong target — it resolves its repo root from its own location, so it would repair the
+      // CORE's mirrors. There, recreate them here instead.
+      fix: isWindows && hasSetupWindows
         ? "node scripts/setup-windows.mjs"
-        : "ln -sf AGENTS.md CLAUDE.md && ln -sf AGENTS.md GEMINI.md",
+        : isWindows
+          ? "node bin/sidekicks core init   (recreates the AGENTS.md mirrors for this workspace)"
+          : "ln -sf AGENTS.md CLAUDE.md && ln -sf AGENTS.md GEMINI.md",
       apply: () => {
         // On Windows the OS-correct fix (junctions + file-symlink-or-copy)
         // lives in setup-windows.mjs — one cross-platform implementation, not a
         // Windows-only fork. On POSIX, recreate the symlinks directly.
-        if (isWindows) {
+        if (isWindows && hasSetupWindows) {
           const r = spawnSync("node", ["scripts/setup-windows.mjs"], {
             cwd: ROOT,
             encoding: "utf8",
@@ -551,6 +611,9 @@ function buildChecks() {
           };
         }
         try {
+          const target = join(ROOT, "AGENTS.md");
+          if (!existsSync(target)) return { ok: false, msg: "no AGENTS.md to mirror" };
+          let copied = false;
           for (const name of ["CLAUDE.md", "GEMINI.md"]) {
             const link = join(ROOT, name);
             try {
@@ -558,9 +621,21 @@ function buildChecks() {
             } catch {
               /* nothing to remove */
             }
-            symlinkSync("AGENTS.md", link); // repo-relative target, like `ln -sf AGENTS.md`
+            try {
+              symlinkSync("AGENTS.md", link, "file"); // repo-relative target, like `ln -sf AGENTS.md`
+            } catch {
+              // Windows without Developer Mode refuses symlinks; a byte-equal copy is the
+              // supported form there, and it is what the mirror check accepts.
+              writeFileSync(link, readFileSync(target, "utf8"));
+              copied = true;
+            }
           }
-          return { ok: true, msg: "CLAUDE.md, GEMINI.md → AGENTS.md symlinked" };
+          return {
+            ok: true,
+            msg: copied
+              ? "CLAUDE.md, GEMINI.md copied from AGENTS.md (symlinks unavailable)"
+              : "CLAUDE.md, GEMINI.md → AGENTS.md symlinked",
+          };
         } catch (e) {
           return { ok: false, msg: e.message };
         }
@@ -592,11 +667,15 @@ function buildChecks() {
       ok,
       label: `Host skill links (${EXPOSURE_LINKS.join(", ")})`,
       detail: ok ? "resolve to .agents/skills" : `missing or text-stub placeholders: ${broken.join(", ")}`,
-      fix: "run any `node bin/sidekicks` verb (auto-heals), or node scripts/setup-windows.mjs",
+      fix: hasSetupWindows
+        ? "run any `node bin/sidekicks` verb (auto-heals), or node scripts/setup-windows.mjs"
+        : "run any `node bin/sidekicks` verb (auto-heals)",
       apply: () => {
         // On Windows, setup-windows.mjs ensures the junctions; on POSIX a single
-        // CLI verb self-heals the symlinks (the documented mechanism).
-        if (isWindows) {
+        // CLI verb self-heals the symlinks (the documented mechanism). Where that
+        // script does not exist (a mounted-core workspace), the CLI verb is the
+        // cross-platform answer — it creates junctions on Windows too.
+        if (isWindows && hasSetupWindows) {
           const r = spawnSync("node", ["scripts/setup-windows.mjs"], {
             cwd: ROOT,
             encoding: "utf8",

@@ -29,6 +29,15 @@ requires:
       optional: true
       degraded: 'no per-step progress notes and no started/done bookends reach the card. The sequence itself is untouched: SKILL.md marks the call "best-effort — never fail the step over this" and instructs the runner to ignore any exit code and proceed, so the step''s real result stands.'
       # documented, seen at SKILL.md:405
+  # Framework surfaces this skill CALLS but does not carry. Not installable: a lifted copy of this
+  # folder cannot bring them, so each row states what the absence costs.
+  framework_files:
+    - path: lib/run-events/schema.mjs
+      degraded: 'the run-event sidecar is unavailable, so scripts/run-event.mjs preflight exits 4 and the run proceeds with event recording OFF (the report says so). No stage transition is mirrored to events.v1.jsonl and no run.reconciled is written. The sequence itself is untouched: the sidecar is a DIAGNOSTIC audit trail and the Workflow journal plus the stages array remain the resume source of truth, so a missing diagnostic never halts real work.'
+      # seen at scripts/run-event.mjs (dynamic import, resolved from the repo root at run time)
+    - path: bin/sidekicks
+      degraded: 'the `sidekicks artifacts events` verb cannot be invoked, which is the same outcome as the row above - preflight exits 4 and the run records nothing. The CLI is the ONLY writer of events.v1.jsonl on purpose: it owns the lock, the sequence assignment and the tail-recovery policy, and three engines in two languages append through it, so this skill never writes the file itself.'
+      # seen at scripts/run-event.mjs and SKILL.md (Run events)
   # DERIVED from skill.yaml — do not hand-edit. The rules and criteria this skill OWNS.
   framework_rules:
     - id: criterion.command-sequences
@@ -37,8 +46,8 @@ requires:
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:d2506c1cbb52295569b4cdf1d92454096bb797cb19d27ce0191d4c6990b3a259
-  VERSION.json: sha256:5e822180aff8bb85af1d4fc66b879877060c59693d7e061be01e665b95777c9f
+  SKILL.md: sha256:a200b261f1bb6b09ed4cf786950fffe72c3fc4b568068c698dce398971a8ae0b
+  VERSION.json: sha256:85b1f5ecb6b3bd25813f7f84960ef7037dffafcb263b2e2b151747b7f007ff84
   improvements/001-ralph-arm-guard-when-plugin-absent.yaml: sha256:66bffe4608f7057143e85870b9ebee9c3f327236dfcd9f8928ae085e6b6b877c
   improvements/002-service-pull-is-registry-mutating.yaml: sha256:5ae24c5b633ed24f27592234fe7362661008806ef0aab131da8753383219c02a
   improvements/003-set-remote-is-registry-mutating.yaml: sha256:28f353b5a752d4b4ee76370622dd7c03393479dd39377d085be5103f76f0d55c
@@ -57,7 +66,8 @@ bundle:
   improvements/016-cross-scope-worktrees-are-created-without-consent.yaml: sha256:eabd2ffb8ced390a2fcd20fa886a71891954f3266f2a67f06dcd1f7f80e4e2b7
   improvements/017-integrate-misdiagnoses-a-stale-base-conflict.yaml: sha256:4e80e8d0dab53287b261a67534431b678a16aaba178356c55ed40362f967a832
   improvements/INDEX.md: sha256:5f3490849873d11325a9057d5c55ff8055ecf987fab75d482247937b7223a8bd
-  references/commander-workflow-template.js: sha256:3993a910d444fd330787e2c3ececb9ef2f5e078bbed9069784247cf1ab946da2
+  references/commander-workflow-template.js: sha256:f709ef883c3444a9d58e54e848dd971e0cfcad9b99b784f30af260e12e2e0f1d
   rules/criterion.command-sequences.md: sha256:356c6cf64ed6dae24caa5f2b47d211317a2212f3cceb7b4b2fc376e45600e51d
   scripts/resolve-anchor.mjs: sha256:d8bab074b6b57094ccedad740eb65c14426f1a81086616ba40ef434c1e21e83d
+  scripts/run-event.mjs: sha256:dad2caaadc4e23f9f8d7c528e6623ec093adc7ebf40dd15d302250341de55ba3
   skill.yaml: sha256:1442293ff64b10a42fd05ef0b4654b3d8f79cdc235ce5e7dbd66f4286af72828

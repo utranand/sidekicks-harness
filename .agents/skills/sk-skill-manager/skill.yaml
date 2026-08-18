@@ -1,0 +1,20 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning, no catalog).
+#
+# NO `rules:` BLOCK ON PURPOSE. The rule this skill is the front door for already exists as a
+# framework-core entry: `criterion.new-skill-checklist` (lib/framework-settings/core-registry.mjs),
+# whose body is in CLAUDE.md and which shipped with `owners: []`. A descriptor may NOT redeclare a
+# core entry — buildRegistry() refuses it — so ownership is claimed by adding this skill to that
+# entry's `owners[]` array, which is exactly what the array is for. That also means `framework
+# sync` writes nothing here: the id is already listed in .sidekicks/framework.yaml, so the
+# visibility rule stays satisfied without minting a second criterion that would only restate the
+# 823-line architecture guide.
+#
+# config.block names this skill's OWN tuning block. One block, one owning skill, so the resolver
+# never has two skills claiming the same defaults.
+
+skill: sk-skill-manager
+
+config:
+  block: skill_manager
+  family: skills
+  defaults: config.defaults.yaml

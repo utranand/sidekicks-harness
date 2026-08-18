@@ -1,12 +1,13 @@
 {
   "name": "artifacts-lifecycle",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "artifacts-lifecycle library component",
   "files": [
     "_shared.mjs",
     "_manage.mjs",
     "archive.mjs",
     "child.mjs",
+    "events.mjs",
     "list.mjs",
     "liveness-config.mjs",
     "watch-config.mjs",

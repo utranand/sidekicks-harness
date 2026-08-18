@@ -1,0 +1,91 @@
+# config.defaults.yaml — this skill's OWN defaults for its `skill_manager:` block.
+#
+# Resolution order: projects/<active>/config.yaml → .sidekicks/config.yaml (only for blocks that
+# inherit root, which this one does not — only `slack` and `run_notify` do) → THIS FILE → the
+# skill's documented built-in. Inspect the resolved result with
+# `sidekicks framework config sk-skill-manager`.
+#
+# SECRETS ARE FORBIDDEN HERE (committed file; enforced by .githooks/pre-commit and
+# tests/skill-config.test.mjs). Nothing below is a credential: a public git URL is not one, and
+# reaching a PRIVATE repo uses the operator's own already-configured git credentials, never a token
+# recorded here.
+
+skill_manager:
+  # The skills repositories this skill exports to and imports from — a MAP, one named destination
+  # per repository. There is more than one on purpose: some skills are publishable and some are
+  # client-specific, and a single `skill_repo:` could not express that, so nothing could check it.
+  # A destination name is what `skill export --destination <name>` and `skill destinations
+  # --destination <name>` take; a skill pins itself to one with `skill_repo: <name>` in its own
+  # skill.yaml (or withholds itself everywhere with `skill_repo: none`).
+  #
+  # THE FLAT SINGLE-REPO SHAPE STILL RESOLVES. A config written before this map existed (a bare
+  # `remote:`/`checkout:` here) reads as one destination named `default` — a lifted copy carrying the
+  # old shape is not a misconfiguration.
+  skill_repo:
+    # Layout version of the on-disk contract every destination shares — see
+    # references/skill-repo-layout.md §3 (layout 1), §3b (layout 2) and §3c (layout 3). Block-level:
+    # it is a setting, not a destination.
+    #
+    # 3 since 2026-08-18: EVERY skill publishes to `<root>/.agents/skills/`, whether or not it is
+    # parked here, so a destination never carries a `skill-offloaded/` tree. Layout 2 published parked
+    # skills to `<root>/.sidekicks/skill-offloaded/`; layout 1 published both trees to
+    # `<root>/.sidekicks/skills/`.
+    #
+    # THIS VALUE IS A RECORD, NOT A SWITCH. Nothing reads it to decide behaviour — the writer's layout
+    # is `LAYOUT_VERSION` in lib/skill-package/portable.mjs, and every reader probes the filesystem
+    # (`DEST_TREES`) and so resolves any layout. It is here so a checkout states which contract its
+    # destinations were written at, and so a bump is a reviewable line rather than a silent change.
+    layout: 3
+
+    # `checkout:` is a local clone to read and write instead of cloning on demand. Repo-relative or
+    # absolute; empty means "no local checkout" and every status against it reads `unreachable`
+    # rather than being mistaken for "never exported". Deliberately not a guessed path — pointing
+    # one at the wrong tree would import somebody else's version of a skill over yours.
+    #
+    # `source_repo:` is optional and per-destination: it overrides `export.source_repo` below for
+    # THIS repository only, which is how a public destination and a private one get attributed
+    # differently. Empty or absent falls through to the block-level value.
+    public:
+      remote: 'https://github.com/utranand/sidekicks-skills.git'
+      checkout: 'projects/global/services/sidekicks-skills/src'
+      source_repo: 'https://github.com/utranand/sidekicks-harness.git'
+    private:
+      remote: 'https://github.com/utranand/sidekicks-skills-private.git'
+      checkout: 'projects/global/services/sidekicks-skills-private/src'
+      source_repo: 'https://github.com/utranand/sidekicks-harness.git'
+
+  # PUBLISHED PROVENANCE, so it must name a repo a reader of the DESTINATION can reach — the framework
+  # core, never whatever working repo the export ran in. Repointed 2026-08-17 when the core repo was
+  # renamed sidekicks-framework -> sidekicks-harness: the old URL now 404s, and a public catalog
+  # attributing 100 skills to a dead repository is worse than one attributing them to none.
+  export:
+    # Carry a skill's declared sibling skills, framework files and hook bodies by default. The
+    # opposite default is how package transfer's `// skills are self-contained` gap happened.
+    with_deps: true
+    # Refuse to export a skill whose bundle{} does not match disk. An export is a copy that will
+    # be verified somewhere else; exporting a stale tree just moves the drift.
+    require_clean_bundle: true
+    # The repo the exported copies are ATTRIBUTED to — written into the destination's catalog.yaml
+    # and every meta/<skill>/origin.yaml. It is the PUBLISHED framework core, not whatever private
+    # working repo the export happens to run in: a destination repo may be public, so its provenance
+    # must name a repo a reader can actually reach.
+    #
+    # `skill export` READS this. Resolution, most specific first: `--source-repo <url>` on the
+    # command line (including `--source-repo=''`, which records no source repo at all) > the
+    # destination's own `source_repo:` above > this value > the source repo's own git remote. It is
+    # a fallback and not a default the flag must repeat, because an export run without the flag is
+    # exactly how the private working repo's URL once reached a public catalog.
+    source_repo: 'https://github.com/utranand/sidekicks-harness.git'
+
+  import:
+    # Back the local skill up before replacing it. Cheap, and the one thing that makes a wrong
+    # import recoverable.
+    backup: true
+    # --force overwrites a locally-modified skill. Off by default: the whole point of the
+    # three-way reconcile is that a conflict stops and asks.
+    allow_force: false
+
+  bmad:
+    # Guidance target only. The bmad agents and workflows are CLI plugin skills, so nothing here
+    # installs them and no scanner can see them — this URL is what the user is pointed at.
+    repo: 'https://github.com/bmad-code-org/BMAD-METHOD.git'

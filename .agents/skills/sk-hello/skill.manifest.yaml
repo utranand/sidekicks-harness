@@ -41,11 +41,11 @@ requires:
   # `degraded:` has to say what a lifted copy loses.
   framework_files:
     - path: scripts/install-hooks.mjs
-      degraded: 'the "Git hooks" readiness check can still DETECT core.hooksPath drift but can no longer repair it. scripts/readiness.mjs:402-410 both names this script as the fix string and spawns it under --apply, so the check degrades from fixable to reportable - the diagnosis a reader sees is unchanged, the one-command remedy is gone.'
-      # seen at scripts/readiness.mjs:406
+      degraded: 'the "Git hooks" readiness row reports N/A instead of a fixable gap. scripts/readiness.mjs:530-532 requires BOTH this script and .githooks/pre-commit to exist before it offers the row at all, because the check travels to layouts that carry neither - a mounted-core workspace keeps them inside .sidekicks-core/, and the core copy is the wrong target (install-hooks.mjs resolves its repo root from its own location, so it would set the hooks path of the core). Nothing is lost where the pair is absent by design; in a framework repo missing it, core.hooksPath drift stops being detected.'
+      # seen at scripts/readiness.mjs:530
     - path: scripts/setup-windows.mjs
-      degraded: 'the agent-context mirror check loses its repair on Windows only. readiness.mjs:438-446 branches on the platform: POSIX repairs with `ln -sf`, Windows delegates here because junction plus file-symlink-or-copy is the OS-correct fix and there is one cross-platform implementation of it rather than an inline fork. On POSIX nothing is lost; on Windows the check becomes report-only.'
-      # seen at scripts/readiness.mjs:442
+      degraded: 'nothing is lost - the mirror and skill-link rows fall back to a layout-neutral repair. readiness.mjs:514 tests for this script and, when it is absent (a mounted-core workspace has no scripts/ of its own), the mirror row recreates the symlinks inline with a byte-copy fallback for a Windows checkout without Developer Mode, and the skill-link row uses the CLI verb that self-heals junctions on Windows too. Where the script IS present it stays the Windows implementation, so there is still no Windows-only fork of it.'
+      # seen at scripts/readiness.mjs:514
     - path: scripts/framework-core-publish.mjs
       degraded: 'the "Framework core (release debt)" readiness row is SKIPPED entirely - readiness.mjs guards on existsSync for both this script and the core service before adding it, so nothing errors and no other row is affected. The row is the only consumer: it spawns `status --json` and renders the result. Absence is therefore a lost signal (the release log stops being surfaced automatically) rather than a broken check, which is why this is a requires entry and not a hard dependency.'
       # seen at SKILL.md:175
@@ -57,4 +57,4 @@ bundle:
   improvements/001-trim-description-under-cap.yaml: sha256:d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599
   improvements/INDEX.md: sha256:a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5
   scripts/capability.mjs: sha256:f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3
-  scripts/readiness.mjs: sha256:69995a9706f1a48a1d07d9d099fc17d1d3f0fcc99a970228971919f07f9f0de6
+  scripts/readiness.mjs: sha256:38f297db6481b27c09ac8207970d86b7befce611dc19bf2e83a37b967c984419
