@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "name": "sidekicks-harness",
-  "version": "1.2.1",
+  "version": "1.2.3",
   "layout": 1,
-  "forged_at": "2026-08-19T22:47:45+07:00",
+  "forged_at": "2026-08-19T23:02:28+07:00",
   "source_commit": "af5d1c10"
 }
