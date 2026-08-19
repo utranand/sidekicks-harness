@@ -10,7 +10,7 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `9c5f447b` on 2026-08-19T09:00:52+07:00 (Asia/Bangkok). It is regenerated on every
+> `af5d1c10` on 2026-08-19T22:47:02+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
 > instructions in `AGENTS.local.md` and reference it from here — add a line reading
 > `@AGENTS.local.md` below. That reference is what makes them survive, and it works on every CLI:
@@ -130,6 +130,15 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
 
 ## Operational rules
 
+- **Plan-first — enter plan mode before implementation (hard rule):** before the first code write of
+  any non-trivial implementation, enter the CLI's plan mode, present the plan, and get the user's
+  approval to exit it. No plan artifact file is required — the approved plan IS the gate. Exempt:
+  trivial edits (typo, one-liner, mechanical rename); an explicit user instruction to skip planning
+  (a NAMED override you state back, never a silent skip); and executing an already-authored
+  command-sequence. If this runtime also enables `rule.bmad-first`, ask the user ONCE at the first
+  implementation attempt of a work item — BMAD pipeline or plan mode — and let that answer hold for
+  the rest of the work item. Check either with `sidekicks framework check <id>` (exit 0 enabled);
+  turn this one off with `sidekicks framework disable rule.plan-first`.
 - **Cross-platform:** every script must run on both macOS and Windows — one unified
   implementation, never an OS fork. Watch path joining, line endings (tolerate `\r\n`), and
   executable suffixes (`.venv/bin` vs `.venv/Scripts`).

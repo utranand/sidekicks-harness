@@ -1359,8 +1359,8 @@
     ]
   },
   "framework": {
-    "entry_count": 59,
-    "rule_count": 27,
+    "entry_count": 60,
+    "rule_count": 28,
     "criterion_count": 17,
     "hook_count": 15,
     "floor_count": 17,
@@ -1956,6 +1956,24 @@
         "body_marker": "LOCAL-ONLY",
         "script": null,
         "floor": true,
+        "source": "core"
+      },
+      {
+        "id": "rule.plan-first",
+        "kind": "rule",
+        "title": "Enter plan mode before implementation",
+        "owners": [
+          "sk-bmad-developer",
+          "sk-bmad-pm",
+          "sk-framework-dev",
+          "sk-get-plan-done",
+          "sk-implementation-planner",
+          "sk-jira-autopilot"
+        ],
+        "body_at": "AGENTS.md",
+        "body_marker": "Plan-first — enter plan mode before implementation",
+        "script": null,
+        "floor": false,
         "source": "core"
       },
       {

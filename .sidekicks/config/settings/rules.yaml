@@ -14,6 +14,7 @@
 #
 # Safety-floor ids cannot appear here (lib/framework-settings/floor.mjs) — writing one is a
 # validation error, not a silent no-op.
+plan-first: true
 branch-naming: true
 cross-platform: true
 incident-reports: false
