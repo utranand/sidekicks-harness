@@ -1,0 +1,38 @@
+# agents-watch.example.yaml — committed schema documentation for the running-agents
+# monitor's WATCH FOLDERS (lib/artifacts-lifecycle/watch-config.mjs).
+#
+# HOW TO USE: copy this file to `agents-watch.yaml` in the same directory (.sidekicks/) and
+# list the artifact folders to watch. The file is OPTIONAL — absent or unparseable, only the
+# standard bases are scanned (repo root + every project + service `src/` `artifacts/runs`),
+# so a fresh clone needs no config. This example is safe to commit.
+#
+# WHO READS IT (one config, two consumers — always the same coverage):
+#   1. `sidekicks artifacts scan` + the artifact-liveness watcher hook — extra roots are
+#      folded into the consolidated inventory AND the centralized running-agents file
+#      (.sidekicks/running-agents.json) that lists every agent's info + status.
+#   2. The office-viz generator (sk-office-viz, static and --serve live mode) — the
+#      same roots become visible desks in the 3D office, so "what the monitor sees" and
+#      "what the office shows" never diverge.
+#
+# ROOT-ONLY (not per-project): the running-agents file is a SINGLE repo-wide artifact, so
+# there is nothing per-project to tune. Distinct from agents-liveness.yaml, which configures
+# HOW staleness is judged (thresholds/debounce); this file configures WHERE to look.
+
+agents_watch:
+  # Master switch for the EXTRA roots below. `false` drops them from monitoring; the
+  # standard bases are always scanned regardless. Default true.
+  enabled: true
+
+  # Extra runs-roots to watch, ON TOP of the standard <base>/artifacts/runs bases.
+  # Children of each root must be <skill>/<slug>/ run folders (the same contract as the
+  # office-config `runsRoots` array). Entries are repo-relative paths — NEVER
+  # machine-absolute (portable-artifact rule). A path may carry single-segment `*`
+  # wildcards, expanded live against the filesystem, so trees created after this file was
+  # written are picked up without an edit. Use the mapping form to pin the office
+  # department room the runs appear in (default: derived from a projects/<p>/ prefix).
+  watch_roots:
+    - docs/implementation-plans/*/artifacts/runs
+    - projects/*/docs/implementation-plans/*/artifacts/runs
+    - projects/*/services/*/src/docs/implementation-plans/*/artifacts/runs
+    # - path: projects/workspace-sk/custom/runs
+    #   dept: workspace-sk

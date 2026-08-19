@@ -1,0 +1,30 @@
+# agents-liveness.example.yaml — committed schema documentation for the artifact-liveness
+# watcher (scripts/artifact-liveness-hook.mjs) and the `sidekicks artifacts scan` threshold.
+#
+# HOW TO USE: copy this file to `agents-liveness.yaml` in the same directory (.sidekicks/) and
+# adjust. The file is OPTIONAL — absent or unparseable, everything falls back to the built-in
+# defaults shown below, so a fresh clone needs no config. This example carries only defaults
+# and is safe to commit.
+#
+# ROOT-ONLY (not per-project). The liveness inventory is a SINGLE repo-wide artifact
+# (.sidekicks/artifacts-inventory.{json,md}) — one scan folds every project + service scope
+# into one file — so there is nothing per-project to tune. Unlike run_notify:/slack: (which
+# live in the per-scope config.yaml), this config lives ONLY at .sidekicks/agents-liveness.yaml.
+
+artifact_liveness:
+  # Master switch for the AUTOMATIC watcher (the SessionStart/Stop/SubagentStop hook).
+  # Always-on by default — only an explicit `false` opts out. When false the hook no-ops;
+  # a hand-run `sidekicks artifacts scan` still produces the inventory regardless.
+  enabled: true
+
+  # Staleness cutoff, in seconds: how old an ACTIVE-status run's most-recent heartbeat may be
+  # before it is classified "stale / orphaned" (a likely-dead worker) instead of "actually
+  # running". Default 1800 (30 min) = 2× the get-things-done lease TTL, so a live GTD run
+  # heartbeating inside its lease is never mislabeled. `scan --stale-seconds <n>` overrides
+  # this per-run; this value is the standing default for both the watcher and bare scans.
+  stale_seconds: 1800
+
+  # Min seconds between automatic watcher refreshes (debounce). The hook fires on every turn;
+  # this keeps it from re-walking the repo more than once per window. Well under stale_seconds,
+  # so the cache never lags meaningfully. Default 60.
+  debounce_seconds: 60

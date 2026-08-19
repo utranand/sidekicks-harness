@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "_readme": "Safe Agent Office template. Edit this workspace-local file freely; departments are discovered locally.",
+  "building": { "width": 150, "depth": 112, "corridor": 10, "innerWallHeight": 1.7, "outerWallHeight": 3.6 },
+  "palette": { "grass": "#7FA06A", "path": "#B9B2A4", "outerWall": "#EAE0CE", "innerWall": "#F0E7D7", "wainscot": "#9DAF9A", "trim": "#FBF7EE", "corridorFloor": "#C9BFA9", "woodFloor": "#C8A97C", "deptFloors": ["#D8CFC0"], "accents": ["#D98E2B"] },
+  "lighting": { "pendantsPerRoom": 2, "roomLightDay": 0.32, "roomLightNight": 1.05, "corridorLights": true },
+  "decor": { "paintingsPerRoom": 2, "plants": true, "rugs": true, "windows": true },
+  "commonRooms": [{ "id": "lobby", "kind": "lobby", "label": "Lobby", "weight": 6 }],
+  "deptRooms": [],
+  "runsRoots": ["artifacts/runs", "projects/*/artifacts/runs"],
+  "theme": "minecraft"
+}

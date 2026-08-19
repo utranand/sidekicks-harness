@@ -100,6 +100,7 @@ import { spawnSync } from "node:child_process";
 import { join, dirname, resolve, relative, isAbsolute, basename, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { configurationInventory } from "../lib/core-lifecycle/config-templates.mjs";
 
 // ── Repo root ───────────────────────────────────────────────────────────────
 // Walk up for .sidekicks/ rather than `git rev-parse`: this script sits next to
@@ -671,6 +672,7 @@ function publishedInventory() {
       // shipped none, so a new pack is correctly an addition), while an unreadable HEAD stays
       // unknown and the classifier compares nothing.
       packs: Array.isArray(last.packs) ? [...last.packs].sort() : packsAtHead(),
+      configuration: Array.isArray(last.configuration) ? last.configuration : null,
       source: "state.json",
       at: "state",
     };
@@ -681,6 +683,7 @@ function publishedInventory() {
       skills: headSkills,
       lib: subdirsAtHead("lib"),
       packs: packsAtHead(),
+      configuration: configurationInventory(SRC_ABS).filter((row) => row.mode),
       source: "the core's committed HEAD",
       at: "head",
     };
@@ -689,6 +692,7 @@ function publishedInventory() {
     skills: subdirs(join(SRC_ABS, '.agents', 'skills')),
     lib: subdirs(join(SRC_ABS, "lib")),
     packs: subdirs(join(SRC_ABS, ".sidekicks", "agent-packs")),
+    configuration: configurationInventory(SRC_ABS).filter((row) => row.mode),
     source: "the forged working tree (unreleased content may be present)",
     at: "worktree",
   };
@@ -700,6 +704,7 @@ function sourceInventory(planSkills) {
     skills: planSkills, // may be null when `inherit plan` could not run
     lib: subdirs(join(ROOT, "lib")),
     packs: subdirs(join(ROOT, ".sidekicks", "agent-packs")),
+    configuration: configurationInventory(ROOT).filter((row) => row.mode),
   };
 }
 
@@ -738,6 +743,13 @@ async function classifyBump(planSkills) {
   // then lost is a crew that stops being re-installable, and a new one is an additive capability.
   const removedPacks = setDiff(pub.packs, src.packs);
   const addedPacks = setDiff(src.packs, pub.packs);
+  const configMap = (rows) => new Map((rows || []).map((row) => [row.destination, row.hash || '']));
+  const publishedConfig = configMap(pub.configuration);
+  const sourceConfig = configMap(src.configuration);
+  const removedConfiguration = [...publishedConfig.keys()].filter((p) => !sourceConfig.has(p)).sort();
+  const addedConfiguration = [...sourceConfig.keys()].filter((p) => !publishedConfig.has(p)).sort();
+  const changedConfiguration = [...sourceConfig.keys()].filter((p) => publishedConfig.has(p)
+    && sourceConfig.get(p) !== publishedConfig.get(p)).sort();
   const pubVerbs = await verbIds(SRC_ABS);
   const srcVerbs = await verbIds(ROOT);
   const addedVerbs = setDiff(srcVerbs, pubVerbs);
@@ -749,6 +761,7 @@ async function classifyBump(planSkills) {
   if (removedLib.length) reasons.push(`lib module removed: ${removedLib.join(", ")}`);
   if (removedVerbs.length) reasons.push(`CLI verb removed: ${removedVerbs.join(", ")}`);
   if (removedPacks.length) reasons.push(`agent pack removed: ${removedPacks.join(", ")}`);
+  if (removedConfiguration.length) reasons.push(`configuration removed: ${removedConfiguration.join(", ")}`);
   if (reasons.length) {
     kind = "major";
   } else {
@@ -756,7 +769,9 @@ async function classifyBump(planSkills) {
     if (addedLib.length) reasons.push(`lib module added: ${addedLib.join(", ")}`);
     if (addedVerbs.length) reasons.push(`CLI verb added: ${addedVerbs.join(", ")}`);
     if (addedPacks.length) reasons.push(`agent pack added: ${addedPacks.join(", ")}`);
+    if (addedConfiguration.length) reasons.push(`configuration added: ${addedConfiguration.join(", ")}`);
     if (reasons.length) kind = "minor";
+    else if (changedConfiguration.length) reasons.push(`configuration template changed: ${changedConfiguration.join(", ")}`);
     else reasons.push("content-only change behind an unchanged surface");
   }
   return {
@@ -771,6 +786,9 @@ async function classifyBump(planSkills) {
     removed_verbs: removedVerbs,
     added_packs: addedPacks,
     removed_packs: removedPacks,
+    added_configuration: addedConfiguration,
+    removed_configuration: removedConfiguration,
+    changed_configuration: changedConfiguration,
     published: pub,
     source: src,
   };
@@ -1898,6 +1916,7 @@ async function doPublish() {
           skills: cls.source.skills || [],
           lib: cls.source.lib || [],
           packs: cls.source.packs || [],
+          configuration: cls.source.configuration || [],
           gates: gates.map((g) => ({ name: g.name, result: g.result, note: g.note || null })),
         },
         // Null until someone runs `--verify-remote` AFTER pushing. Absence means "not verified",

@@ -4,8 +4,8 @@
   "direction": "one-way: sidekicks source -> this runtime",
   "source": {
     "repo": "sidekicks",
-    "commit": "af5d1c10",
-    "inherited_at": "2026-08-19T23:02:27+07:00",
+    "commit": "46d91e27",
+    "inherited_at": "2026-08-20T02:33:06+07:00",
     "tool": "sk-inherit"
   },
   "options": {
@@ -17,8 +17,8 @@
       "origin": "active",
       "version": "1.7.0",
       "source_path": ".agents/skills/sk-hello",
-      "source_commit": "af5d1c10",
-      "inherited_at": "2026-08-19T23:02:27+07:00",
+      "source_commit": "46d91e27",
+      "inherited_at": "2026-08-20T02:33:06+07:00",
       "files": {
         "SKILL.md": "f11c1febd69326b4bd14465a1387dcee48be7db8f25f7be5b6a4127489318ad2",
         "VERSION.json": "9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af",
@@ -34,8 +34,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-cli",
-      "source_commit": "af5d1c10",
-      "inherited_at": "2026-08-19T23:02:27+07:00",
+      "source_commit": "46d91e27",
+      "inherited_at": "2026-08-20T02:33:06+07:00",
       "files": {
         "SKILL.md": "339bbc3ed4999dc91550811ea86f99d994dba6d5d1bf71f04c06b8092d7f95d8",
         "VERSION.json": "23ae847800c72cb55557e9a52d3d9e1f5f5650f218db63c1b8ab7ade771c1646",
@@ -48,8 +48,8 @@
       "origin": "active",
       "version": "1.3.0",
       "source_path": ".agents/skills/sk-commander",
-      "source_commit": "af5d1c10",
-      "inherited_at": "2026-08-19T23:02:27+07:00",
+      "source_commit": "46d91e27",
+      "inherited_at": "2026-08-20T02:33:06+07:00",
       "files": {
         "SKILL.md": "a200b261f1bb6b09ed4cf786950fffe72c3fc4b568068c698dce398971a8ae0b",
         "VERSION.json": "85b1f5ecb6b3bd25813f7f84960ef7037dffafcb263b2e2b151747b7f007ff84",
@@ -84,8 +84,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-scope-switch",
-      "source_commit": "af5d1c10",
-      "inherited_at": "2026-08-19T23:02:27+07:00",
+      "source_commit": "46d91e27",
+      "inherited_at": "2026-08-20T02:33:06+07:00",
       "files": {
         "SKILL.md": "0c429429f6d535e538680bd0d701a954c4737260a85b72d18d5dbbd7a1a60d17",
         "VERSION.json": "2f8fffddaf0f59c6711434d2b4477beb3d19f847fdb02f09826ce348b3a4e405"
@@ -96,8 +96,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-config-doctor",
-      "source_commit": "af5d1c10",
-      "inherited_at": "2026-08-19T23:02:27+07:00",
+      "source_commit": "46d91e27",
+      "inherited_at": "2026-08-20T02:33:06+07:00",
       "files": {
         "SKILL.md": "198908336a007135039fa971f60708ebebc5dd30e779afd01b4e822b964ece46",
         "VERSION.json": "86a579f1dc8a18d070e0e6a1f68488a04c94d19384c9f2c25888ce11f82fdf72",
@@ -109,8 +109,8 @@
       "origin": "active",
       "version": "1.6.0",
       "source_path": ".agents/skills/sk-skill-manager",
-      "source_commit": "af5d1c10",
-      "inherited_at": "2026-08-19T23:02:27+07:00",
+      "source_commit": "46d91e27",
+      "inherited_at": "2026-08-20T02:33:07+07:00",
       "files": {
         "SKILL.md": "e271724e0f7ab5fa4bc90c9b84a940774781d07832dcbd54d0f83be6acf2d47e",
         "VERSION.json": "206f32a6bb6d3831419e5bd2c515c43ac61081e04987da07d8d028fdaf2e13e2",
@@ -152,5 +152,191 @@
         "skill.yaml": "54e6ae0288bab42e1a3f7309fea10170f342d74e960c2dc6e9bf9bd7eb422cba"
       }
     }
-  }
+  },
+  "configuration": [
+    {
+      "source": ".sidekicks/config/agents-liveness.example.yaml",
+      "destination": ".sidekicks/config/agents-liveness.example.yaml",
+      "classification": "example",
+      "initializer_origin": "example",
+      "mode": "copy",
+      "hash": "dd91a286a469ebdbf4927ecf088d6f550c16053e0673aa2a3e1b9389da1db85b"
+    },
+    {
+      "source": ".sidekicks/config/agents-liveness.example.yaml",
+      "destination": ".sidekicks/config/agents-liveness.yaml",
+      "classification": "template",
+      "initializer_origin": ".sidekicks/config/agents-liveness.example.yaml",
+      "mode": "render",
+      "hash": "dd91a286a469ebdbf4927ecf088d6f550c16053e0673aa2a3e1b9389da1db85b"
+    },
+    {
+      "source": ".sidekicks/config/agents-watch.example.yaml",
+      "destination": ".sidekicks/config/agents-watch.example.yaml",
+      "classification": "example",
+      "initializer_origin": "example",
+      "mode": "copy",
+      "hash": "9c74a7f36fcd744728e19c5e529c021f789aa8f0573a576c14b4587695a6fa0f"
+    },
+    {
+      "source": ".sidekicks/config/agents-watch.example.yaml",
+      "destination": ".sidekicks/config/agents-watch.yaml",
+      "classification": "template",
+      "initializer_origin": ".sidekicks/config/agents-watch.example.yaml",
+      "mode": "render",
+      "hash": "9c74a7f36fcd744728e19c5e529c021f789aa8f0573a576c14b4587695a6fa0f"
+    },
+    {
+      "source": ".sidekicks/config/agents.yaml",
+      "destination": ".sidekicks/config/agents.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/cli-executors.example.json",
+      "destination": ".sidekicks/config/cli-executors.example.json",
+      "classification": "example",
+      "initializer_origin": "example",
+      "mode": "copy",
+      "hash": "e3f9d9102ffe204b46d352845c4b7af8abdc4e69bbb4bc2b2f8951b44a34ad62"
+    },
+    {
+      "source": ".sidekicks/config/cli-executors.example.json",
+      "destination": ".sidekicks/config/cli-executors.json",
+      "classification": "template",
+      "initializer_origin": ".sidekicks/config/cli-executors.example.json",
+      "mode": "render",
+      "hash": "e3f9d9102ffe204b46d352845c4b7af8abdc4e69bbb4bc2b2f8951b44a34ad62"
+    },
+    {
+      "source": ".sidekicks/config/comms.secret.yaml",
+      "destination": ".sidekicks/config/comms.secret.yaml",
+      "classification": "excluded",
+      "reason": "secret, retired, or state file"
+    },
+    {
+      "source": ".sidekicks/config/comms.yaml",
+      "destination": ".sidekicks/config/comms.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/confluence.yaml",
+      "destination": ".sidekicks/config/confluence.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/database.yaml",
+      "destination": ".sidekicks/config/database.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/framework.example.yaml",
+      "destination": ".sidekicks/config/framework.example.yaml",
+      "classification": "example",
+      "initializer_origin": "example",
+      "mode": "copy",
+      "hash": "3f8b53dc98b9cd6cf311ac6c4ad359666669406fd0d83a6f7afcd8d48e1134c5"
+    },
+    {
+      "source": ".sidekicks/config/framework.example.yaml",
+      "destination": ".sidekicks/config/framework.yaml",
+      "classification": "template",
+      "initializer_origin": ".sidekicks/config/framework.example.yaml",
+      "mode": "render",
+      "hash": "3f8b53dc98b9cd6cf311ac6c4ad359666669406fd0d83a6f7afcd8d48e1134c5"
+    },
+    {
+      "source": ".sidekicks/config/.gitignore",
+      "destination": ".sidekicks/config/.gitignore",
+      "classification": "gitignore",
+      "initializer_origin": "framework config ignore",
+      "mode": "copy",
+      "hash": "d553b4bcd279224ae79ae045f4f05462e51876549a6b7b56c53e55df7595612c"
+    },
+    {
+      "source": ".sidekicks/config/jira.secret.yaml",
+      "destination": ".sidekicks/config/jira.secret.yaml",
+      "classification": "excluded",
+      "reason": "secret, retired, or state file"
+    },
+    {
+      "source": ".sidekicks/config/jira.yaml",
+      "destination": ".sidekicks/config/jira.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/kubernetes.yaml",
+      "destination": ".sidekicks/config/kubernetes.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/media.secret.yaml",
+      "destination": ".sidekicks/config/media.secret.yaml",
+      "classification": "excluded",
+      "reason": "secret, retired, or state file"
+    },
+    {
+      "source": ".sidekicks/config/media.yaml",
+      "destination": ".sidekicks/config/media.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    },
+    {
+      "source": ".sidekicks/config/office-config.example.json",
+      "destination": ".sidekicks/config/office-config.example.json",
+      "classification": "example",
+      "initializer_origin": "example",
+      "mode": "copy",
+      "hash": "3945a18eaadadcf0bf299af38fb7bc37ed07c1adaf99fe962b2b4613b7a78696"
+    },
+    {
+      "source": ".sidekicks/config/office-config.example.json",
+      "destination": ".sidekicks/config/office-config.json",
+      "classification": "template",
+      "initializer_origin": ".sidekicks/config/office-config.example.json",
+      "mode": "render",
+      "hash": "3945a18eaadadcf0bf299af38fb7bc37ed07c1adaf99fe962b2b4613b7a78696"
+    },
+    {
+      "source": ".sidekicks/config/pending-removal.config.yaml",
+      "destination": ".sidekicks/config/pending-removal.config.yaml",
+      "classification": "excluded",
+      "reason": "secret, retired, or state file"
+    },
+    {
+      "source": ".sidekicks/config/settings/criteria.yaml",
+      "destination": ".sidekicks/config/settings/criteria.yaml",
+      "classification": "settings",
+      "initializer_origin": "framework setting",
+      "mode": "copy",
+      "hash": "6522e3504532c43eff346eb2ce26432631a92c20e3030bddbfea05fbe09d6ff0"
+    },
+    {
+      "source": ".sidekicks/config/settings/hooks.yaml",
+      "destination": ".sidekicks/config/settings/hooks.yaml",
+      "classification": "settings",
+      "initializer_origin": "framework setting",
+      "mode": "copy",
+      "hash": "20d7e19aa434e7b225ecd9e004b58a40b474b9222d2c5fac63cd887c4b413c20"
+    },
+    {
+      "source": ".sidekicks/config/settings/rules.yaml",
+      "destination": ".sidekicks/config/settings/rules.yaml",
+      "classification": "settings",
+      "initializer_origin": "framework setting",
+      "mode": "copy",
+      "hash": "54c5dfc8a646cee761f68a582506775aec28516887a815b4a82300ddee886b7a"
+    },
+    {
+      "source": ".sidekicks/config/skills.yaml",
+      "destination": ".sidekicks/config/skills.yaml",
+      "classification": "skill-family",
+      "reason": "generated by config sync"
+    }
+  ]
 }

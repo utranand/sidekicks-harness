@@ -1,0 +1,62 @@
+# .sidekicks/framework.example.yaml — documented template for .sidekicks/framework.yaml
+#
+# WHAT THIS FILE IS
+# The framework enable map: one switch per framework rule, per CLAUDE.md criterion, and per
+# wired hook. It is COMMITTED (unlike .sidekicks/settings.json, which is git-ignored and
+# per-machine), so a decision to turn something off travels with the clone and with
+# `sidekicks package create`.
+#
+# HOW TO USE IT — always through the CLI, never by hand-editing (Rule 1):
+#   sidekicks framework list                  # every id, its state and where that came from
+#   sidekicks framework show <id>             # one id, with its owner and body location
+#   sidekicks framework disable <id>          # write `false` into .sidekicks/framework.yaml
+#   sidekicks framework enable  <id>          # write `true`
+#   sidekicks framework check   <id>          # exit 0 = enabled, 1 = disabled (what hooks use)
+#   sidekicks framework doctor                # registry/wiring drift check
+#
+# IDS are `<kind>.<kebab-slug>` with kind ∈ {rule, criterion, hook}; the kind decides which
+# block below the entry lives in:
+#   rule.*      -> rules:        a framework rule (boundary contract, operational rule)
+#   criterion.* -> criteria:     a CLAUDE.md behavioural default
+#   hook.*      -> hooks:        a hook wired in the per-CLI settings files
+#
+# RESOLUTION ORDER (highest wins):
+#   0. the safety floor            frozen in lib/framework-settings/floor.mjs — see below
+#   1. projects/<active>/manifest.yaml   overrides.framework.{rules,criteria,hooks}.<slug>
+#   2. .sidekicks/settings.json          framework.{rules,criteria,hooks}.<slug>  (per machine)
+#   3. THIS FILE                         {rules,criteria,hooks}.<slug>            (team default)
+#   4. built-in default: enabled
+# Layer 1 above layer 2 is the precedence .sidekicks/RULES.md already documents
+# (`manifest.overrides` = High (Wins)).
+#
+# A MISSING FILE IS NEVER AN ERROR. Delete this file and everything resolves enabled —
+# identical to the framework's behaviour before the enable map existed.
+#
+# THE SAFETY FLOOR IS NOT CONFIGURABLE. Safety rules (the six boundary rules, Teleport-only
+# production access, headful-only Google automation, the protected-branch prohibition, the
+# irreversible/outward-facing confirmation stop, local-only project memory, portable artifact
+# paths, worktree --force consent, and the hooks that enforce them) are a frozen constant in
+# lib/framework-settings/floor.mjs. `disable` refuses them, and writing one into this file is
+# a validation error, not a silent no-op — so this file can never disagree with the code.
+#
+# Values are booleans only (`true` / `false`). Anything else is a validation error.
+
+# ── Framework rules ──────────────────────────────────────────────────────────
+rules:
+  # Turn off BMAD-first gating for a repo that does not use the BMAD lifecycle.
+  # (Its body lives in the owning skill; the reference line stays in CLAUDE.md.)
+  # Mirror Jira progress from executable plans.
+
+# ── CLAUDE.md criteria ───────────────────────────────────────────────────────
+criteria:
+  # Compressed reply style loaded at session start.
+  # Post a completion report for the listed skills.
+  # Skill self-improvement funnel (PROPOSE/APPLY).
+
+# ── Hooks ────────────────────────────────────────────────────────────────────
+hooks:
+  # Every gated hook exits 0 having done nothing when its id is disabled — a disabled
+  # hook must never look like a failing hook.
+  office-viz: true
+  artifact-liveness: true
+  run-notify: true
