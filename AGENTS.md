@@ -1,7 +1,7 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `46d91e27` on 2026-08-20T02:33:09+07:00 (Asia/Bangkok). It is regenerated on every
+> `4c050bab` on 2026-08-22T23:13:44+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
 > instructions in `AGENTS.local.md` and reference it from here — add a line reading
 > `@AGENTS.local.md` below. That reference is what makes them survive, and it works on every CLI:
@@ -137,10 +137,14 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
 - **Timezone:** `Asia/Bangkok` (UTC+07:00) for ALL timestamps and dates.
 - **Protected branches — never implement on them (hard rule):** no implementation work may be
   edited, committed, or amended directly on `main`, `sit`, `uat`, `staging`, `prod`, or
-  `release/*`. Confirm the branch (`git branch --show-current`) before the first file write; if it
-  is protected, get onto a work branch `<type>/<slug>` first (`feature|fix|chore|docs`) — never a
-  commit on the protected branch to "move it later". Protected branches only ever receive work
-  through a merge or PR the user approves.
+  `release/*`. Before the first write, align a supplied target path to its scope (otherwise read the
+  active project/service configuration), resolve every intended write path to its nearest owning
+  Git worktree, and check the live branch in each de-duplicated owner. An enclosing repo that merely
+  contains a nested service checkout may stay protected; a dirty submodule/gitlink observation is
+  not itself an intentional write. If parent-owned metadata or artifacts are also written, that
+  parent repo must be checked too. Get every protected owner onto a work branch `<type>/<slug>`
+  first (`feature|fix|chore|docs`) — never commit on the protected branch to "move it later".
+  Protected branches only ever receive work through a merge or PR the user approves.
 - **Never hijack a shared working tree (hard rule):** the checkout may have another agent session,
   a dev server, a build, or the user's editor live in it. Getting onto the work branch is
   worktree-first — `git worktree add ../worktrees/<slug> -b <type>/<slug> <base>`, then work

@@ -4,7 +4,7 @@
   "//2": "CLI write surface): `sidekicks cli-executor register|list|remove`. This example documents the shape.",
   "//3": "Live file is scope-resolved: root -> .sidekicks/cli-executors.json ; project -> projects/<active>/cli-executors.json.",
   "//4": "A MISSING file is not an error — the three built-ins apply by default (fresh-clone behavior unchanged).",
-  "schema_version": 1,
+  "schema_version": 2,
   "executors": {
     "claude": {
       "//": "kind=generic — Claude Code's own CLI registered as an executor (claude -p headless). Commonly the MAIN/default pick: put it first in routing.prefer so `executor: auto` items resolve to a fresh headless Claude, with the other CLIs picked by specialty/availability.",
@@ -33,9 +33,9 @@
       "//": "kind=builtin only toggles a native adapter (codex/gemini/antigravity). Omit to keep the default; set enabled:false to silence it.",
       "kind": "builtin",
       "enabled": true,
+      "//models": "OPTIONAL per-complexity model map, TIER KEYS ONLY — the map is rendered into a live registry, so a comment key inside it becomes a bogus tier. The orchestrator picks a tier by task difficulty; the executor resolves tier->id here and passes the CLI's model flag (codex -m, gemini -m, agy --model). Set with `register codex --model-high <id> --model-mid <id> --model-low <id>`.",
+      "//models1": "IDs are machine/account-specific. An absent map or unmapped tier means no flag -> the CLI's own default for sk-cli-executor; the GOAL engine instead fails closed, so an unmapped tier makes this family ineligible for that role.",
       "models": {
-        "//": "OPTIONAL per-complexity model map. The orchestrator picks a tier by task difficulty; the executor resolves tier->id here and passes the CLI's model flag (codex -m, gemini -m, agy --model). Set with `register codex --model-high <id> --model-mid <id> --model-low <id>`.",
-        "//1": "IDs are machine/account-specific — these are ILLUSTRATIVE, not real. An absent map or unmapped tier means no flag -> the CLI's own default (pre-feature behavior).",
         "high": "gpt-5-codex",
         "mid": "gpt-5",
         "low": "gpt-5-mini"
@@ -45,8 +45,9 @@
     },
     "my-cli": {
       "//": "kind=generic is a NEW CLI driven entirely by this spec via adapter_generic.py — no bespoke adapter.",
+      "//enabled": "DISABLED on purpose: this entry documents the generic shape and its binary does not exist. This file is RENDERED into a forged core's live registry, so an enabled placeholder would arrive there as a real executor. Set enabled:true only on a spec you actually installed.",
       "kind": "generic",
-      "enabled": true,
+      "enabled": false,
       "binary": "mycli",
       "invoke": ["-p", "{brief}", "--model={model}"],
       "//invoke": "Arg template. Placeholders: {brief}=brief text, {brief_file}=path to brief on disk, {work_dir}=abs workspace, {model}=resolved model id. Must contain {brief} or {brief_file}, OR set brief_stdin:true.",

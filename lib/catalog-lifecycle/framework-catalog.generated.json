@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "cli": {
-    "namespace_count": 18,
-    "command_count": 142,
+    "namespace_count": 19,
+    "command_count": 154,
     "namespaces": [
       {
         "namespace": "agent",
@@ -26,7 +26,7 @@
       },
       {
         "namespace": "cli-executor",
-        "command_count": 4
+        "command_count": 8
       },
       {
         "namespace": "config",
@@ -42,6 +42,10 @@
       },
       {
         "namespace": "framework",
+        "command_count": 8
+      },
+      {
+        "namespace": "goal",
         "command_count": 8
       },
       {
@@ -457,11 +461,38 @@
         "module": "lib/check-lifecycle/run.mjs"
       },
       {
+        "id": "cli:cli-executor/auth",
+        "namespace": "cli-executor",
+        "verb": "auth",
+        "args": "status [<name>|all] | renew <name> [--interactive] [--refresh-capabilities] [--json]",
+        "summary": "Inspect auth state or explicitly launch a native interactive renewal; never handles credentials",
+        "status": "implemented",
+        "module": "lib/cli-executor-lifecycle/auth.mjs"
+      },
+      {
+        "id": "cli:cli-executor/discover",
+        "namespace": "cli-executor",
+        "verb": "discover",
+        "args": "[<name>...] [--metadata-only] [--json]",
+        "summary": "Read capability metadata into a reviewable candidate; never writes registry configuration",
+        "status": "implemented",
+        "module": "lib/cli-executor-lifecycle/discover.mjs"
+      },
+      {
+        "id": "cli:cli-executor/invoke",
+        "namespace": "cli-executor",
+        "verb": "invoke",
+        "args": "--executor <name> --tier <top|high|mid|low> --role <plan|implement|review|final-verify> --prompt-file <path> [--work-dir <path>] [--output-schema <path>] [--timeout <ms>] [--dry-run] [--json]",
+        "summary": "Run ONE agent-CLI session in a named role with its containment enforced by the CLI's own flags: plan/review/final-verify are read-only, implement uses the narrowest non-interactive edit mode, and a bypass mode is never emitted. Asynchronous spawn with an argv array (a Windows .cmd shim goes through the audited cmd.exe escaper), structured output validated per CLI, and the transcript, session id, exit code and usage returned rather than written — the caller is the only writer. --dry-run prints the resolved argv, model, family and containment without launching",
+        "status": "implemented",
+        "module": "lib/cli-executor-lifecycle/invoke.mjs"
+      },
+      {
         "id": "cli:cli-executor/list",
         "namespace": "cli-executor",
         "verb": "list",
-        "args": "[--json]",
-        "summary": "Show the effective executor set for the active scope (built-ins merged with the on-disk registry)",
+        "args": "[--root] [--json]",
+        "summary": "Show the effective built-in, root, and active-project executor set with provenance and selection status",
         "status": "implemented",
         "module": "lib/cli-executor-lifecycle/list.mjs"
       },
@@ -469,8 +500,8 @@
         "id": "cli:cli-executor/register",
         "namespace": "cli-executor",
         "verb": "register",
-        "args": "<name> [--binary <exe>] [--invoke '<a,{brief}>'] [--probe '<a>'] [--transport print-mode|json] [--sandbox <lvl>] [--brief-stdin] [--usage-exposed] [--disabled] [--description <d>] [--model-high <id>] [--model-mid <id>] [--model-low <id>] [--specialties '<a,b,c>'] [--model-specialties-high '<a,b>'] [--model-specialties-mid '<a,b>'] [--model-specialties-low '<a,b>']",
-        "summary": "Register/update an external agent CLI (generic, no adapter needed) so the executor family delegates to it without guessing; re-annotate a built-in with --disabled; set the per-complexity-tier model map with --model-high/mid/low; declare task specialties the orchestrator routes against with --specialties; pair each model tier with the jobs it is best at via --model-specialties-<tier>",
+        "args": "<name> [--root|--inherit] [--binary <exe>] [--invoke '<a,{brief}>'] [--probe '<a>'] [--capabilities-command '<a,b>'] [--auth-status-command '<a,b>'] [--auth-renew-command '<a,b>'] [--auth-interactive] [--effort-<tier> <value>]",
+        "summary": "Register/update an executor and its selected model/effort tiers; generic capability and auth commands are explicit side-effect-free metadata contracts",
         "status": "implemented",
         "module": "lib/cli-executor-lifecycle/register.mjs"
       },
@@ -478,8 +509,8 @@
         "id": "cli:cli-executor/remove",
         "namespace": "cli-executor",
         "verb": "remove",
-        "args": "<name>",
-        "summary": "Drop a registered executor from the scope-resolved registry (disable a built-in via register --disabled)",
+        "args": "<name> [--root]",
+        "summary": "Remove the selected-layer executor override (or use register --inherit for a project)",
         "status": "implemented",
         "module": "lib/cli-executor-lifecycle/remove.mjs"
       },
@@ -487,10 +518,19 @@
         "id": "cli:cli-executor/route",
         "namespace": "cli-executor",
         "verb": "route",
-        "args": "[set <name>... | clear | skill [set <task-kind> <name>... [--avoid '<a,b>'] [--note '<why>'] | remove <task-kind>]]",
-        "summary": "Manage the routing policy: the global preference chain (set/clear) AND per-task-kind recommendations ('route skill set image-generation antigravity codex --avoid claude') the orchestrator consults to pick the best-fit executor for a job",
+        "args": "[set <name>... | clear | inherit | skill …] [--root]",
+        "summary": "Manage the layered global and per-task routing policy",
         "status": "implemented",
         "module": "lib/cli-executor-lifecycle/route.mjs"
+      },
+      {
+        "id": "cli:cli-executor/sync",
+        "namespace": "cli-executor",
+        "verb": "sync",
+        "args": "--from <candidate.json|-> [--root] [--apply] [--json]",
+        "summary": "Preview or explicitly atomically apply discovered capability snapshots",
+        "status": "implemented",
+        "module": "lib/cli-executor-lifecycle/sync.mjs"
       },
       {
         "id": "cli:config/doctor",
@@ -707,6 +747,78 @@
         "summary": "Materialise .sidekicks/config/settings/ so every toggleable entry is listed (--check = read-only drift check; --split migrates the pre-split framework.yaml monolith)",
         "status": "implemented",
         "module": "lib/framework-lifecycle/sync.mjs"
+      },
+      {
+        "id": "cli:goal/approve",
+        "namespace": "goal",
+        "verb": "approve",
+        "args": "<run-id> --digest <sha256> | <run-id> [--max-attempts N] [--max-total-attempts N] [--breaker N] [--max-attempt-ms N] [--max-total-ms N]",
+        "summary": "Approve ONE exact approval-envelope digest — the gate no implementation subprocess starts before. The digest is recomputed from disk, so a plan edit, a moved branch or an advanced base commit fails the gate instead of riding in on a stale approval. Budget flags on a blocked run propose an append-only amendment that preserves every completed node; anything other than a budget change needs re-planning",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/approve.mjs"
+      },
+      {
+        "id": "cli:goal/approve-action",
+        "namespace": "goal",
+        "verb": "approve-action",
+        "args": "<run-id> <request-id> --digest <sha256>",
+        "summary": "Grant ONE held outward or destructive action — a push, deploy, database write, publication or message — after the run paused before executing it. Verifies the request's own canonical digest and authorizes nothing else; goal approval never covered these",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/approve-action.mjs"
+      },
+      {
+        "id": "cli:goal/plan",
+        "namespace": "goal",
+        "verb": "plan",
+        "args": "\"<goal>\" | <goal-file> [--executor <name>] [--tier top|high|mid|low] [--contest] [--planners <a,b,c>] [--json]",
+        "summary": "Turn a goal into a plan a CLI agent authored in enforced read-only mode, have a fresh independent critic check it (at most two correction passes, then it asks you), and print the approval-envelope digest. Writes goal.json, plan.json and a readable implementation-plan.md; dispatches nothing. --contest fans planning out to the highest eligible tier of every capable CLI family in parallel, cross-judges each candidate with a different family on a fixed rubric, and synthesizes the winner",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/plan.mjs"
+      },
+      {
+        "id": "cli:goal/report",
+        "namespace": "goal",
+        "verb": "report",
+        "args": "<run-id> [--json]",
+        "summary": "The evidence report: observed facts kept separate from claims, every attempt and fallback named with its routing and model tier, exclusions listed, and unresolved gaps stated rather than smoothed over",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/report.mjs"
+      },
+      {
+        "id": "cli:goal/resume",
+        "namespace": "goal",
+        "verb": "resume",
+        "args": "<run-id> [--abandon-attempt <id>] [--json]",
+        "summary": "Reconcile and continue after an interruption, deriving the next action from run.json and the filesystem alone — never from chat context. An attempt with no proven terminal result is never re-dispatched: a live child is reported, a dead or unverifiable one waits for you to abandon it explicitly",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/resume.mjs"
+      },
+      {
+        "id": "cli:goal/run",
+        "namespace": "goal",
+        "verb": "run",
+        "args": "<run-id> [--max-nodes N] [--json]",
+        "summary": "Dispatch the approved plan one ready node at a time: implement at the routed tier in a bounded edit mode, then judge that attempt with a FRESH independent reviewer against the node's criteria, reopening the same node with an evidence-bearing correction on a fail. STOP, attempt limits, budget, breaker, branch drift and the action policy are all code-enforced",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/run.mjs"
+      },
+      {
+        "id": "cli:goal/status",
+        "namespace": "goal",
+        "verb": "status",
+        "args": "[<run-id>] [--json]",
+        "summary": "Where a run is and what it is waiting for: phase, per-node attempts, spend, breaker, lease owner, STOP gate, sidecar divergence, held action requests and the contest scoreboard. Read-only and takes no lease, so it works while another process holds the run",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/status.mjs"
+      },
+      {
+        "id": "cli:goal/stop",
+        "namespace": "goal",
+        "verb": "stop",
+        "args": "<run-id> [--reason <text>]",
+        "summary": "Set the durable STOP gate from any session, lease or no lease. Graceful: the running attempt finishes and no new one is dispatched, because a half-written edit is worse than one more completed attempt",
+        "status": "implemented",
+        "module": "lib/goal-lifecycle/stop.mjs"
       },
       {
         "id": "cli:index/get",

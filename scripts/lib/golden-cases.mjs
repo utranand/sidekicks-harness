@@ -82,6 +82,10 @@ export function normalize(text, roots = []) {
   out = out.replace(/\(\d+(?:\.\d+)?ms\)/g, '(<ms>)');
   out = out.replace(/\b\d+(?:\.\d+)?s\b/g, '<s>');
 
+  // The mounted-core doctor reports the Node runtime that happened to execute the fixture. Its
+  // presence and semantic shape matter; the developer machine's exact version does not.
+  out = out.replace(/(\bnode\s+node\s+)\d+\.\d+\.\d+\b/g, '$1<version>');
+
   return out.trimEnd() + '\n';
 }
 

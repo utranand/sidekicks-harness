@@ -1,0 +1,33 @@
+{
+  "name": "goal-lifecycle",
+  "version": "1.0.0",
+  "description": "goal-lifecycle library component",
+  "files": [
+    "approve-action.mjs",
+    "approve.mjs",
+    "commands.mjs",
+    "contest.mjs",
+    "correction.mjs",
+    "evidence.mjs",
+    "final-verify.mjs",
+    "graph.mjs",
+    "guard-decide.mjs",
+    "guard.mjs",
+    "jobs.mjs",
+    "plan.mjs",
+    "planner.mjs",
+    "policy.mjs",
+    "render.mjs",
+    "report-core.mjs",
+    "report.mjs",
+    "resume.mjs",
+    "reviewer.mjs",
+    "run.mjs",
+    "runner.mjs",
+    "schema.mjs",
+    "state-machine.mjs",
+    "status.mjs",
+    "stop.mjs",
+    "store.mjs"
+  ]
+}

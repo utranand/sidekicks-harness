@@ -62,6 +62,7 @@
 // Direct test mode (prints the decision it WOULD return — {"allow":true} or
 // {"decision":"ask"|"deny","reason":"…"}):
 //   node scripts/enforce-branch-safety.mjs --command "<shell command>" [--cwd <dir>]
+//   node scripts/enforce-branch-safety.mjs --event  # hook-shaped JSON on stdin, gate bypassed for tests
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -618,10 +619,14 @@ function main() {
   process.exit(0);
 }
 
-// Framework gate: `sidekicks framework disable hook.enforce-branch-safety` makes this a no-op.
-await import('./lib/hook-gate.mjs')
-  .then((gate) => gate.exitIfDisabled('hook.enforce-branch-safety'))
-  .catch(() => {}); // gate module absent (partial copy) ⇒ run anyway
+// Direct-test mode is the hook's documented pure decision surface. It must stay testable even when
+// the operator disabled the live hook in this checkout; otherwise the test suite receives empty
+// stdout and tests the setting rather than the classifier. Real hook events still honor the gate.
+if (!process.argv.includes('--command') && !process.argv.includes('--event')) {
+  await import('./lib/hook-gate.mjs')
+    .then((gate) => gate.exitIfDisabled('hook.enforce-branch-safety'))
+    .catch(() => {}); // gate module absent (partial copy) ⇒ run anyway
+}
 
 try {
   main();
