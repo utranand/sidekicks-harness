@@ -16,10 +16,14 @@
 //
 // Usage:
 //   node .agents/skills/sk-skill-manager/scripts/skill-repo-not-carried.mjs \
-//     --report <export-report.json> --out <destination-repo-root> [--source-commit <sha>]
+//     --report <export-report.json> --out <destination-repo-root> [--source-commit <sha>] \
+//     [--append <file>]...
 //
 // Reads:
 //   <report>          a `sidekicks skill export --json` report (must have dry_run: false)
+//   <append-file>...  each --append file is appended VERBATIM after the generated rollup. Pass
+//                     assets/not-carried-withholding.md on every public fill — without it the
+//                     addendum must be hand-appended and the next regeneration silently drops it.
 // Writes:
 //   <out>/NOT-CARRIED.md
 //

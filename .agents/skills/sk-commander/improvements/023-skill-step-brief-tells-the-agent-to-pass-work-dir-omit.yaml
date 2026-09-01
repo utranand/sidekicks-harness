@@ -1,0 +1,49 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 023-skill-step-brief-tells-the-agent-to-pass-work-dir-omit
+target_skill: sk-commander
+created: 2026-08-28T02:10:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 0 (mid-tier discovery panel on the cross-copy-consistency angle, gated at verify_tier=high). Anchors re-read by the gate: commander-workflow-template.js:310-326 (note lines 314-315 for the conditional form that already exists) and SKILL.md:447-457.'
+kind: instructions
+observation: >-
+  For a skill step with no `work_dir`, the template's brief emits a literal instruction to pass a
+  placeholder as the anchor value. commander-workflow-template.js:326 is
+  `Pass work_dir=${step.work_dir || '(omit)'}${docsSuffix}${workItemSuffix} to the skill so it anchors
+  there`, so the rendered brief reads "Pass work_dir=(omit) … to the skill so it anchors there" — an
+  instruction to hand a sub-skill the seven-character string `(omit)` as its work_dir, immediately
+  followed by "so it anchors there". Nothing in the brief says "omit the flag".
+  The same brief already contradicts itself four lines up: line 310 renders the descriptive field as
+  `- work_dir: none — use the skill's normal scope resolution`, and the file already has the correct
+  pattern for this exact case — `docsSuffix`/`workItemSuffix` at lines 314-315 are
+  `step.docs_dir ? ' docs_dir=' + step.docs_dir : ''`, i.e. the token disappears entirely when unset.
+  Only `work_dir` was written the other way.
+  The Fallback's copy is a third variant: SKILL.md:447 defines the bullet as
+  `<work_dir, or "none — use the skill's normal scope resolution">` and SKILL.md:455-457 then says
+  `Pass work_dir=<work_dir> (docs_dir=… and work_item=…, when set)`, whose substitution for a missing
+  work_dir is undefined — a literal reading splices the descriptive sentence into the flag value.
+  Failure mode this creates: CLAUDE.md's anchor contract makes `work_dir=` the highest-precedence scope
+  input, so a sub-skill that takes the string at face value resolves an anchor from `(omit)` instead of
+  falling back to its own scope resolution — the same class of silent mis-anchoring that artifact 007's
+  empty-anchor guard exists to prevent.
+proposal: >-
+  Make the `work_dir` token conditional like its two siblings. In
+  commander-workflow-template.js, add `const wdSuffix = step.work_dir ? ' work_dir=' + step.work_dir : ''`
+  beside the existing `docsSuffix`/`workItemSuffix` (lines 314-315) and rewrite line 326 as
+  `Pass${wdSuffix}${docsSuffix}${workItemSuffix} to the skill so it anchors there` — with the sentence
+  reworded so it still reads correctly when every anchor is absent (e.g. "Pass the anchors above to the
+  skill (nothing to pass if none are listed), then run the skill to completion"). Mirror the identical
+  wording into the Fallback brief at SKILL.md:455-457 so the two copies agree, and keep the descriptive
+  `- work_dir: none — …` bullet as is.
+expected_effect: >-
+  A step with no `work_dir` no longer instructs its subagent to pass a placeholder anchor; the sub-skill
+  falls back to its own scope resolution as the brief's own descriptive line already promises, and the
+  Workflow and Fallback briefs stop disagreeing about what to emit.
+risk: low                        # downgraded from medium at apply: all 3 refuters judged the effective risk low (wording-only; `(omit)` fires solely when no anchor exists and never reaches data)
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T02:35:00+07:00
+applied_notes: 'Applied with the refuters'' exact wording: the template gained `wdSuffix`, `anchorFlags = [wdSuffix, docsSuffix, workItemSuffix].join("").trim()` and a branched `anchorLine`, so the sentence renders "Pass no anchor flags — let the skill use its own scope resolution" when no anchor exists and is BYTE-IDENTICAL to the previous output when work_dir is set (verified by rendering the real brief() before and after). The Fallback mirror now reads "Pass the anchors above that have a value ... if none are set, pass no anchor flags". `(omit)` no longer appears anywhere in the skill outside the improvement artifacts. Effective risk: low; the CLAUDE.md-precedence / 007-class framing in the observation is overstated and should be read as an instruction-consistency defect. || APPLY: auto-verified 2026-08-28: 3 refuters at verify_tier=high, 2/3 non-refuted (third vote not required), floor_hit=false on both returned (007''s Step-3a empty-anchor halt guard at SKILL.md:587-592 is untouched). The observation was settled by RENDERING the template literal: with no anchors it prints `Pass work_dir=(omit) to the skill so it anchors there`. History checked: the introducing commit (d35f65dd) is a bulk catch-all that never defends the placeholder, and at that commit docsSuffix/workItemSuffix did not yet exist — so work_dir was simply never retrofitted to the conditional form. `(omit)` is the sole occurrence in the repo, so it is no convention. Consumers verified: sk-bmad-pm, sk-bmad-developer and sk-database-analyst all state an explicit work_dir WINS and instruct skipping their own scope-resolution step. APPLIED SHAPE per the refuters: risk downgraded to low, the CLAUDE.md-precedence / 007-class framing dropped, anchors corrected to SKILL.md:449 and :457, and the replacement sentence BRANCHED (an explicit ''Pass no anchors — let the skill resolve its own scope'' clause) rather than pointing at ''the anchors above''.'
+changes:
+  files: [references/commander-workflow-template.js, SKILL.md, skill.manifest.yaml, VERSION.json]
+  version_from: 1.3.0
+  version_to: 1.4.0
+  commit: null

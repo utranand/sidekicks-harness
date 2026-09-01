@@ -46,14 +46,15 @@ requires:
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:a200b261f1bb6b09ed4cf786950fffe72c3fc4b568068c698dce398971a8ae0b
-  VERSION.json: sha256:85b1f5ecb6b3bd25813f7f84960ef7037dffafcb263b2e2b151747b7f007ff84
+  SKILL.md: sha256:66397e830f26d1fa4f69c2b7ef2695e03135325552b2366aa9915b3dce929339
+  VERSION.json: sha256:1916895f28fd3fd5d28af2efd7e9f1b27d541964256734b8cd89e86ba94734b9
+  evals/trigger-eval.json: sha256:2c058f1c3cb6bf63f2953817c557fc51ceb0dd5439fe1fcb3a28bc072f90180c
   improvements/001-ralph-arm-guard-when-plugin-absent.yaml: sha256:66bffe4608f7057143e85870b9ebee9c3f327236dfcd9f8928ae085e6b6b877c
   improvements/002-service-pull-is-registry-mutating.yaml: sha256:5ae24c5b633ed24f27592234fe7362661008806ef0aab131da8753383219c02a
   improvements/003-set-remote-is-registry-mutating.yaml: sha256:28f353b5a752d4b4ee76370622dd7c03393479dd39377d085be5103f76f0d55c
   improvements/004-step3a-extract-embedded-anchor-before-helper.yaml: sha256:35fa6a84eb6baf5571775b1c654435ec9a88b99a14cad5de8fc739889ed06dfe
   improvements/005-leading-dot-definition-omits-bare-dotdot.yaml: sha256:baca1e072ab7a5f35e652e0b6cf072deafff9473543609b4e722b18edb607542
-  improvements/006-add-triggering-eval-set.yaml: sha256:f54d666769283b7246c2699e7c9fd34b4acf861f28bdcfbb46b162692e832bf3
+  improvements/006-add-triggering-eval-set.yaml: sha256:db892540f933198e57bef3c64ce1561d45ac8fa26e62ca26f74dbfdf0c032241
   improvements/007-resolve-anchor-main-module-guard-not-portable.yaml: sha256:bfc1dee04d6a498d0f97ae423ad6eba1e5a13d4ad461f78a0f6f94481e075f44
   improvements/008-service-add-scaffolding-is-wrong-three-ways.yaml: sha256:cc88712675ab631460e0b1ad1bbe71a21210d16df7696df89b9de2692b3c01df
   improvements/009-model-tier-token-is-undefined.yaml: sha256:53c4cf2a58bbdde24ac14421d84a9f38dd8ee92ffa80a3fafe5ae71c94fa4c91
@@ -65,9 +66,19 @@ bundle:
   improvements/015-manifest-comment-cites-the-wrong-skill-md-line.yaml: sha256:4925a400166f0f29b50668b774c363494b8121c997322a7b1ec276e884c77552
   improvements/016-cross-scope-worktrees-are-created-without-consent.yaml: sha256:eabd2ffb8ced390a2fcd20fa886a71891954f3266f2a67f06dcd1f7f80e4e2b7
   improvements/017-integrate-misdiagnoses-a-stale-base-conflict.yaml: sha256:4e80e8d0dab53287b261a67534431b678a16aaba178356c55ed40362f967a832
-  improvements/INDEX.md: sha256:5f3490849873d11325a9057d5c55ff8055ecf987fab75d482247937b7223a8bd
-  references/commander-workflow-template.js: sha256:f709ef883c3444a9d58e54e848dd971e0cfcad9b99b784f30af260e12e2e0f1d
+  improvements/018-work-item-and-stage-count-are-unbound-shell-vars.yaml: sha256:da15163755053b48e9302ad4a3fb34103175cf4fa5542735c7f7743cb04860bf
+  improvements/019-verification-cli-steps-fan-out-into-worktrees-that-cannot-build.yaml: sha256:717bdf77086f31bc1970b98f1f80d287c8083b84b86b97eb42700b1dce4ce15e
+  improvements/020-args-events-model-is-declared-by-the-template-but-never-documented.yaml: sha256:779150d4fd9dac5cfece6c920581cf4248aa4f386eac93bad35cb5875d7e1e3b
+  improvements/021-cli-step-output-capture-differs-across-the-three-copies.yaml: sha256:820b98be06f49ebed12fbfe21c8792967945e85be982212c89190b04e19ff753
+  improvements/022-fallback-worktree-addendum-lost-the-cli-branch.yaml: sha256:d1f0d0a225d7a2a9a8bc41db4c0d5441ea5b7c259c61cd414addae5c733a318b
+  improvements/023-skill-step-brief-tells-the-agent-to-pass-work-dir-omit.yaml: sha256:33d5fad6d23c2ee0758a8ddec83a71d556ec09fdc0559dfe5d03e42f4f3fd25e
+  improvements/024-resolve-anchor-does-not-tolerate-backslash-inputs-it-claims-to.yaml: sha256:018ec5dc02826ea95843f50fb976fdbf41155af7f48a97ce7d23789c3148354a
+  improvements/025-eval-set-positives-that-name-a-file-path-are-structural-zeros.yaml: sha256:4f76ca5b88c9599078193a1a189d6c31484a436014d1ccdd3bc9308a9004148a
+  improvements/026-catch-block-halt-omits-the-stage-the-contract-promises.yaml: sha256:f2ada82f61b2c383786a79d2a10c3185d6f940ccfaaca232a6cfec4b7f8925ff
+  improvements/027-description-under-triggers-on-step-range-and-build-all-services.yaml: sha256:60616ef8f03d446b83e277adb40703bc8ba9e5169dacd03c13671df869961900
+  improvements/INDEX.md: sha256:a1beb6d343620121b0c1e59f1ae62fd20c9761f898d35aadfa02e2d82c291786
+  references/commander-workflow-template.js: sha256:1a0e2ad62a77c28f5a986632d0f186db2873772746cdfb41f2d67de2a5bc270f
   rules/criterion.command-sequences.md: sha256:356c6cf64ed6dae24caa5f2b47d211317a2212f3cceb7b4b2fc376e45600e51d
-  scripts/resolve-anchor.mjs: sha256:d8bab074b6b57094ccedad740eb65c14426f1a81086616ba40ef434c1e21e83d
+  scripts/resolve-anchor.mjs: sha256:49c4fb92469763330b4d463fd3aa8f7041a7ea3adbd6e9a480fda8bd0433ecf1
   scripts/run-event.mjs: sha256:dad2caaadc4e23f9f8d7c528e6623ec093adc7ebf40dd15d302250341de55ba3
   skill.yaml: sha256:1442293ff64b10a42fd05ef0b4654b3d8f79cdc235ce5e7dbd66f4286af72828

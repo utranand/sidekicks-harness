@@ -1,0 +1,73 @@
+id: 016-require-clean-bundle-inert
+target_skill: sk-skill-manager
+created: 2026-08-28T07:00:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, round 1 (mid tier), rubric dimension 6
+  (dead content). The probe's stronger claim — that export performs no staleness refusal at all —
+  was CHECKED AND REFUTED at the gate; what survives is the narrower, verified finding below.
+kind: assets
+observation: >-
+  `config.defaults.yaml:67` declares `require_clean_bundle: true` under `skill_repo.export`, with a
+  comment written as though the key controls behaviour ("Refuse to export a skill whose bundle{}
+  does not match disk. An export is a copy that will be verified somewhere else; exporting a stale
+  tree just moves the drift."). Nothing reads it. A repo-wide grep returns exactly two hits: the
+  declaration itself, and `lib/skill-lifecycle/destinations.mjs:206`, a JSDoc `@returns` annotation
+  describing the SHAPE of a resolved-config object (`require_clean_bundle?: boolean`) that is never
+  consumed.
+  IMPORTANT — the behaviour itself is real, so this is a dead KNOB, not a missing guard. The gate
+  verified that `lib/skill-lifecycle/export.mjs:183-184` collects stale entries and `:300-302`
+  refuses with "skill export: refusing to export a stale tree — the recorded baseline does not
+  describe the folder". SKILL.md's EXPORT claim "**Export refuses a stale tree**" (SKILL.md:393) is
+  therefore TRUE and must not be touched. The defect is only that the refusal is UNCONDITIONAL and
+  hardcoded while a configuration key advertises itself as governing it — so an operator who sets
+  `require_clean_bundle: false` in a scope's `skills.yaml`, reasonably expecting to permit a stale
+  export, gets the refusal anyway with no indication their setting was ignored. Skill-attributable:
+  `config.defaults.yaml` is this skill's own declared config surface.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/config.defaults.yaml`, keep the key (removing it would break
+  any scope that has already set it) but rewrite its comment to state what is actually true: the
+  staleness refusal is unconditional in `lib/skill-lifecycle/export.mjs` and this key does not
+  currently gate it, so setting it to `false` does not permit a stale export. Mark it explicitly as
+  reserved-for-future-wiring.
+  Do NOT resolve this by deleting the export refusal or by making it conditional — that would turn a
+  hardcoded guard into a switchable one, which is a safety-relevant change and is out of scope for
+  this artifact. If the knob should genuinely become live, that is a separate framework change to
+  `export.mjs` for a human to decide, and it should be filed as such.
+expected_effect: >-
+  The config file stops advertising control it does not have, so an operator cannot silently believe
+  they have disabled a guard that is in fact unconditional.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T09:15:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. 014 and 015
+  were applied in a SINGLE pass over the shared references/skill-repo-layout.md (disjoint ranges) and
+  the bundle baseline re-recorded ONCE afterwards with `sidekicks skill manifest sk-skill-manager
+  --apply`, the second run a clean no-op — the follow-up both verifiers flagged as missing from the
+  proposals. Post-apply checks: the reference file's title, intro and TOC now name layout 3 as the
+  write target with a §3c entry; no live `sidekicks-framework` URL remains in the file (the one
+  surviving mention is the new sentence explaining the retirement); config.defaults.yaml parses;
+  skill doctor and skill verify re-run clean.
+changes:
+  files: [config.defaults.yaml, skill.manifest.yaml]
+  version_from: 0.5.0
+  version_to: 0.5.1
+  commit: null
+
+# VERIFICATION RECORD — three independent adversarial refuters, each told to refute and to default to
+# refuted when uncertain: the round-1/round-2 strong-tier gate verifier, then lens A (factual
+# correctness of every citation) and lens B (is the proposal correctly aimed / would it make things
+# worse). Result for this finding: refuted=false and floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified and below the floor -> auto-applied.
+
+# CORRECTION ACCEPTED — and it changed the applied text. Lens B warned that the artifact's own
+# proposed phrasing, "reserved-for-future-wiring", reads as a roadmap note and could invite exactly
+# the wiring the artifact rules out. That wording was NOT used. The comment as applied says instead
+# that making the refusal conditional would be a deliberate, separately reviewed change to
+# export.mjs's guard logic decided by a human, and that it is "not planned, not half-built, and not
+# a config toggle waiting to be flipped".
+# SCOPE GAP reported, not fixed here: docs/guide/v1.5/skills-repos-and-framework-core.md:619 and the
+# commented example at .sidekicks/config/skills.yaml:30 advertise the same false control to the same
+# operator. Both are outside this skill's folder — the guide is repo docs, skills.yaml is CLI-owned
+# (Rule 1) — so they are the operator's to correct.

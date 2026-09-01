@@ -1,0 +1,53 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 018-work-item-and-stage-count-are-unbound-shell-vars
+target_skill: sk-commander
+created: 2026-08-28T02:05:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 0 (high-tier discovery panel, gated at verify_tier=high). Evidence commands re-run by the gate: `grep -rn "WORK_ITEM" .agents/skills/sk-commander/` returns exactly SKILL.md:325 and SKILL.md:346 and nothing else; `grep -rn "stages=<n>\|STAGES_N" .agents/skills/sk-commander/` returns only SKILL.md:346.'
+kind: instructions
+observation: >-
+  The Run-events section tells the runner to resolve its run dir with
+  `RUNDIR="$(node "$ROOT/bin/sidekicks" scope run-base sk-commander ${WORK_ITEM:+"$WORK_ITEM"})"`
+  (SKILL.md:325) and to open the sidecar with
+  `--work-item "$WORK_ITEM" --detail stages=<n>` (SKILL.md:346) — but `$WORK_ITEM` is never
+  assigned anywhere in the skill. A grep over the whole skill directory (SKILL.md, both scripts, the
+  template, rules/, improvements/) returns those two USES and no `WORK_ITEM=` binding at all, and
+  `stages=<n>` is likewise a placeholder the text never resolves. Under `set -u` the expansion form
+  `${WORK_ITEM:+...}` is safe but always empty, and the bare `"$WORK_ITEM"` on line 346 is not; either
+  way the work item never reaches `scope run-base`, so every commander run lands its run folder at
+  `_adhoc/sk-commander` even when the sequence carries a work item.
+  The ordering makes it unfixable by the runner as written: the sidecar open sits inside run-procedure
+  step 1 ("Resolve `ROOT` … Then open the run-event sidecar … before any stage transitions",
+  SKILL.md:532-541) while the parse — the only place a work item or a stage count could come from — is
+  step 2 (SKILL.md:545). So at the moment RUNDIR is computed the sequence has not been read.
+  This contradicts the skill's own handling of the field: SKILL.md:115-121 defines `work_item?` and the
+  template threads it into every step brief (commander-workflow-template.js:315, 326), and CLAUDE.md's
+  runs-layout-v2 ladder states orchestrators MUST propagate `work_item`. The commander propagates it to
+  its children and drops it for itself.
+proposal: >-
+  Two edits, both in SKILL.md, no script change.
+  (1) Bind the two variables where they can actually be known. Move the sidecar open out of
+  run-procedure step 1 and into a new step 2b that runs AFTER the parse and BEFORE step 3's pre-flight,
+  and state the bindings there explicitly, e.g.:
+  `WORK_ITEM="<the sequence's top-level work_item, or the value every step shares; empty when the
+  sequence carries none>"` and `STAGES_N="<the stage count from the parse>"`; then use
+  `--detail "stages=$STAGES_N"`. Keep `ROOT`/`STAMP` resolution in step 1.
+  (2) Make the Run-events section's code block (SKILL.md:322-348) say that `WORK_ITEM` and `STAGES_N`
+  come from the parse, and change the "before any stage transitions" phrasing at SKILL.md:539-541 to
+  "after the parse (step 2), before any stage transitions". Use `--work-item ${WORK_ITEM:+"$WORK_ITEM"}`
+  (or omit the flag when empty) so an unset work item cannot fail under `set -u`.
+  Do not change scripts/run-event.mjs or the template.
+expected_effect: >-
+  A sequence that carries a `work_item` gets its run folder under that work item, as runs layout v2 and
+  CLAUDE.md's propagate-the-work-item rule require, instead of silently falling into
+  `_adhoc/sk-commander`; the sidecar's `run.created` carries a real work item and a real stage count;
+  and the documented shell no longer references variables the skill never binds.
+risk: medium
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T02:35:00+07:00
+applied_notes: 'Applied NARROWED per the refuters: explicit WORK_ITEM and STAGES_N bindings added beside RUNDIR/RUNREL/RUNID; the run.created append is now `${WORK_ITEM:+--work-item "$WORK_ITEM"} --detail "stages=$STAGES_N" --json` (whole flag conditional, detail quoted) with a sentence naming the reason — unquoted `stages=<n>` is shell redirection and creates a file called `--json`; `work_item: <slug>` documented as a third accepted top-level key with the caller-wins ladder, the per-step field left untouched; step 2 now also picks up work_item and the stage count. The proposed step RENUMBERING was NOT applied (refuted: a halt during the parse would then produce no run.created), and the "every run lands in _adhoc" claim was replaced with "a run CAN fall into _adhoc/sk-commander". || APPLY: auto-verified 2026-08-28: 3 refuters at verify_tier=high, 2/3 non-refuted, floor_hit=false on all three. Confirmed: WORK_ITEM has no assignment anywhere in the repo, `scope run-base sk-commander` resolves to artifacts/runs/_adhoc/sk-commander vs artifacts/runs/<item>/commander with an item, and bare "$WORK_ITEM" dies under `set -u`. The reproduce-lens refuter found a further defect in the same line: unquoted `--detail stages=<n> --json` is parsed by the shell as REDIRECTIONS — it created a file named `--json` and passed a valueless `stages=`. The consequence-lens refuter REFUTED the artifact''s strongest claim with disk evidence (3 of 5 real commander sidecars DO carry a work item: SDHPT-280/commander, start-shph-uat-services/commander, publish-sidekicks-harness-framework-core/commander) and showed the proposed step reordering would regress observability (a halt during the step-2 parse would produce no run.created, where today it does). APPLIED SHAPE, narrowed accordingly: bind both variables, quote/guard the flags, correct the overstated wording; the step renumbering is NOT applied.'
+changes:
+  files: [SKILL.md, skill.manifest.yaml, VERSION.json]
+  version_from: 1.3.0
+  version_to: 1.4.0
+  commit: null

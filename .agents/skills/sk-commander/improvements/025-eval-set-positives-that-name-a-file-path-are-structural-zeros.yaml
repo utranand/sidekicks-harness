@@ -1,0 +1,52 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 025-eval-set-positives-that-name-a-file-path-are-structural-zeros
+target_skill: sk-commander
+created: 2026-08-28T03:00:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, step 2b.2 — the FIRST baseline measurement of this skill''s triggering, taken with the eval set applied earlier in the same run (artifact 006). Evidence is the scorer''s own per-query output: 14/20 passed, and the six failures with their trigger rates.'
+kind: assets
+observation: >-
+  The first measured baseline of sk-commander's description is 14/20 (all 10 negatives pass at 0/3;
+  6 of the 10 positives fail). Four of those six failures are not description defects at all — they are
+  artefacts of how the query is written, and they can never pass:
+    0/3  run the command-sequence at projects/acme/artifacts/command-sequence/stop-acme-prod-services-direct.yaml
+    0/3  projects/acme/services/svc-a/src/docs/pipeline.yaml — go
+    0/3  run this pipeline overnight unattended, keep going even if the session exits: run.commander.yaml
+    0/3  kick off the plan in projects/acme/services/svc-a/src/docs/pipeline.yaml
+  Every one names a file path. `scripts/trigger_eval.py` scores from a NEUTRAL trigger-root — a temp
+  directory containing only the skill under test — so none of those paths exist, and the scorer records a
+  no-trigger whenever the first tool call is not a Skill invocation (a Read of some other path counts as
+  not-triggered). A model handed "run the sequence at <path>" reasonably reads the path first, so the query
+  measures "does the model read a file before invoking a skill", not "does this description win". A
+  refuter predicted this exact failure mode while verifying artifact 006 ("a near-certain structural zero
+  … a permanent ~1/20 score floor"); the measurement confirms it at 4/20, a 20-point permanent floor that
+  makes the set unable to score above 16/20 no matter how good the description is.
+  The remaining two failures ARE real signal and are being handled by the description-optimize loop:
+    0/3  execute steps 1-5 of this sequence and fan stage 2 out across the three services in parallel
+    1/3  build all three services at once from this numbered step list, each with its own work_dir
+  Skill-attributable: the eval set is the skill's own committed measurement instrument, filed by this
+  auditor family, and an instrument with a fixed 20-point floor mis-measures every future audit of this
+  skill — dimension 1 is decided by this file.
+proposal: >-
+  Rewrite the four path-bearing positives in .agents/skills/sk-commander/evals/trigger-eval.json so they
+  carry the same INTENT without naming a filesystem path the neutral root cannot contain — describe the
+  artifact instead of pointing at it. For example: "run the command-sequence I just pasted, the one that
+  stops the prod services" ; "the sequence above — go" ; "run this pipeline overnight unattended and keep
+  going even if the session exits" ; "kick off the numbered plan I gave you, stage by stage". Keep the
+  10/10 positive/negative balance and the 20-entry size, change nothing else, and leave every negative
+  untouched (all ten pass and they are the boundary this set exists to defend).
+  Add a one-line comment convention or a note in the run's report that a should_trigger query must not
+  name a path that does not exist in the neutral trigger-root — the same trap will catch the next author.
+expected_effect: >-
+  The set's achievable ceiling returns to 20/20, so a future description candidate can be judged on
+  triggering rather than against a fixed 4-query floor, and the measured baseline becomes comparable across
+  runs instead of encoding an artefact of the harness.
+risk: low
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: 'PARKED 2026-08-28 by sk-skill-auditor run audit-sk-commander-2026-08-28 — FAILED adversarial verification 1/3 (refuted by 2 of 2 returned refuters at verify_tier=high; floor_hit=false on both, so this is parked as UNVERIFIED, not as a safety-floor case). THE OBSERVATION IS WRONG AS WRITTEN and must not be applied in this form. Decisive counter-example, from the same baseline JSON this artifact cites: positive #2 ("orchestrate these steps end to end: sk-bmad-pm, then sk-bmad-validate-prd, then sk-bmad-developer, all on projects/acme/services/api/src") names a path that is equally absent from the neutral trigger-root and scored 3/3 — so naming a path is neither necessary nor sufficient for a zero, and "permanent structural floor" is an inference, not a measurement. Two of the six failures name no path at all. The refuters'' competing explanation is better supported: the discriminator is intent-word coverage in the DESCRIPTION ("orchestrate these steps end to end" is in it; "kick off the plan" and "pipeline" are not, and "deliver the plan end to end / phase by phase" is the set''s own NEGATIVE #16). Second independent ground: the measurement is a single unreplicated run at runs_per_query=3, against this auditor family''s own recorded variance on an identical description+set — artifacts/archived/runs/skill-auditor/audit-jira-2026-06-26/ledger.yaml records 12/20 where a prior run measured the same description 20/20 — and critique-criteria.md makes replication mandatory for dimension 1. Third: two of the proposed rewrites are harmful — "kick off the numbered plan I gave you, stage by stage" is near-identical to the set''s own negative #16, and "run this pipeline overnight and keep going even if the session exits" is near-verbatim sk-get-plan-done''s own claimed phrasing; and deleting the bare-path positives would delete coverage of what SKILL.md calls "the strongest signal" (execute "even when the accompanying message is only a path"). Fourth: the artifact quotes a refuter prediction that exists only in the run''s conversation, not on disk — it has since been persisted verbatim to the run log, but citing an unreachable source was a filing error. WHAT A HUMAN SHOULD DO INSTEAD: (1) re-score the UNCHANGED set and treat only queries at 0/3 in BOTH runs as candidates; (2) if rewriting at all, change only the "bare path as the sole object of a run-this-file instruction" shape, keep #2''s proven path-bearing form as the counterexample, and keep at least one bare-path positive; (3) drop the proposed "no should_trigger query may name a path" convention — #2 disproves it; (4) note that a pre-rewrite score is not comparable to a post-rewrite one; (5) the primary fix probably belongs in a DIFFERENT skill, sk-skill-auditor/scripts/trigger_eval.py, which decides on the first tool block alone (L187-191, L198-202) so a first Read of any other path scores zero — either watch the first N tool calls instead of returning False, or seed the neutral root with stubs for paths a query names; (6) any edit here must end with `sidekicks skill manifest sk-commander --apply`.'
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

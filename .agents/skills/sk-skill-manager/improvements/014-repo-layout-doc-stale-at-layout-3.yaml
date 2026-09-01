@@ -1,0 +1,77 @@
+id: 014-repo-layout-doc-stale-at-layout-3
+target_skill: sk-skill-manager
+created: 2026-08-28T06:55:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, round 1 (mid tier, bundled-content angle),
+  rubric dimension 6. Re-verified at the gate against the reference file and the live public
+  destination checkout.
+kind: assets
+observation: >-
+  `references/skill-repo-layout.md` — the file SKILL.md names as "the on-disk contract" and points
+  BOTH the BOOTSTRAP and EXPORT modes at — contradicts itself about which layout is current, and its
+  title and opening are the half that is wrong:
+    - line 1, the title: "The `sidekicks-skills` repository contract — layouts 1 and 2"
+    - lines 7-8: "**Layout 2 is what export writes today** (§3b)."
+    - but line 139-142, §3b itself: "> **Historical, and still read.** Written between 2026-08-17
+      and 2026-08-18. Superseded by [layout 3] ... which retires the destination's parked tree."
+    - and line 189-191, §3c: "## 3c. Layout 3 — the current write target ... Since **2026-08-18**,
+      `skill export` writes layout 3."
+  So the document's front matter says layout 2 is the write target while its own body says layout 3
+  superseded it eight days ago. The Table of Contents compounds it: line 16 reads
+  "3b. [Layout 2 — the current write target](#3b-layout-2--the-current-write-target)" — a label and
+  anchor that belong to §3c, against a §3b whose real heading is just "3b. Layout 2" — and there is
+  no TOC entry for §3c at all, so a reader scanning the contents never learns layout 3 exists.
+  Reality agrees with the body, not the front matter: the live public destination
+  `projects/global/services/sidekicks-skills/src/.sidekicks/` contains only `.gitkeep` — the layout-3
+  root marker — with no `skill-offloaded/` parked tree, which is precisely what layout 3 retires.
+  Skill-attributable: this is the skill's own bundled reference, and a reader who trusts the title
+  and stops there works from a contract that was superseded.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/references/skill-repo-layout.md`:
+    1. Retitle line 1 to "... — layouts 1 to 3" and rewrite lines 7-8 so layout 3 is named as the
+       current write target, with layouts 1 and 2 described as historical-but-still-read.
+    2. Fix the Table of Contents: give §3b the label "Layout 2" (dropping "the current write
+       target") and add the missing §3c entry, "Layout 3 — the current write target", with the
+       correct anchor.
+  Text-only edit to one bundled reference. No behaviour, no command, no guard changes; §3b's and
+  §3c's own bodies are already correct and stay untouched.
+expected_effect: >-
+  The document stops naming a superseded layout as the write target in the two places a reader
+  looks first (title and TOC), and layout 3 becomes discoverable from the contents rather than only
+  by reading to line 189.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T09:15:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. 014 and 015
+  were applied in a SINGLE pass over the shared references/skill-repo-layout.md (disjoint ranges) and
+  the bundle baseline re-recorded ONCE afterwards with `sidekicks skill manifest sk-skill-manager
+  --apply`, the second run a clean no-op — the follow-up both verifiers flagged as missing from the
+  proposals. Post-apply checks: the reference file's title, intro and TOC now name layout 3 as the
+  write target with a §3c entry; no live `sidekicks-framework` URL remains in the file (the one
+  surviving mention is the new sentence explaining the retirement); config.defaults.yaml parses;
+  skill doctor and skill verify re-run clean.
+changes:
+  files: [references/skill-repo-layout.md, skill.manifest.yaml]
+  version_from: 0.5.0
+  version_to: 0.5.1
+  commit: null
+
+# VERIFICATION RECORD — three independent adversarial refuters, each told to refute and to default to
+# refuted when uncertain: the round-1/round-2 strong-tier gate verifier, then lens A (factual
+# correctness of every citation) and lens B (is the proposal correctly aimed / would it make things
+# worse). Result for this finding: refuted=false and floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified and below the floor -> auto-applied.
+
+# CORRECTIONS ACCEPTED:
+#   - Both verifiers noted the proposal omitted a required follow-up: references/skill-repo-layout.md
+#     is bundle-recorded in skill.manifest.yaml, so editing it makes the tree stale against the very
+#     unconditional export refusal finding 016 examines. The manifest WAS re-recorded after applying
+#     (`skill manifest sk-skill-manager --apply`, second run a clean no-op) — see applied_notes.
+#   - 015 edits the SAME file at a disjoint range, so both were applied in ONE pass and the manifest
+#     re-recorded once, per the verifier's advice.
+#   - Scope note from lens A: the published catalog.yaml:12 still STAMPS `layout: 2` while the
+#     destination is layout 3 on disk. The doc itself says stamps are records nobody reads, so this
+#     does not contradict the finding — but "the live checkout is layout 3" is true of the .gitkeep
+#     marker, not of the stamp. Correcting the stamp is a destination-side change, not a skill edit.

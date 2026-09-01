@@ -79,6 +79,13 @@ framework:
 # non-framework member fail against an unknown family.
 agents:
   blurb: 'Persistent delegate agents: creation, standby loops, mailbox bridge, journals, scheduling'
+  # Audits as `ops` (it is a macOS menu-bar status app, so it sweeps with the operational skills),
+  # browses as `agents` — it is the ONLY member of this family whose category cannot be derived from
+  # its audit group. The other eight sk-agent-* skills already resolve here via `groupOf()`, so
+  # listing them would be the second copy this file's header warns against; `members:` ADDS to the
+  # audit-group default, it does not replace it.
+  members:
+    - sk-agent-tray
 architecture:
   blurb: 'Architecture authoring, rules documents, API cartography, validation gates'
 bmad:

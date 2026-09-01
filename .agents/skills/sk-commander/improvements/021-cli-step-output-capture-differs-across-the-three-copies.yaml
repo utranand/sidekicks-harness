@@ -1,0 +1,49 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 021-cli-step-output-capture-differs-across-the-three-copies
+target_skill: sk-commander
+created: 2026-08-28T02:08:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 0 (mid-tier discovery panel on the cross-copy-consistency angle, gated at verify_tier=high). Anchors re-read by the gate: SKILL.md:222-225, SKILL.md:478-482, commander-workflow-template.js:300-306 and the STEP schema at 225-237.'
+kind: instructions
+observation: >-
+  The same requirement — "return the command's output" — reads three different ways in the skill's three
+  copies of the CLI-step contract.
+  (1) SKILL.md:222-225, the "Things the template already encodes for you (don't re-derive them)" list,
+  asserts the template's CLI brief tells the agent to "set `ok=true` only on exit 0 — or when the
+  command's effect already holds … — and return the stdout/stderr tail."
+  (2) The template's real CLI brief (commander-workflow-template.js:300-304) never asks for output on
+  success: "On ok=false put the stderr/exit detail in \"error\". List any paths it created/changed in
+  outputs, and give a one-line handoff (the command + outcome) for the next stage." The STEP schema
+  (lines 225-237) has no output/tail field either — `outputs` is documented as "absolute paths written or
+  changed" and `error` as "failure detail when ok=false".
+  (3) The Fallback's CLI-step brief (SKILL.md:478-482) invents a third behaviour: "Put the stdout/stderr
+  tail in the handoff on success or the error on failure."
+  Consequence, concretely: Example 6 (SKILL.md:788-810) uses `npm test` as a verification gate. Run
+  through the template — which SKILL.md:239-240 instructs be kept verbatim — a passing gate surfaces no
+  test output at all, though SKILL.md's own summary says it does; run through the Fallback, the same gate
+  does surface it. A reader of SKILL.md cannot tell which is true, and the two execution paths genuinely
+  differ.
+proposal: >-
+  Make one behaviour true in all three places. Preferred direction (keep the capture, since a
+  verification gate's tail is the useful part): in commander-workflow-template.js, have the CLI brief ask
+  for the stdout/stderr tail on success and give it a home — either extend the STEP schema with a
+  `commandOutput` string field ("stdout/stderr tail; CLI steps only") or state explicitly that the tail
+  goes in `handoff` — and mirror the exact wording into the Fallback brief at SKILL.md:478-482 so the two
+  paths are byte-comparable.
+  Acceptable alternative if the schema must not grow: delete "and return the stdout/stderr tail" from
+  SKILL.md:225 and drop the tail sentence from the Fallback brief, so all three copies agree that only a
+  failure detail is captured.
+  Either way, edit all three copies in the same change — the defect is the divergence, not any one copy.
+expected_effect: >-
+  SKILL.md's description of the template stops over-claiming, and the Workflow path and the Fallback path
+  return the same thing for the same CLI step, so a verification gate's output is either always captured
+  or never promised.
+risk: low                        # downgraded from medium at apply: the applied direction only deletes an over-claim from two prose copies; two of three refuters judged the effective risk low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T02:35:00+07:00
+applied_notes: 'Applied in the artifact''s ALTERNATIVE direction (2:1 among the refuters): the over-claim "and return the stdout/stderr tail" was deleted from the "Things the template already encodes" bullet and replaced with what the template actually does (failure detail in `error`, no success-output field, and an explicit note that a tail never rides in handoff — one line, interpolated into every later brief); the Fallback CLI brief''s tail sentence became "On failure, put the stderr/exit detail in the error field." No STEP schema field added. All three copies now agree that only failure detail is captured. Effective risk: low, not medium. || APPLY: auto-verified 2026-08-28: 3 refuters at verify_tier=high, 3/3 non-refuted, floor_hit=false on all three. All three anchors verified byte-exact; the word ''tail''/''stdout'' appears nowhere in the template; not a duplicate of 013 (013 is one-directional loss inside the brief blocks, while this artifact''s leg 1 is an over-claim in the ''Things the template already encodes'' list, far above 013''s edit range — applying 013 in full would leave SKILL.md:225 wrong). No churn: `git log --all -S''stdout/stderr tail''` returns one commit (a tree move) and -S''commandOutput'' returns zero. APPLIED DIRECTION = the artifact''s ALTERNATIVE, 2:1 among the refuters: delete the over-claim rather than grow the STEP schema. All three refuters reject routing the tail through `handoff` — handoffs are joined into ctx and interpolated into every later brief, so a multi-line tail means formatting corruption plus untrusted-text injection; and the skill''s own run-event.mjs:134 already names a large stdout tail as a payload hazard. Effective risk is low, not medium.'
+changes:
+  files: [SKILL.md, skill.manifest.yaml, VERSION.json]
+  version_from: 1.3.0
+  version_to: 1.4.0
+  commit: null

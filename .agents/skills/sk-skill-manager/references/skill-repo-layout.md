@@ -1,19 +1,21 @@
-# The `sidekicks-skills` repository contract — layouts 1 and 2
+# The `sidekicks-skills` repository contract — layouts 1 to 3
 
 Read this when exporting to or importing from `github.com/utranand/sidekicks-skills`, or when
 deciding what has to travel with a skill by hand while `skill export` / `skill import` are still
 being built.
 
-**Layout 2 is what export writes today** (§3b). Layout 1 (§3) describes every clone published before
-2026-08-17 and is still read, forever — the only difference between them is where the active skill
-folders sit.
+**Layout 3 is what export writes today** (§3c) — since 2026-08-18. Layouts 1 (§3) and 2 (§3b) are
+**historical, and still read, forever**: layout 1 describes every clone published before 2026-08-17,
+layout 2 those written between 2026-08-17 and 2026-08-18. The differences are where the active skill
+folders sit and whether the destination carries a parked tree, which layout 3 retires.
 
 ## Contents
 
 1. [What a skill has to carry to be liftable](#1-what-a-skill-has-to-carry-to-be-liftable)
 2. [What `package transfer` does NOT carry today](#2-what-package-transfer-does-not-carry-today)
 3. [Layout 1](#3-layout-1)
-3b. [Layout 2 — the current write target](#3b-layout-2--the-current-write-target)
+3b. [Layout 2](#3b-layout-2)
+3c. [Layout 3 — the current write target](#3c-layout-3--the-current-write-target)
 4. [Why the sidecars sit outside the skill folder](#4-why-the-sidecars-sit-outside-the-skill-folder)
 5. [Version-pinned Python dependencies](#5-version-pinned-python-dependencies)
 6. [Importing: reconcile before you overwrite](#6-importing-reconcile-before-you-overwrite)
@@ -118,9 +120,12 @@ rebuild — except that the generators FILL a hand-authored scaffold rather than
 new family needs its `categories/<name>/README.md` created in the destination in the same change.
 
 `source_repo` in `catalog.yaml` and in every `origin.yaml` is **published provenance, not a local
-fact**: it must name a repo a reader of the destination can reach, which is the published framework
-core (`https://github.com/utranand/sidekicks-framework`) rather than whatever working repo the export
-ran in. `skill export` resolves it from `--source-repo`, then the destination's own `source_repo:`,
+fact**: it must name a repo a reader of the destination can reach — the published framework core,
+never whatever working repo the export ran in. **Do not retype the URL from here**: read the resolved
+value with `sidekicks framework config sk-skill-manager`, which is authoritative
+(`config.defaults.yaml` -> `skill_manager.export.source_repo`, or a destination's own `source_repo:`).
+It is currently `https://github.com/utranand/sidekicks-harness.git`; the earlier
+`.../sidekicks-framework` name was retired on 2026-08-17 and now 404s. `skill export` resolves it from `--source-repo`, then the destination's own `source_repo:`,
 then `skill_manager.export.source_repo`, then the source repo's git remote — so the normal case needs
 no flag. Still check the `source_repo` echoed back in the `--json` report before committing: it was
 flag-only once, and a single run without the flag published the private working repo's URL across

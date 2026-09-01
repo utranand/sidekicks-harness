@@ -1,0 +1,52 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 024-resolve-anchor-does-not-tolerate-backslash-inputs-it-claims-to
+target_skill: sk-commander
+created: 2026-08-28T02:55:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 1 (mid-tier probe on the bundled scripts, gated at verify_tier=high). Reproduced by the gate by importing the real module and calling resolveAnchor(value, seqFile, repoRoot) directly.'
+kind: scripts
+observation: >-
+  scripts/resolve-anchor.mjs promises separator tolerance it does not deliver. Its header states
+  "Cross-platform: pure node:path, tolerates `/` and `\` inputs, always emits `/` (POSIX) output so the
+  baked YAML/brief reads the same on macOS and Windows", and `isLeadingDot()` deliberately accepts both
+  forms (`/^\.\.?[\\/]/`, documented as "`.`, `..`, `./…`, `../…`, `.\…`, `..\…`"). But `resolveAnchor()`
+  then resolves with a plain `path.resolve(seqDir, value)`, which on a POSIX host does not treat `\` as a
+  separator. Measured, with seqFile = <repo>/projects/acme/docs/bundle/x.commander.yaml:
+    "../sib"  -> "projects/acme/docs/sib"                     (correct)
+    "..\sib"  -> "projects/acme/docs/bundle/..\sib"           (WRONG — backslash kept as one literal segment)
+    ".\sub"   -> "projects/acme/docs/bundle/.\sub"            (WRONG)
+    "./sub"   -> "projects/acme/docs/bundle/sub"              (correct)
+  So a backslash-style anchor is classified as leading-dot, accepted, and then silently mis-resolved: no
+  error, exit 0, non-empty output. That last part is what makes it dangerous — SKILL.md step 3a guards only
+  emptiness ("resolve-anchor returned nothing for '$VALUE' — halt, do not bake an empty work_dir"), and a
+  corrupt-but-non-empty value sails through and is baked into the authored Workflow script's
+  `work_dir`/`docs_dir`. The step then anchors at a path that does not exist, far from the cause.
+  Skill-attributable twice over: the defect is in the skill's own bundled script, and the skill's own
+  header comment and SKILL.md step 3a ("the bundled helper is deterministic + cross-platform") tell the
+  runner to trust it with whatever leading-dot value it extracted. A relocatable bundle authored on Windows
+  with `\`-style anchors is exactly the portable-bundle case the leading-dot feature exists to serve, and
+  CLAUDE.md requires one implementation that runs on both hosts. The bundled test
+  tests/skills/commander-resolve-anchor.test.mjs asserts only that `isLeadingDot` RECOGNISES the backslash
+  forms; nothing asserts `resolveAnchor` resolves one.
+proposal: >-
+  Normalise separators before resolving, in scripts/resolve-anchor.mjs: replace
+  `const abs = path.resolve(seqDir, value)` with
+  `const abs = path.resolve(seqDir, value.replace(/\\/g, '/'))` — harmless on Windows, where `/` is also a
+  valid separator, and correct on POSIX. Add a test to
+  tests/skills/commander-resolve-anchor.test.mjs that drives `resolveAnchor` (not just `isLeadingDot`) with
+  `..\sib` and `.\sub` and asserts the same repo-relative POSIX output as the forward-slash forms.
+  Do not change SKILL.md step 3a's emptiness guard — it stays correct and necessary; this fixes the case it
+  cannot see.
+expected_effect: >-
+  The script delivers the separator tolerance its own header promises, so a relocatable bundle authored on
+  either host resolves identically on the other instead of silently baking a corrupt anchor into the
+  Workflow script.
+risk: medium
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

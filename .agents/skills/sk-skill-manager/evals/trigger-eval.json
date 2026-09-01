@@ -1,0 +1,82 @@
+[
+  {
+    "query": "create a new skill for exporting our postgres schema captures",
+    "should_trigger": true
+  },
+  {
+    "query": "sk-database-transfer is broken — reinstall its python dependencies and restore its bundle from git",
+    "should_trigger": true
+  },
+  {
+    "query": "publish the jira family of skills to the private skills repository",
+    "should_trigger": true
+  },
+  {
+    "query": "pull sk-release-notes in from the skills repo and install it here",
+    "should_trigger": true
+  },
+  {
+    "query": "delete sk-hello from this repo and unwire everything it turned on",
+    "should_trigger": true
+  },
+  {
+    "query": "retract sk-shp-add-pcu from the public skills repository, it should not be published any more",
+    "should_trigger": true
+  },
+  {
+    "query": "is there a skill for converting xlsx spreadsheets to csv, or do I need to write one?",
+    "should_trigger": true
+  },
+  {
+    "query": "what needs re-exporting — give me a pick list of skills that drifted from the skills repo",
+    "should_trigger": true
+  },
+  {
+    "query": "what else do I need installed for sk-bmad-developer to work?",
+    "should_trigger": true
+  },
+  {
+    "query": "set up a new private skills repository at ../sidekicks-skills-private and register it as a destination",
+    "should_trigger": true
+  },
+  {
+    "query": "park sk-office-viz — turn it off but keep the files around",
+    "should_trigger": false
+  },
+  {
+    "query": "forge a portable runtime package of the framework skills for another machine",
+    "should_trigger": false
+  },
+  {
+    "query": "audit the jira group of skills and find what is worth improving",
+    "should_trigger": false
+  },
+  {
+    "query": "apply the approved improvement artifacts sitting under sk-get-things-done",
+    "should_trigger": false
+  },
+  {
+    "query": "sk-jira-autopilot's description is 1200 chars, trim it under the cap",
+    "should_trigger": false
+  },
+  {
+    "query": "make sure the hooks are wired identically for codex and gemini",
+    "should_trigger": false
+  },
+  {
+    "query": "create an agent named nina for jira delivery work",
+    "should_trigger": false
+  },
+  {
+    "query": "the database connector cannot see my staging env alias — check my config",
+    "should_trigger": false
+  },
+  {
+    "query": "write me a command-sequence that builds three services in order",
+    "should_trigger": false
+  },
+  {
+    "query": "which skills does the framework runtime preset carry into a forged runtime?",
+    "should_trigger": false
+  }
+]

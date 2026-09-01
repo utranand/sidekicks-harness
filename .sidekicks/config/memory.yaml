@@ -1,0 +1,38 @@
+# .sidekicks/config/memory.example.yaml — Local memory — external sources
+#
+# The SAFE initializer for config/memory.yaml. A forged core and a fresh workspace start from this
+# file, never from another checkout's real registry (see lib/core-lifecycle/config-templates.mjs).
+#
+# WHY THIS FILE EXISTS AT ALL. The memory STORE (.sidekicks/memory/) is git-ignored: entries are
+# local to a checkout and this repo's history carries none of them. What travels instead is this
+# registry — the list of external folders and repositories the store is pulled from and pushed to.
+# Without it a fresh clone has an empty store and no way to name where its knowledge went.
+#
+#   sidekicks memory source add <name> --kind dir --path ~/sidekicks-memory
+#   sidekicks memory source add <name> --kind git --url git@example.com:me/sidekicks-memory.git
+#   sidekicks memory publish <name>          # push the local store out (git: add --push to push)
+#   sidekicks memory sync    [<name>]        # pull entries back in
+#
+# Written by those verbs and by `sidekicks config set` — never by hand (Rule 1). A credential a
+# private source needs (an HTTPS token) belongs in the git-ignored sibling memory.secret.yaml.
+
+memory_sources:
+  # merge | skip | overwrite. `merge` folds two independently-refined copies of one entry
+  # field-by-field (links union, `rule: true` wins, earliest `created`) and keeps BOTH bodies with a
+  # `merge_review` stamp when they diverge, rather than silently picking a side.
+  default_strategy: merge
+
+  # One entry per source. Empty by default: `memory doctor` warns when a populated store has no
+  # source registered, because nothing then carries it off this machine.
+  sources: []
+
+  # - name: home
+  #   kind: git
+  #   url: git@example.com:me/sidekicks-memory.git
+  #   ref: main
+  #   namespaces: ["*"]        # or a subset: ["root", "projects/alpha"]
+  #
+  # - name: shared
+  #   kind: dir
+  #   path: ~/Dropbox/sidekicks-memory
+  #   namespaces: ["root"]

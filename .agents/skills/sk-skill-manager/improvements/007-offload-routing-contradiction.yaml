@@ -1,0 +1,90 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/007-offload-routing-contradiction.yaml
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 007-offload-routing-contradiction
+target_skill: sk-skill-manager
+created: 2026-08-28T05:26:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6 (contradictory
+  content). Independently surfaced by the high-tier adversarial verifier while judging the
+  triggering-benchmark query set, then re-verified at the gate against both skills' SKILL.md.
+kind: instructions
+observation: >-
+  sk-skill-manager's two routing surfaces give opposite answers for the same ask, and a third skill
+  settles it against the body:
+    - Its frontmatter description ends "NOT for offloading (sk-skill-offload)" — telling the host
+      NOT to trigger this skill for a park/archive ask at all.
+    - Its mode-routing table (SKILL.md:76) routes that exact phrasing here:
+      `| "park X", "archive X", "turn X off but keep the files" | **OFFLOAD** — the verb is here,
+      the judgement is sk-skill-offload's |`, backed by a full `## OFFLOAD` section (SKILL.md:673-684)
+      that prints `node bin/sidekicks skill offload <skill> [--apply] [--restore] [--list] [--force]`
+      and closes "this is only the engine".
+  The claim that only the verb lives here does not hold: `sk-skill-offload`'s own SKILL.md runs the
+  identical CLI verb itself (lines 58-62 — `skill offload`, `--apply`, `--force`, `--restore --apply`,
+  `--list`), and its description claims the whole ask verbatim ("Use whenever the user wants to
+  offload, archive, retire, deactivate, mothball, shelve, or 'turn off' a skill"). So the operation
+  is owned end to end by the sibling, the description is right to disclaim it, and what is left here
+  is a routing row plus an eleven-line command block that duplicates the sibling and contradicts this
+  skill's own description. Two concrete costs: whichever surface a run reads first, the two disagree
+  about whether this skill handles the ask; and the duplicated flag list can drift from
+  sk-skill-offload's — a drift SKILL.md's own rule at line 39 ("Never hardcode a flag list") exists to
+  prevent. This is skill-attributable: both contradicting sentences are this skill's own.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/SKILL.md`, make the body agree with the description rather
+  than changing the description (the description's routing is the correct one — the sibling owns the
+  operation end to end):
+    1. Rewrite the mode-routing row at line 76 so it hands off instead of claiming the mode, e.g.
+       `| "park X", "archive X", "turn X off but keep the files" | -> **sk-skill-offload** — it owns
+       this end to end, the CLI verb included |`.
+    2. Replace the `## OFFLOAD` section (lines 673-684) with a short pointer that keeps the one
+       genuinely useful distinction this skill is placed to make — OFFLOAD parks and REMOVE
+       destroys, and the offloaded tree stays inside `SKILL_TREES` on purpose so rule ids, config
+       block and hook wiring survive — and then sends the reader to `sk-skill-offload` for the
+       operation. Drop the duplicated `node bin/sidekicks skill offload …` flag line, per this
+       skill's own "never hardcode a flag list" rule.
+  Keep the OFFLOAD-vs-REMOVE contrast; it is load-bearing for the neighbouring REMOVE section.
+  Text-only edit to one file. No verb, no flag, no safety rule and no hard stop is changed — REMOVE's
+  dry-run-by-default `--apply` gate and BOOTSTRAP's refusal to `git init` are untouched.
+expected_effect: >-
+  The description, the routing table and the body agree on one answer for a park/archive ask, and
+  the duplicated flag roster that could drift from sk-skill-offload's stops being maintained in two
+  places — while the OFFLOAD-vs-REMOVE distinction a reader of the REMOVE section needs stays put.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTIONS accepted from lens 1: the description does not END with "NOT for offloading
+# (sk-skill-offload)" — that phrase OPENS the NOT-clause, which continues through sk-inherit,
+# sk-packager, sk-skill-auditor, sk-self-improve and sk-parity-keeper. The substance is unaffected:
+# the description does disclaim offloading. The OFFLOAD section spans 673-683, not 673-684.
+#
+# MEASURED CONFIRMATION, produced after this artifact was filed: the triggering benchmark scored the
+# incumbent description at 19/20, and its SOLE failure was the query "park sk-office-viz — turn it
+# off but keep the files around", which over-triggered at rate 1.00 (3 of 3). So the contradiction
+# this finding describes is not only textual — the description's disclaimer measurably fails to
+# prevent the skill from claiming a park request.

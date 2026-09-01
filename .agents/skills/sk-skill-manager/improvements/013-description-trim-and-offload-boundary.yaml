@@ -1,0 +1,120 @@
+id: 013-description-trim-and-offload-boundary
+target_skill: sk-skill-manager
+created: 2026-08-28T06:20:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 1 — MEASURED by the
+  triggering benchmark (scripts/trigger_eval.py via `auditor.sh score`, num-workers 1, 3 runs per
+  query, scored from a neutral trigger-root), against the 20-query set committed by finding 004.
+kind: description
+observation: >-
+  Two independent defects in the frontmatter description, one measured and one counted.
+  (1) MEASURED, replicated. The incumbent description scores 19/20, twice — runs of
+  19/20 and 19/20. Its sole failure is the same query both times, at the same decisive rate: "park
+  sk-office-viz — turn it off but keep the files around" over-triggers at rate 1.00 (3 of 3), even
+  though the description explicitly disclaims offloading and `sk-skill-offload`'s own description
+  claims that phrasing verbatim ("offload, archive, retire, deactivate, mothball, shelve, or 'turn
+  off' a skill"). A rate of 1.00 replicated across two runs is not sampling noise — the disclaimer
+  as worded ("NOT for offloading (sk-skill-offload)") simply does not connect to how a user actually
+  phrases the ask, which is "park", "archive" or "turn it off but keep the files". This is the
+  measured half of finding 007: that artifact showed the routing table and the description
+  contradict each other; this shows the description loses the boundary in practice too.
+  (2) COUNTED. The description is 1131 characters against the 1024-character host cap — 107 over.
+  This is a regression, not a standing state: improvement 003 trimmed it from 1161 to 1013
+  specifically to fit under the cap, and it has grown back past it since, with nothing measuring or
+  testing the limit.
+  The candidate below fixes both. It scores 20/20, twice — runs of 20/20 and 20/20 — at 1018
+  characters. Under the replication rule the rubric requires (the winner's WORST must strictly beat
+  the incumbent's BEST), the bar is 20 > 19: cleared on every one of the four runs, with no run of
+  either description deviating from its own result.
+proposal: >-
+  Replace the `description:` frontmatter in `.agents/skills/sk-skill-manager/SKILL.md` with the
+  measured winner below (1018 chars, under the 1024 cap). Three substantive changes from the
+  incumbent, each earning its place: the offload disclaimer is restated in the user's own words
+  ("NOT for parking or archiving a skill, or turning one off while keeping its files") instead of
+  the term "offloading", which is what fixes the measured over-trigger; BOOTSTRAP is named, a
+  documented mode (SKILL.md's own routing row "set up a new skills repo") the incumbent description
+  omitted entirely; and the redundant trigger phrases are dropped to buy the space ("unpublish X"
+  is already covered by "retract X from the skills repo", and "I need something that can do X" /
+  "find me a skill that" / "nothing here does X" all restate "is there a skill for X"). No claim
+  about what the skill does is added, weakened, or invented — every mode named is one the body
+  documents. Winning description, verbatim:
+  |
+  Front door for a skill's whole life in Sidekicks: CREATE one (via skill-creator), ARCHITECT its work_dir=/docs_dir= anchors, VALIDATE one (skill doctor/verify/manifest), HEAL one (install deps, restore bundle), BOOTSTRAP a skills repo, EXPORT/IMPORT skills to/from the configured skills repos, REMOVE one (delete it here and unwire it, or retract its published copy), DISCOVER an uninstalled skill by describing the task, report what is published where (DESTINATIONS), REVIEW drift and pick what to republish, ADVISE which siblings a skill needs. Use for "create a new skill", "is this skill built right", "this skill is broken", "publish these skills", "pull skill X in", "delete skill X", "retract X from the skills repo", "is there a skill for X", "what else do I need for X". NOT for parking or archiving a skill, or turning one off while keeping its files (sk-skill-offload); runtimes (sk-inherit); packaging (sk-packager); audits (sk-skill-auditor); improvements (sk-self-improve); CLI parity (sk-parity-keeper).
+expected_effect: >-
+  Triggering measured at 20/20 instead of 19/20, replicated; the skill stops claiming park/archive
+  requests that belong to sk-skill-offload; and the description returns under the 1024-character
+  host cap it has been 107 over, with a committed query set that will now catch the next regression.
+risk: medium
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:35:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. The
+  description written to SKILL.md is BYTE-IDENTICAL to the text that was measured — verified after
+  the write — because editing it post-measurement would invalidate the score it was filed on. Every
+  correction the verifiers raised is therefore RECORDED below rather than folded in; the two worth
+  acting on are carried forward as follow-ups for the next audit round, not silently patched here.
+  Post-apply checks: description 1018 chars (under the 1024 cap, down from 1131); SKILL.md
+  frontmatter parses; version bumped 0.4.0 -> 0.5.0 (minor, risk medium).
+changes:
+  files: [SKILL.md]
+  version_from: 0.4.0
+  version_to: 0.5.0
+  commit: null
+
+# MEASUREMENT RECORD (all four runs, same 20-query set, same neutral trigger-root, num-workers 1):
+#   incumbent (1131 chars)  run 1: 19/20    run 2: 19/20    BEST  19
+#   cand-D    (1018 chars)  run 1: 20/20    run 2: 20/20    WORST 20
+#   Replication bar: winner's worst (20) strictly beats incumbent's best (19). PASS.
+#   The incumbent's only failure, both runs: "park sk-office-viz — turn it off but keep the files
+#   around", should_trigger=false, observed trigger rate 1.00 (3/3). cand-D passes it 0.00 (0/3),
+#   with no other query changing verdict in either direction.
+#   Candidates scored this loop: 1 (cand-D). The loop stopped on a PERFECT score, which the
+#   benchmark treats as an immediate exit — not on the dry streak and not on the 6-candidate
+#   backstop. converged: true.
+
+# VERIFICATION RECORD — 3 independent refuters, distinct lenses, each told to refute and to default
+# to refuted when uncertain:
+#   lens A — over/under-claiming in the new text:   refuted=false  floor_hit=false
+#   lens B — measurement soundness / winner's curse: refuted=false  floor_hit=false
+#   lens C — was the benchmark bent to fit the candidate (the set and the winner were authored by
+#            the same run, in that order — a real conflict of interest):  refuted=false  floor_hit=false
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified and below the floor -> auto-applied.
+#
+# Lens C's independent check is the load-bearing one: it re-derived the disputed label WITHOUT
+# deferring to this run, reading BOTH the pre-007 SKILL.md (`git show HEAD:`) and the post-007 one,
+# and found the pre-existing OFFLOAD section already said "this is only the engine" and gave the
+# judgement to sk-skill-offload, whose own description claims "offload, archive, retire, deactivate,
+# mothball, shelve, or 'turn off' a skill". So should_trigger:false on the park query is correct on
+# the merits, not correct because this run wrote it.
+#
+# CORRECTIONS ACCEPTED — the write-up above was optimistic in six places. Recorded, not buried:
+#   1. The proposal says four trigger phrases were dropped; the diff drops FIVE. "what needs
+#      re-exporting / diff before I export" is also gone and is not covered by the stated redundancy
+#      argument. It is measured safe (that query passes 1.00 in both candidate runs) and REVIEW's
+#      semantic clause still covers it — an under-documented trim, not a correctness problem.
+#   2. TWO SILENT NARROWINGS in the NOT-for list that no query tests: "audits/evals" became
+#      "audits", dropping the only eval-facing disclaimer (skill-creator's own description claims
+#      "run evals to test a skill"), and "(public/private)" plus "from a destination" were dropped
+#      from the EXPORT/REMOVE clauses. FOLLOW-UP for the next round: restore "evals" to the
+#      disclaimer and re-measure — there are only 6 characters of headroom under the cap, so it
+#      needs a real trim elsewhere, which is why it was NOT patched in blind here.
+#      ("applying improvements" -> "improvements" is a BROADER disclaimer — a strengthening, not a loss.)
+#   3. The redundancy claim for the dropped phrases is ASSERTED, not measured: no query in the set
+#      uses "unpublish X", "I need something that can do X", "find me a skill that" or "nothing here
+#      does X", so 20/20 is not evidence that dropping them is free. The body's routing table still
+#      lists them, but the host only ever sees the description. FOLLOW-UP: add queries for those
+#      phrasings to evals/trigger-eval.json so the next trim cannot drop them unmeasured.
+#   4. CAUSALITY IS INFERRED, NOT MEASURED. One candidate was scored, and it changes three things at
+#      once (reworded disclaimer, BOOTSTRAP added, five phrases dropped). "The reworded disclaimer is
+#      what fixed the miss" is the plausible reading, not an ablated one.
+#   5. The disclaimer's new wording does not literally cover sk-skill-offload's other synonyms —
+#      retire, mothball, deactivate, shelve. Generalising beyond the one tested phrasing relies on
+#      the scorer being semantic rather than lexical: plausible, unverified.
+#   6. "no run of either description deviating from its own result" holds at the SCORE level only.
+#      Per-query rates do move: "delete sk-hello" 0.67 in base1 vs 1.00 in base2, and — reproducibly
+#      — "create a new skill for exporting our postgres schema captures" sits at 1.00 (3/3) in both
+#      incumbent runs but 0.67 (2/3) in both candidate runs. Still a pass either way (threshold 0.5),
+#      so no verdict flips, but it is a repeatable softening on an easy true-positive that the
+#      "clean win" framing did not disclose. Lens B judged it consistent with the scorer's own
+#      documented noise source (a first tool call that is not Skill/Read counts as no-trigger).

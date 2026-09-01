@@ -1,0 +1,8 @@
+{
+  "name": "worktree-lifecycle",
+  "version": "1.0.0",
+  "description": "worktree-lifecycle library component",
+  "files": [
+    "link-deps.mjs"
+  ]
+}

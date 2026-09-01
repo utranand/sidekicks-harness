@@ -62,8 +62,15 @@ skill_manager:
     # Carry a skill's declared sibling skills, framework files and hook bodies by default. The
     # opposite default is how package transfer's `// skills are self-contained` gap happened.
     with_deps: true
-    # Refuse to export a skill whose bundle{} does not match disk. An export is a copy that will
-    # be verified somewhere else; exporting a stale tree just moves the drift.
+    # INERT — this key gates nothing. The staleness refusal it describes is REAL but UNCONDITIONAL:
+    # lib/skill-lifecycle/export.mjs collects stale entries and refuses with "refusing to export a
+    # stale tree — the recorded baseline does not describe the folder", reading no config at all.
+    # Nothing anywhere consumes this key, so setting it `false` does NOT permit a stale export; the
+    # refusal happens regardless. Kept rather than deleted only so a scope that has already set it
+    # does not fail `config doctor` on an undeclared key.
+    # Making the refusal actually conditional would turn a hardcoded guard into a switchable one —
+    # a deliberate, separately reviewed change to export.mjs's guard logic, decided by a human. It is
+    # not planned, not half-built, and not a config toggle waiting to be flipped.
     require_clean_bundle: true
     # The repo the exported copies are ATTRIBUTED to — written into the destination's catalog.yaml
     # and every meta/<skill>/origin.yaml. It is the PUBLISHED framework core, not whatever private

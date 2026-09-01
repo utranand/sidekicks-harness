@@ -1,0 +1,81 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/006-stale-manifest-check-claim.yaml
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 006-stale-manifest-check-claim
+target_skill: sk-skill-manager
+created: 2026-08-28T05:20:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6 (dead/contradictory
+  content). Raised by the mid-tier discovery pass, independently re-verified at the gate by running
+  `node bin/sidekicks skill manifest --all --check`.
+kind: instructions
+observation: >-
+  SKILL.md's VALIDATE section (lines 225-226) states a specific empirical fact that is no longer
+  true, and the way it is worded guarantees it will keep going stale:
+    "**Do not gate on `skill manifest --all --check`.** It exits 2 today: eight vendor skills have
+     a manifest pending `create`. Gate on the skill you touched."
+  Every load-bearing detail in that sentence is wrong against the live command. Running
+  `node bin/sidekicks skill manifest --all --check` at the gate reported FIVE skills, not eight —
+  sk-commander, sk-get-jira-done, sk-get-plan-done, sk-shp-backup-table, sk-skill-manager — every
+  one of them `update (bundle baseline)`, not `create`, and NONE of them a vendor or adopted skill;
+  they are all first-party skills authored in this repo. The mid-tier discovery pass, running the
+  same command minutes earlier, saw FOUR rows — the set changed within a single audit run, which is
+  the point: the count is a moving number that no test pins, so the sentence rots continuously and
+  silently. The claim's own subject is now one of the offending rows — sk-skill-manager's manifest
+  is itself stale against its bundle baseline. The durable half of the advice ("gate on the skill
+  you touched, not the aggregate") is correct and worth keeping; only the frozen snapshot beneath it
+  is wrong. This is skill-attributable rather than input-caused: the skill chose to record a
+  volatile measurement as a standing fact.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/SKILL.md`, replace the two-sentence bullet at lines 225-226
+  with the durable claim alone, dropping the count and the cause:
+    "- **Do not gate on `skill manifest --all --check`.** It is not a clean gate today — several
+       skills carry a manifest stale against its bundle baseline, and the set moves. Gate on the
+       skill you touched; run the aggregate only to see the current list."
+  Keep the surrounding bullets unchanged. Text-only edit to one file; no verb, flag, behaviour or
+  safety rule changes.
+expected_effect: >-
+  The instruction stops asserting a number and a cause that were already wrong and that nothing
+  keeps current, while preserving the advice that actually matters (gate per-skill, not on the
+  aggregate). A reader who runs the command no longer finds the skill contradicting the tool.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# Operational note, NOT part of this artifact's change: the gate run also showed sk-skill-manager's
+# own manifest is stale (`update (0 new entries, bundle baseline)`). Clearing it is
+# `sidekicks skill manifest sk-skill-manager --apply` — a repo housekeeping action for a human,
+# not a SKILL.md edit, so it is reported rather than filed.
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTION accepted from lens 1: the observation's phrase "they are all first-party
+# skills authored in this repo" is imprecise. sk-commander carries an import receipt at
+# .sidekicks/registry/skills/sk-commander.yaml with provenance: imported (source.kind: sidekicks —
+# a first-party Sidekicks skills repo, not a vendored/marketplace skill). The load-bearing claim
+# stands: none of the five is a vendor or adopted skill, and none is pending `create`. The
+# "mid-tier saw four rows minutes earlier" detail is unverifiable from disk and is not relied on;
+# the gate's own run of the command saw five.

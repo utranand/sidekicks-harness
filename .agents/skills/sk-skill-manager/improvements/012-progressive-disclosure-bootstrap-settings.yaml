@@ -1,0 +1,92 @@
+id: 012-progressive-disclosure-bootstrap-settings
+target_skill: sk-skill-manager
+created: 2026-08-28T05:42:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 5 (progressive-disclosure
+  bloat). Raised by the high-tier discovery pass with per-section line counts; the low-tier sweep
+  independently measured the same section sizes. Re-verified at the gate.
+kind: instructions
+observation: >-
+  SKILL.md is 872 lines — well over the ~500 the rubric flags — and two specific blocks totalling
+  roughly 120 of them are not needed at trigger time:
+    - **BOOTSTRAP, 64 lines** (SKILL.md:266-330). It is a once-per-destination procedure: `sidekicks
+      config get skill_manager --json` shows exactly two destinations, `public` and `private`, both
+      with populated `checkout:` paths that exist on disk. Its five numbered legs and three
+      "explain rather than work around" bullets are read on every single run of every other mode,
+      to serve an operation that has already happened for both destinations and runs again only when
+      a third skills repository is created.
+    - **The settings-vs-configuration restatement, ~56 lines** (SKILL.md:118-175). Its decision rule
+      and 3-row table restate `AGENTS.md` (the always-loaded framework contract, which carries the
+      same "if the answer is `true`/`false` and a user could want the behaviour off, it is a
+      *setting*" sentence and the same Declared-in / Lands-in / writer rows), so that content is
+      paid for twice in every session. The `settings_split:` exemption format specifically — the
+      four exempt kinds, the YAML shape, and the `lib/yaml-subset` one-quoted-line constraint — is
+      needed only when someone is actually recording an exemption, which is rare.
+  A destination for moved-out prose already exists and the skill already uses the pattern: BOOTSTRAP
+  itself points at `references/skill-repo-layout.md` (342 lines) at SKILL.md:330, and the file's own
+  opening rule (SKILL.md:33-37) is "Read the structure guide, do not restate it … This file is a
+  router over it." The bloat is load-bearing on context, not cosmetic: it is a fixed per-run cost on
+  the largest single-mode section and on content the session already holds.
+proposal: >-
+  Two moves, both preserving the trigger-time essentials:
+    1. Move BOOTSTRAP's five numbered legs and its three "explain rather than work around" bullets
+       to a new `references/bootstrap-destination.md`. Keep in SKILL.md: the mode-routing row, the
+       `skill repo init <path>` one-liner, the two hard facts a wrong run turns on (`repo init` never
+       runs `git init` — leg 2, `rule.irreversible-outward-confirm` — and never writes
+       `catalog.yaml`; and a `<path>` resolving inside this repo's `.sidekicks/` or
+       `.agents/skills/` is refused), and the pointer to the reference.
+    2. In CREATE, collapse SKILL.md:125-132 to the single decision-rule sentence plus a pointer to
+       AGENTS.md -> *Settings vs configuration* and docs/guide/v1.5/settings-vs-configuration.md,
+       and move the `settings_split:` exemption format (SKILL.md:151-175) to a new
+       `references/settings-split-exemptions.md`.
+  KEEP in SKILL.md, explicitly: the Mode routing table, the runs-layout-v2 section, and the three
+  "failures to refuse" (SKILL.md:134-144) — that trio is the gate every other mode invokes and must
+  stay at trigger time. Carry both refusals verbatim into the reference files rather than
+  paraphrasing them: the `git init` refusal and the `.sidekicks/`/`.agents/skills/` path refusal are
+  the two guards in this section, and this change must relocate them intact, not soften them.
+expected_effect: >-
+  Roughly 120 lines of per-run context move behind a pointer without losing anything a run needs at
+  trigger time, and the file follows its own "router, not a restatement" rule. Both BOOTSTRAP guards
+  survive verbatim in the reference.
+risk: medium
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes: {files: [], version_from: null, version_to: null, commit: null}
+
+# APPLY ORDER (raised by the harm/regression verifier, accepted): 010-not-carried-append-unwired
+# edits SKILL.md:307, inside the 266-330 block this artifact moves. Apply 010 FIRST, then let this
+# move carry the already-edited `--append` invocation into references/bootstrap-destination.md.
+
+# ▶ PARKED FOR A HUMAN — SAFETY FLOOR ◀
+# sk-skill-auditor autonomous adversarial self-verification, 3 independent lenses:
+#   lens 1 (factual correctness):  see run log
+#   lens 2 (harm/regression):      refuted=false  floor_hit=false
+#   lens 3 (safety floor):         refuted=false  floor_hit=TRUE
+# The floor is conservative by design: a SINGLE verifier's floor flag parks the change, however
+# confident the others were, and auto-verification can never license crossing it. So this artifact
+# stays `proposed` and is NOT auto-applied. A human decides it.
+#
+# The flag, verbatim in substance: BOOTSTRAP's third "explain rather than work around" bullet —
+# "Never let the new repo ignore `.agents/skills`" (SKILL.md:324-328) — guards a silent, TOTAL
+# failure mode: the export truly reports every skill folder written while `git add` stages zero of
+# them, so the destination looks published and is empty. This proposal folds that bullet into a
+# wholesale move of "three bullets" to references/bootstrap-destination.md WITHOUT naming it among
+# the guards committed to verbatim carry-over, and without keeping it among the "hard facts" left in
+# SKILL.md. Its exact wording is therefore not guaranteed to survive a skill-creator rewrite — the
+# "ambiguous about a guard's survival" condition, which this lens treats as a floor hit.
+#
+# WHAT WOULD CLEAR IT (the verifier's own correction, recorded so the human does not re-derive it):
+#   1. Extend the "carry verbatim" commitment from two guards to all THREE, naming the
+#      `.agents/skills`-ignore refusal explicitly — INCLUDING its verification instruction
+#      ("test the outcome — `git -C <root> add -An` — not the file"), which is the part that makes
+#      the guard actionable rather than advisory.
+#   2. Add a post-apply check that diffs the relocated guard text against the original SKILL.md
+#      wording byte-for-byte before the change counts as applied.
+# With those two amendments the proposal would carry no ambiguity about a guard's survival.
+#
+# APPLY-ORDER NOTE still stands: 010 edits SKILL.md:307, inside the 266-330 block this artifact
+# moves. If a human later approves this, apply 010 first (it is already applied as of this run), and
+# ensure the move carries the edited `--append` invocation across.
+

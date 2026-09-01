@@ -1,0 +1,63 @@
+id: 017-eval-set-mode-coverage
+target_skill: sk-skill-manager
+created: 2026-08-28T07:05:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, round 1 (high tier, reviewing this run's
+  own applied work), rubric dimension 6. This finding is against artifact 004, filed and applied
+  EARLIER IN THIS SAME RUN — the run auditing its own output.
+kind: assets
+observation: >-
+  The triggering benchmark this run committed (004) covers 10 of the skill's 16 documented modes,
+  and the INDEX line recording it overstates that as full coverage. SKILL.md's mode-routing table
+  lists 16 rows; `evals/trigger-eval.json`'s ten `should_trigger: true` queries cover CREATE, HEAL,
+  EXPORT, IMPORT, REMOVE-local, REMOVE-destination, DISCOVER, REVIEW, ADVISE and BOOTSTRAP. There is
+  NO query for ARCHITECT, VALIDATE, DESTINATIONS, REGISTRY, IMPORT->ADOPT or CATALOG — and ARCHITECT
+  and VALIDATE are the description's own second and third clauses, so the two modes named earliest
+  in the text a host actually reads are the two nothing measures. `improvements/INDEX.md`'s 004 line
+  ORIGINALLY said "10 should-trigger (one per mode)", which reads as one query per mode of the skill; the
+  artifact body itself is accurate (004-trigger-eval-set.yaml names exactly those ten), so the
+  overclaim is in the one-liner, not the artifact.
+  This matters because of what the benchmark is now used FOR. Finding 013 trimmed the description
+  from 1131 to 1018 characters on the strength of a 20/20 score, and there are only 6 characters of
+  headroom under the 1024 cap — so the next trim must cut something. A mode with no query can be cut
+  out of the description without the score moving, which is exactly the regression the eval set was
+  committed to prevent. 013's own corrections already book the dropped-trigger-phrase half of this
+  as a follow-up; the uncovered-mode half is untracked, which is what this artifact fixes.
+proposal: >-
+  Two changes, both additive:
+    1. Add six `should_trigger: true` queries to
+       `.agents/skills/sk-skill-manager/evals/trigger-eval.json`, one for each uncovered mode —
+       ARCHITECT, VALIDATE, DESTINATIONS, REGISTRY, IMPORT->ADOPT and CATALOG — phrased the way a
+       user actually asks, using each mode's own routing-table trigger text as the starting point.
+       Re-score the CURRENT description against the enlarged set and record the new baseline: the
+       point is a truthful measurement, not a score to protect, so a mode that under-triggers is a
+       finding to file rather than a query to soften.
+    2. [ALREADY APPLIED, see the note below — only item 1 remains outstanding] Correct the
+       `004-trigger-eval-set` line in `improvements/INDEX.md` from "one per mode" to
+       "ten of the sixteen modes", so the index does not claim coverage the set does not have.
+  Also fold in the two follow-ups 013 recorded but did not schedule: add queries exercising the five
+  trigger phrases 013 dropped ("unpublish X", "I need something that can do X", "find me a skill
+  that", "nothing here does X", "what needs re-exporting"), whose redundancy 013 asserted without
+  measuring; and re-test restoring "evals" to the `audits` disclaimer once the enlarged set exists.
+expected_effect: >-
+  A description trim can no longer silently drop a mode or a trigger phrase that nothing measures —
+  which is the whole reason the benchmark was committed, and is not yet true of the set as filed.
+risk: low
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: null
+changes: {files: [], version_from: null, version_to: null, commit: null}
+
+# CITATION CORRECTION, raised independently by TWO verifiers and accepted: the observation above
+# describes improvements/INDEX.md's 004 line as still reading "one per mode". It does not. That line
+# was corrected in the working tree immediately after this artifact was filed and now reads
+# "10 should-trigger (ten of the sixteen modes — see 017)". So proposal item 2 is a no-op already
+# done, and only item 1 — adding six should-trigger queries for ARCHITECT, VALIDATE, DESTINATIONS,
+# REGISTRY, IMPORT->ADOPT and CATALOG, plus the two follow-ups 013 recorded — is outstanding work.
+# The coverage gap itself was independently re-derived by both verifiers and is unaffected.
+#
+# COUNT NOTE: the observation says the routing table "lists 16 rows". It literally lists 17; one of
+# them (the "park X" row) routes AWAY to sk-skill-offload and is not a mode of this skill, leaving 16
+# of the skill's own modes. The arithmetic the finding rests on — 10 of 16 covered, 6 uncovered — is
+# correct; only the raw row count was loose.

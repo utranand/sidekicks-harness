@@ -1,0 +1,69 @@
+id: 015-repo-layout-doc-dead-source-repo-url
+target_skill: sk-skill-manager
+created: 2026-08-28T06:57:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, round 1 (mid tier), rubric dimension 6.
+  Re-verified at the gate against config.defaults.yaml and the live published catalog.
+kind: assets
+observation: >-
+  `references/skill-repo-layout.md:121-122` tells the reader that published provenance "must name a
+  repo a reader of the destination can actually reach, which is the published framework core
+  (`https://github.com/utranand/sidekicks-framework`)". That repository no longer exists under that
+  name. The skill's OWN `config.defaults.yaml:57-59` records the rename and the reason, on the same
+  day it happened: "Repointed 2026-08-17 when the core repo was renamed sidekicks-framework ->
+  sidekicks-harness: the old URL now 404s, and a public catalog attributing 100 skills to a dead
+  repository is worse than one attributing them to none." Both configured destinations resolve
+  `source_repo: 'https://github.com/utranand/sidekicks-harness.git'`
+  (config.defaults.yaml:51 and :55), and the live published catalog agrees —
+  `projects/global/services/sidekicks-skills/src/catalog.yaml:14` carries the harness URL. So the
+  config was fixed and the reference doc was not, leaving the skill shipping a dead URL in the one
+  document it points at for provenance. The cost is exactly the one config.defaults.yaml names: a
+  reader following the reference can retype the 404 URL into `--source-repo`, and EXPORT's own
+  warning that "the provenance is published bytes, and a wrong one is only visible there" means it
+  would not be caught until it was published.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/references/skill-repo-layout.md:121-122`, stop hardcoding the
+  URL: replace the parenthetical with a pointer to the resolved value — the destination's own
+  `source_repo:` or `skill_manager.export.source_repo` in `config.defaults.yaml`, read with
+  `sidekicks framework config sk-skill-manager` — and note that it is currently
+  `https://github.com/utranand/sidekicks-harness.git`. Pointing at the config rather than repeating
+  the literal is what stops this from going stale a second time, and it matches SKILL.md's own
+  EXPORT rule, "Provenance comes from config; check it, do not retype it".
+expected_effect: >-
+  The reference stops naming a repository that 404s, and stops carrying a second copy of a value
+  that already has one authoritative home — so the next rename needs one edit, not two.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T09:15:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. 014 and 015
+  were applied in a SINGLE pass over the shared references/skill-repo-layout.md (disjoint ranges) and
+  the bundle baseline re-recorded ONCE afterwards with `sidekicks skill manifest sk-skill-manager
+  --apply`, the second run a clean no-op — the follow-up both verifiers flagged as missing from the
+  proposals. Post-apply checks: the reference file's title, intro and TOC now name layout 3 as the
+  write target with a §3c entry; no live `sidekicks-framework` URL remains in the file (the one
+  surviving mention is the new sentence explaining the retirement); config.defaults.yaml parses;
+  skill doctor and skill verify re-run clean.
+changes:
+  files: [references/skill-repo-layout.md, skill.manifest.yaml]
+  version_from: 0.5.0
+  version_to: 0.5.1
+  commit: null
+
+# VERIFICATION RECORD — three independent adversarial refuters, each told to refute and to default to
+# refuted when uncertain: the round-1/round-2 strong-tier gate verifier, then lens A (factual
+# correctness of every citation) and lens B (is the proposal correctly aimed / would it make things
+# worse). Result for this finding: refuted=false and floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified and below the floor -> auto-applied.
+
+# CORRECTIONS ACCEPTED:
+#   - The rename-comment span in config.defaults.yaml is :57-60, not :57-59 (verifiers disagreed by
+#     one line; the quoted sentence runs to 60).
+#   - Applied together with 014 in one pass on the shared file, manifest re-recorded once.
+#   - SCOPE GAP the operator should know about, outside this skill's write surface: the retired name
+#     survives in two more places this artifact does NOT fix — references/publication-split.md:63
+#     (prose, not a URL) and, more importantly, `.sidekicks/config/skills.yaml:31`, whose COMMENTED
+#     EXAMPLE still shows `source_repo: https://github.com/utranand/sidekicks-framework.git`. That
+#     file is CLI-owned (Rule 1), so the skill may not edit it — but it is the likeliest place an
+#     operator copies from, so the retypeable 404 is still reachable. Reported, not silently left.

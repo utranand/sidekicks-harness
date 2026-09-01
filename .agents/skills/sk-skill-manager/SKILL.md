@@ -2,20 +2,18 @@
 name: sk-skill-manager
 description: >-
   Front door for a skill's whole life in Sidekicks: CREATE one (via skill-creator), ARCHITECT its
-  work_dir=/docs_dir= anchors, VALIDATE one (skill doctor/verify/manifest), HEAL one (install
-  deps, restore bundle), EXPORT/IMPORT skills to/from the configured skills repos
-  (public/private), REMOVE one (delete it here and unwire it, or retract its published copy from a
-  destination), DISCOVER an uninstalled skill by describing the task, report what is published
-  where (DESTINATIONS), REVIEW drift and pick what to republish, ADVISE which siblings a skill
-  needs. Use for "create a new skill", "is this skill built right", "this skill is broken",
-  "publish these skills", "pull skill X in", "delete skill X", "unpublish X", "retract X from the
-  skills repo", "is there a skill for X", "I need something that can
-  do X", "find me a skill that", "nothing here does X", "what needs re-exporting / diff before I
-  export", "what else do I need for X". NOT for offloading (sk-skill-offload), runtimes
-  (sk-inherit), packaging (sk-packager), audits/evals (sk-skill-auditor),
-  applying improvements (sk-self-improve), or CLI parity (sk-parity-keeper).
+  work_dir=/docs_dir= anchors, VALIDATE one (skill doctor/verify/manifest), HEAL one (install deps,
+  restore bundle), BOOTSTRAP a skills repo, EXPORT/IMPORT skills to/from the configured skills
+  repos, REMOVE one (delete it here and unwire it, or retract its published copy), DISCOVER an
+  uninstalled skill by describing the task, report what is published where (DESTINATIONS), REVIEW
+  drift and pick what to republish, ADVISE which siblings a skill needs. Use for "create a new
+  skill", "is this skill built right", "this skill is broken", "publish these skills", "pull skill X
+  in", "delete skill X", "retract X from the skills repo", "is there a skill for X", "what else do I
+  need for X". NOT for parking or archiving a skill, or turning one off while keeping its files
+  (sk-skill-offload); runtimes (sk-inherit); packaging (sk-packager); audits (sk-skill-auditor);
+  improvements (sk-self-improve); CLI parity (sk-parity-keeper).
 user-invocable: true
-version: 0.3.0
+version: 0.5.2
 sidekicks:
   logical-id: skill:sk-skill-manager
   depends-on:
@@ -33,16 +31,19 @@ The skill that manages skills. It owns no engine of its own: every mode below dr
 **Read the structure guide, do not restate it.** Everything about what a skill *is* —
 `SKILL.md` anatomy, `skill.yaml`, `skill.manifest.yaml`, the YAML subset, the 22 audit checks,
 portability, the lifecycle verbs — lives in
-[docs/guide/skill-architecture.md](../../../docs/guide/skill-architecture.md). This file is a
+[docs/guide/pending-update/skill-architecture.md](../../../docs/guide/pending-update/skill-architecture.md). This file is a
 router over it.
 
-**Never hardcode a flag list.** Every verb's real surface is `sidekicks skill --help` /
-`sidekicks framework --help`. A copied flag roster in a skill body is drift waiting to happen.
+**No flag roster here is exhaustive — and neither is `--help`.** Each mode below carries a short
+usage line, but treat none of them as the full surface: a copied roster drifts, and
+`sidekicks skill --help` / `sidekicks framework --help` is hand-maintained rather than generated
+from the parser, so it omits real flags. When a flag matters, confirm it against the verb's
+implementation in `lib/skill-lifecycle/`.
 
 ## Where generated output lands (runs layout v2)
 
-REVIEW's pick list, DISCOVER's search index, and IMPORT's force-overwrite backups are all generated
-run output (facet `skill-manager`), resolved the standard way — never hand-joined:
+REVIEW's pick list and DISCOVER's search index are generated run output (facet `skill-manager`),
+resolved the standard way — never hand-joined:
 
 ```bash
 ROOT="$PWD"; while [ "$ROOT" != "/" ] && [ ! -d "$ROOT/.sidekicks" ]; do ROOT="$(dirname "$ROOT")"; done
@@ -57,6 +58,13 @@ scripts accept `--work-item`) only when a run is part of a larger tracked work i
 skill-improvement pass driven from a Jira card). Runs written before runs layout v2 stay frozen at
 `<artifacts-base>/artifacts/runs/skill-manager/` — valid read and resume targets, never write
 targets.
+
+**Backups are the exception, and the CLI chooses their path.** The two verbs that back a skill
+folder up before destroying it — `skill import --force` and `skill remove --apply` — write a fixed
+repo-root `artifacts/runs/skill-manager/backups/<stamp>/<skill>/` — hand-joined twice, once in
+`lib/skill-lifecycle/_shared.mjs` (import) and once in `lib/skill-lifecycle/remove.mjs` (remove),
+to the same literal. `artifacts_dir=` and `work_item=` do not move it, so read the path back from
+the verb's report instead of predicting it.
 
 ## Mode routing
 
@@ -73,7 +81,7 @@ targets.
 | "import this GitHub skills repo", "adopt X from the marketplace", "can we use someone else's skill here" | **IMPORT → ADOPT** |
 | "delete skill X", "uninstall X", "remove X from this repo", "get rid of X for good" | **REMOVE** (local) |
 | "unpublish X", "retract X from the skills repo", "X should not be published any more" | **REMOVE** (`--destination`) |
-| "park X", "archive X", "turn X off but keep the files" | **OFFLOAD** — the verb is here, the judgement is `sk-skill-offload`'s |
+| "park X", "archive X", "turn X off but keep the files" | → **`sk-skill-offload`** — it owns this end to end, the CLI verb included |
 | "where did X come from", "what did importing X turn on here", "which skills are not ours" | **REGISTRY** |
 | "what's published where", "is the skills repo up to date", "did we ever export X" | **DESTINATIONS** |
 | "what needs re-exporting", "what changed since I last published", "let me pick which skills to publish", "give me a list to choose from" | **REVIEW** |
@@ -119,7 +127,7 @@ may **not** redeclare a framework-core entry; to co-own one, add the skill to it
 
 ### Settings vs configuration — the gate every mode below applies
 
-Full contract: [docs/guide/settings-vs-configuration.md](../../../docs/guide/settings-vs-configuration.md).
+Full contract: [docs/guide/v1.5/settings-vs-configuration.md](../../../docs/guide/v1.5/settings-vs-configuration.md).
 The decision rule, applied to every skill this mode creates or reviews:
 
 > **If the answer is `true`/`false` and a user could reasonably want the behaviour off, it is a
@@ -181,7 +189,7 @@ across dozens of the 120 skills would fight the shrink-only ratchet in
 `lib/skill-lifecycle/known-gaps.mjs` (`RECORDED_MAX` may only be lowered), and "does *this*
 skill need an anchor at all" needs intent, not a grep.
 
-Read [docs/guide/authoring-scope-aware-skills.md](../../../docs/guide/authoring-scope-aware-skills.md)
+Read [docs/guide/pending-update/authoring-scope-aware-skills.md](../../../docs/guide/pending-update/authoring-scope-aware-skills.md)
 for the preamble; do not paraphrase it here. Then check the four things that actually go wrong:
 
 1. **Does it need anchors at all?** A skill that reads and writes artifacts takes `work_dir=`;
@@ -189,11 +197,14 @@ for the preamble; do not paraphrase it here. Then check the four things that act
    one that generates executable output or run state takes `artifacts_dir=`. A skill that only
    drives a CLI verb against an external `--output` path takes none — `sk-packager` says
    so in its own description, which is the pattern to copy.
-2. **Is `RUNBASE` its own?** `artifacts/runs/<skill-id>/…` must name **this** skill. A
-   copy-pasted preamble carrying another skill's id is the observed failure mode, and it silently
-   files one skill's runs under another's.
-3. **Is anything stacked?** `artifacts/runs/<skill-id>/runs/<engine>/…` is forbidden and nothing
-   currently enforces it.
+2. **Is `RUNBASE` its own, and resolved rather than joined?** The preamble must pass **this**
+   skill's id to `sidekicks scope run-base` and consume what it returns. A copy-pasted preamble
+   carrying another skill's id is the observed failure mode, and it silently files one skill's runs
+   under another's. A hand-joined `artifacts/runs/<skill-id>/` is itself the defect — that is the
+   frozen pre-v2 shape, a read and resume target only; the live v2 answer is
+   `runs/<work-item>/<facet>`, or `runs/_adhoc/<skill-id>` when there is no work item.
+3. **Is anything stacked?** A second run layer beneath the facet — `runs/<item>/<facet>/runs/…` —
+   is forbidden and nothing currently enforces it.
 4. **`run_dir` is not a scope anchor.** It is an engine run-folder parameter, alongside
    `queue_dir` and `knowledge_dir` — a caller-owned folder for a mission ledger or a queue, which
    defaults off `$ARTIFACTSDIR`. Do not "fix" a skill by promoting it to an anchor.
@@ -222,8 +233,9 @@ Reading the output:
 - **`manifest-todo` is a question, not a bug.** Three fields cannot be derived from code —
   `optional`, `install_hint`, `degraded`. Write the sentence; inventing plausible text there
   launders an unanswered question into a passing gate.
-- **Do not gate on `skill manifest --all --check`.** It exits 2 today: eight vendor skills have
-  a manifest pending `create`. Gate on the skill you touched.
+- **Do not gate on `skill manifest --all --check`.** It is not a clean gate today — several skills
+  carry a manifest stale against its bundle baseline, and the set moves. Gate on the skill you
+  touched; run the aggregate only to see the current list.
 - **`hardcoded-default` and `undeclared-criterion` are the split's backfill.** Both are notices
   with file:line evidence, and both mean the same thing: something is baked into the skill that
   belongs in a declaration. Act on them here — they are the whole reason the CREATE gate exists.
@@ -304,8 +316,11 @@ node bin/sidekicks skill repo init <path> [--private] [--name <n>] [--remote <ur
    ```sh
    node .agents/skills/sk-skill-manager/scripts/skill-repo-readmes-public.mjs  --dest <root>   # or
    node .agents/skills/sk-skill-manager/scripts/skill-repo-readmes-private.mjs --dest <root>
-   node .agents/skills/sk-skill-manager/scripts/skill-repo-not-carried.mjs --report <export.json> --out <root>
+   node .agents/skills/sk-skill-manager/scripts/skill-repo-not-carried.mjs --report <export.json> --out <root> \
+     --append .agents/skills/sk-skill-manager/assets/not-carried-withholding.md
    ```
+   `--append` carries the withholding addendum verbatim into the generated rollup; without it the
+   addendum has to be hand-appended afterwards, and the next regeneration silently drops it.
    `skill-repo-not-carried.mjs` is public-only, and reads the **real** (non-dry-run) export's own
    `--json` report — a dry run's report describes a copy that never happened. Then verify:
    `skill destinations --destination <name>`.
@@ -347,7 +362,9 @@ selection has not been made yet. That is **REVIEW**; run it and come back with t
 is a copy plan, not a diff: it says *how many files travel*, never *what changed inside them*, so
 it cannot stand in for the review.
 
-- **Publish a family with `--category <family>`, never `--preset`.** A **category** is what a
+- **Publish a family with `--category <family>`, never `--preset`.** (`--category` is implemented
+  in `lib/skill-lifecycle/export.mjs`, but is currently missing from `skill --help` — its absence
+  there is not evidence the flag is gone.) A **category** is what a
   *repository* publishes; a **preset** is what a *runtime* carries, and a preset may legitimately
   include vendored skills that travel into a runtime but may not be republished (`--preset framework`
   carries `skill-creator`). The intent gate refuses a preset-driven publish — correctly, but only
@@ -594,8 +611,9 @@ still stops is `unversioned` for a skill that *does* need a manifest and has not
 dependency closure is genuinely unknown.
 
 A `--force` overwrite always backs the previous copy up under
-`$ARTIFACTSDIR/backups/<stamp>/<skill>/` first, and the report names the path. That
-backup is the only thing that makes a wrong import recoverable — say where it went.
+`artifacts/runs/skill-manager/backups/<stamp>/<skill>/` first, and the report names the path. That
+backup is the only thing that makes a wrong import recoverable — say where it went, reading the
+path back from the report rather than predicting it.
 
 **The verb writes nothing outside `.sidekicks/`, deliberately.** It prints an ordered apply plan
 instead: repo-root files, hook wiring across all four CLI configs (Rule 6), the criteria and config
@@ -670,17 +688,17 @@ here. `--backfill` needs `--assume-imported` because nothing on disk says which 
 travelled (`skill export` writes to a destination too), and it writes `unknown` for everything it
 cannot know rather than guessing.
 
-## OFFLOAD
+## OFFLOAD → `sk-skill-offload`
 
-```sh
-node bin/sidekicks skill offload <skill> [--apply] [--restore] [--list] [--force]
-```
+**Parking a skill is not this skill's job — hand it over.** `sk-skill-offload` owns the whole
+operation, the CLI verb included; this section exists only so the distinction below is stated
+where a reader of **REMOVE** will find it.
 
-**OFFLOAD parks — it is not REMOVE**, and the difference is easy to get wrong. The skill moves to
-`.sidekicks/skill-offloaded/` and discovery stops loading it, but the offloaded tree is inside
-`SKILL_TREES` **on purpose** — so its rule ids stay listed, its config block stays discoverable and
-its hook stays wired. Reversible with `--restore`. The judgement around it (when to park, when a
-blocker means rework instead) belongs to `sk-skill-offload`; this is only the engine.
+**OFFLOAD parks — it is not REMOVE**, and the difference is easy to get wrong. Offloading moves the
+skill to `.sidekicks/skill-offloaded/` and discovery stops loading it, but the offloaded tree is
+inside `SKILL_TREES` **on purpose** — so its rule ids stay listed, its config block stays
+discoverable and its hook stays wired, and it is reversible. REMOVE below destroys the original.
+When the ask is "park", "archive" or "turn it off but keep the files", route to `sk-skill-offload`.
 
 ## REMOVE
 
@@ -854,6 +872,9 @@ README is absent, so the skills would appear on no browse page at all.
   skills go to which repository, and which are published nowhere.
 - [assets/categories.yaml](assets/categories.yaml) — the publication families, their blurbs, and the
   explicit membership of the `framework` family.
+- [assets/not-carried-withholding.md](assets/not-carried-withholding.md) — the withholding
+  addendum `skill-repo-not-carried.mjs --append` appends verbatim to a public destination's
+  `NOT-CARRIED.md`, so a regeneration cannot silently drop it. Pass it on every public fill.
 - [scripts/export-picklist.mjs](scripts/export-picklist.mjs) — REVIEW's pick list: `plan` classifies
   and enriches the drift, `resolve` turns the ticks into export commands. Its header records what it
   refuses to do (summarise a diff, export, write a skill's intent) and why.
@@ -861,12 +882,12 @@ README is absent, so the skills would appear on no browse page at all.
   skill available in a destination but not installed here, `find "<intent>"` ranks them by term
   match and prints the import command. It refuses to import, to write to a destination checkout, to
   use embeddings (the ranking has to be explainable), and to return a least-bad row below the floor.
-- [docs/guide/skill-architecture.md](../../../docs/guide/skill-architecture.md) — the structure,
+- [docs/guide/pending-update/skill-architecture.md](../../../docs/guide/pending-update/skill-architecture.md) — the structure,
   the schema, every audit check. The authority; this file never restates it.
-- [docs/guide/authoring-scope-aware-skills.md](../../../docs/guide/authoring-scope-aware-skills.md)
+- [docs/guide/pending-update/authoring-scope-aware-skills.md](../../../docs/guide/pending-update/authoring-scope-aware-skills.md)
   — the anchor preamble ARCHITECT checks against.
-- [docs/guide/framework-settings.md](../../../docs/guide/framework-settings.md) — rules,
+- [docs/guide/v1.5/framework-settings.md](../../../docs/guide/v1.5/framework-settings.md) — rules,
   criteria, hooks, and the four config layers.
-- [docs/guide/settings-vs-configuration.md](../../../docs/guide/settings-vs-configuration.md) — the
+- [docs/guide/v1.5/settings-vs-configuration.md](../../../docs/guide/v1.5/settings-vs-configuration.md) — the
   contract every mode above gates on: which half a thing belongs in, how a skill declares each, the
   `framework sync` / `config sync` pair, and what travels on export versus what must never.

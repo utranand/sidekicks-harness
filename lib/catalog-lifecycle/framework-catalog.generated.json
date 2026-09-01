@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "cli": {
-    "namespace_count": 19,
-    "command_count": 154,
+    "namespace_count": 20,
+    "command_count": 159,
     "namespaces": [
       {
         "namespace": "agent",
-        "command_count": 23
+        "command_count": 24
       },
       {
         "namespace": "artifacts",
@@ -58,7 +58,7 @@
       },
       {
         "namespace": "memory",
-        "command_count": 17
+        "command_count": 20
       },
       {
         "namespace": "package",
@@ -79,6 +79,10 @@
       {
         "namespace": "skill",
         "command_count": 14
+      },
+      {
+        "namespace": "worktree",
+        "command_count": 1
       }
     ],
     "commands": [
@@ -243,6 +247,15 @@
         "summary": "One agent's charter, presence, control stage, inbox counts, and recent completed messages",
         "status": "implemented",
         "module": "lib/agent-lifecycle/show.mjs"
+      },
+      {
+        "id": "cli:agent/skill",
+        "namespace": "agent",
+        "verb": "skill",
+        "args": "learning <enable|disable> <agent> | doctor [<agent>] | list <agent> [--owned|--granted|--effective] [--json] | context <agent> [--text <s>] [--json] | show <agent> <skill> [--version <v>] | harvest <agent> [--json] | install <agent> --from <dir> --skill <id> --version <semver> [--auditor <agent> --attested-low-risk] [--apply] [--json] | approve <agent> <skill> <version> --by <human> | retire <agent> <skill> <version> | grant <propose|approve|revoke> ...",
+        "summary": "True per-agent skill roots: opt-in private immutable versions, exact-key harvest candidates, risk-gated activation, and human-approved pinned sharing without copying bundles",
+        "status": "implemented",
+        "module": "lib/agent-lifecycle/skill.mjs"
       },
       {
         "id": "cli:agent/start",
@@ -950,8 +963,8 @@
         "id": "cli:journal/retro",
         "namespace": "journal",
         "verb": "retro",
-        "args": "add <agent> --task <id> --status done|failed --problems <s> [--assignment <s>] [--improve-self <s>] [--do <s>] [--dont <s>] | list [<agent>] [--since 7d] [--json] | show <id>",
-        "summary": "L1 per-assignment retrospective: what went wrong, what to improve, what to do and not do next time",
+        "args": "add <agent> --task <id> --status done|failed --problems <s> [--assignment <s>] [--reuse-key <slug|none> --reuse-summary <s>] [--improve-self <s>] [--do <s>] [--dont <s>] | list [<agent>] [--since 7d] [--json] | show <id>",
+        "summary": "L1 per-assignment retrospective, including an exact reusable-work key consumed by private-skill harvest",
         "status": "implemented",
         "module": "lib/journal-lifecycle/retro.mjs"
       },
@@ -1004,8 +1017,8 @@
         "id": "cli:memory/import",
         "namespace": "memory",
         "verb": "import",
-        "args": "<dir> [--namespace <ns>] [--force] [--json]",
-        "summary": "Ingest a folder produced by 'memory export' into a namespace of the central store",
+        "args": "<dir> [--namespace <ns>] [--as <ns>] [--strategy merge|skip|overwrite] [--force] [--dry-run] [--json]",
+        "summary": "One-shot ingest of a folder of entries — an export folder, another checkout's LIVE .sidekicks/memory/ (every namespace preserved), a dormant projects/<p>/memory/ tree whose path names its namespace, or a flat folder needing --namespace. Same detection and merge semantics as 'memory sync'; --force is the old spelling of --strategy overwrite",
         "status": "implemented",
         "module": "lib/memory-lifecycle/import.mjs"
       },
@@ -1055,6 +1068,15 @@
         "module": "lib/memory-lifecycle/pack.mjs"
       },
       {
+        "id": "cli:memory/publish",
+        "namespace": "memory",
+        "verb": "publish",
+        "args": "<source> [--namespaces a,b] [--message <m>] [--push] [--dry-run] [--offline] [--json]",
+        "summary": "PUSH the local store OUT to a registered source, mirrored in the live store layout so a later sync reads every namespace back intact. A git source is committed in its cache clone and NOT pushed unless --push is passed — a push publishes to a remote other people read",
+        "status": "implemented",
+        "module": "lib/memory-lifecycle/publish.mjs"
+      },
+      {
         "id": "cli:memory/query",
         "namespace": "memory",
         "verb": "query",
@@ -1098,6 +1120,24 @@
         "summary": "Print one local-memory entry (a project falls back to inherited root; --local = active scope only; --trace also resolves the lineage anchor)",
         "status": "implemented",
         "module": "lib/memory-lifecycle/show.mjs"
+      },
+      {
+        "id": "cli:memory/source",
+        "namespace": "memory",
+        "verb": "source",
+        "args": "<add|list|show|remove> <name> [--kind dir|git] [--path <p>] [--url <repo>] [--ref <branch>] [--subdir <p>] [--namespaces a,b] [--as <ns>] [--strategy merge|skip|overwrite] [--force] [--json]",
+        "summary": "Register the EXTERNAL sources the local store syncs from and publishes to. The store (.sidekicks/memory/) is git-ignored, so this committed registry is the only thing that tells a fresh clone where its knowledge lives; it is written into the memory_sources config block, never by hand",
+        "status": "implemented",
+        "module": "lib/memory-lifecycle/source.mjs"
+      },
+      {
+        "id": "cli:memory/sync",
+        "namespace": "memory",
+        "verb": "sync",
+        "args": "[<source>] [--strategy merge|skip|overwrite] [--dry-run] [--offline] [--json]",
+        "summary": "PULL entries in from every registered source (or one named source) — how a fresh clone gets its memory now that git no longer carries the store. Default strategy 'merge' folds two independently-refined copies field-by-field and flags a diverged body for review rather than picking a side; regenerates the three faces once at the end",
+        "status": "implemented",
+        "module": "lib/memory-lifecycle/sync.mjs"
       },
       {
         "id": "cli:memory/triggers",
@@ -1467,6 +1507,15 @@
         "summary": "Integrity check: is everything a skill declared present and unchanged (works on a lifted copy)",
         "status": "implemented",
         "module": "lib/skill-lifecycle/verify.mjs"
+      },
+      {
+        "id": "cli:worktree/link-deps",
+        "namespace": "worktree",
+        "verb": "link-deps",
+        "args": "[<worktree-path>] [--from <main-checkout>] [--check] [--no-exclude] [--json]",
+        "summary": "Point a linked worktree's node_modules at the main checkout's instead of installing a second copy (symlink on POSIX, NTFS junction on Windows; every package dir, not just the root). Warns when the branch's package.json/lockfile has diverged, never deletes an existing install, and excludes the link locally because a `node_modules/` gitignore pattern does not match a symlink. --check reports without writing",
+        "status": "implemented",
+        "module": "lib/worktree-lifecycle/link-deps.mjs"
       }
     ]
   },
@@ -2208,10 +2257,10 @@
     ]
   },
   "skills": {
-    "active_count": 122,
+    "active_count": 126,
     "parked_count": 18,
-    "edge_count": 119,
-    "hard_edge_count": 106,
+    "edge_count": 126,
+    "hard_edge_count": 104,
     "mutual_composition": [
       {
         "cycle": [
@@ -2483,6 +2532,16 @@
         "informational_refs": []
       },
       {
+        "id": "sk-agent-skill-learning",
+        "folder": "sk-agent-skill-learning",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-agent-skill-learning",
+        "hard_depends_on": [],
+        "informational_refs": []
+      },
+      {
         "id": "sk-agent-tray",
         "folder": "sk-agent-tray",
         "tree": ".agents/skills",
@@ -2534,6 +2593,16 @@
         "hard_depends_on": [
           "sk-self-improve"
         ],
+        "informational_refs": []
+      },
+      {
+        "id": "sk-aws-kms",
+        "folder": "sk-aws-kms",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-aws-kms",
+        "hard_depends_on": [],
         "informational_refs": []
       },
       {
@@ -2785,7 +2854,6 @@
         "manifest": true,
         "logical_id": "sk-get-plan-done",
         "hard_depends_on": [
-          "sk-bmad-code-review",
           "sk-commander",
           "sk-get-things-done",
           "sk-implementation-planner",
@@ -2795,7 +2863,11 @@
           "sk-jira-ready-gate",
           "sk-sequence-planner"
         ],
-        "informational_refs": []
+        "informational_refs": [
+          "sk-bmad-code-review",
+          "sk-bmad-developer",
+          "sk-bmad-pm"
+        ]
       },
       {
         "id": "sk-get-things-done",
@@ -2854,11 +2926,13 @@
         "manifest": true,
         "logical_id": "sk-implementation-planner",
         "hard_depends_on": [
-          "sk-bmad-create-architecture",
-          "sk-bmad-validate-architect",
           "sk-sequence-planner"
         ],
-        "informational_refs": []
+        "informational_refs": [
+          "sk-bmad-create-architecture",
+          "sk-bmad-developer",
+          "sk-bmad-validate-architect"
+        ]
       },
       {
         "id": "sk-implementation-rules",
@@ -2914,11 +2988,12 @@
         "manifest": true,
         "logical_id": "sk-jira-autopilot",
         "hard_depends_on": [
-          "sk-bmad-pm",
           "sk-jira-connector",
           "sk-jira-ready-gate"
         ],
-        "informational_refs": []
+        "informational_refs": [
+          "sk-bmad-pm"
+        ]
       },
       {
         "id": "sk-jira-connector",
@@ -3014,7 +3089,6 @@
         "manifest": true,
         "logical_id": "sk-jira-ready-gate",
         "hard_depends_on": [
-          "sk-bmad-create-architecture",
           "sk-confluence-connector",
           "sk-database-analyst",
           "sk-feasibility-probe",
@@ -3024,7 +3098,9 @@
           "sk-jira-connector",
           "sk-jira-footprint"
         ],
-        "informational_refs": []
+        "informational_refs": [
+          "sk-bmad-create-architecture"
+        ]
       },
       {
         "id": "sk-jira-rules",
@@ -3061,7 +3137,6 @@
         "manifest": true,
         "logical_id": "sk-jira-subtask-planner",
         "hard_depends_on": [
-          "sk-bmad-create-architecture",
           "sk-database-analyst",
           "sk-database-data-importer",
           "sk-feasibility-probe",
@@ -3071,7 +3146,9 @@
           "sk-jira-footprint",
           "sk-jira-ready-gate"
         ],
-        "informational_refs": []
+        "informational_refs": [
+          "sk-bmad-create-architecture"
+        ]
       },
       {
         "id": "sk-jira-workspace",
@@ -3252,6 +3329,29 @@
         "informational_refs": []
       },
       {
+        "id": "sk-shp-redeploy-service",
+        "folder": "sk-shp-redeploy-service",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-shp-redeploy-service",
+        "hard_depends_on": [],
+        "informational_refs": []
+      },
+      {
+        "id": "sk-shp-snyk-test",
+        "folder": "sk-shp-snyk-test",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-shp-snyk-test",
+        "hard_depends_on": [
+          "sk-security-remediation",
+          "sk-shp-redeploy-service"
+        ],
+        "informational_refs": []
+      },
+      {
         "id": "sk-skill-auditor",
         "folder": "sk-skill-auditor",
         "tree": ".agents/skills",
@@ -3259,6 +3359,8 @@
         "manifest": true,
         "logical_id": "sk-skill-auditor",
         "hard_depends_on": [
+          "sk-cli-executor",
+          "sk-loop-fleet",
           "sk-self-improve"
         ],
         "informational_refs": []
@@ -4156,7 +4258,25 @@
         "from_folder": "sk-get-plan-done",
         "to_folder": "sk-bmad-code-review",
         "how": "handoff",
-        "kind": "hard",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-get-plan-done",
+        "from_folder": "sk-get-plan-done",
+        "to_folder": "sk-bmad-developer",
+        "how": "subprocess",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-get-plan-done",
+        "from_folder": "sk-get-plan-done",
+        "to_folder": "sk-bmad-pm",
+        "how": "subprocess",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -4309,7 +4429,16 @@
         "from_folder": "sk-implementation-planner",
         "to_folder": "sk-bmad-create-architecture",
         "how": "handoff",
-        "kind": "hard",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-implementation-planner",
+        "from_folder": "sk-implementation-planner",
+        "to_folder": "sk-bmad-developer",
+        "how": "subprocess",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -4318,7 +4447,7 @@
         "from_folder": "sk-implementation-planner",
         "to_folder": "sk-bmad-validate-architect",
         "how": "handoff",
-        "kind": "hard",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -4372,7 +4501,7 @@
         "from_folder": "sk-jira-autopilot",
         "to_folder": "sk-bmad-pm",
         "how": "subprocess",
-        "kind": "hard",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -4489,7 +4618,7 @@
         "from_folder": "sk-jira-ready-gate",
         "to_folder": "sk-bmad-create-architecture",
         "how": "handoff",
-        "kind": "hard",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -4615,7 +4744,7 @@
         "from_folder": "sk-jira-subtask-planner",
         "to_folder": "sk-bmad-create-architecture",
         "how": "handoff",
-        "kind": "hard",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -4836,6 +4965,42 @@
         "parked_source": false
       },
       {
+        "from": "sk-shp-snyk-test",
+        "from_folder": "sk-shp-snyk-test",
+        "to_folder": "sk-security-remediation",
+        "how": "handoff",
+        "kind": "hard",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-shp-snyk-test",
+        "from_folder": "sk-shp-snyk-test",
+        "to_folder": "sk-shp-redeploy-service",
+        "how": "handoff",
+        "kind": "hard",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-skill-auditor",
+        "from_folder": "sk-skill-auditor",
+        "to_folder": "sk-cli-executor",
+        "how": "subprocess",
+        "kind": "hard",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-skill-auditor",
+        "from_folder": "sk-skill-auditor",
+        "to_folder": "sk-loop-fleet",
+        "how": "subprocess",
+        "kind": "hard",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
         "from": "sk-skill-auditor",
         "from_folder": "sk-skill-auditor",
         "to_folder": "sk-self-improve",
@@ -4928,12 +5093,16 @@
     ]
   },
   "config": {
-    "family_count": 10,
-    "block_count": 43,
+    "family_count": 13,
+    "block_count": 47,
     "families": [
       {
         "family": "agents",
-        "block_count": 8
+        "block_count": 9
+      },
+      {
+        "family": "aws",
+        "block_count": 1
       },
       {
         "family": "comms",
@@ -4968,8 +5137,16 @@
         "block_count": 6
       },
       {
+        "family": "memory",
+        "block_count": 1
+      },
+      {
         "family": "skills",
         "block_count": 7
+      },
+      {
+        "family": "snyk",
+        "block_count": 1
       }
     ],
     "blocks": [
@@ -5035,6 +5212,26 @@
         "source": "skill"
       },
       {
+        "id": "config:agent_skill_store",
+        "block": "agent_skill_store",
+        "family": "agents",
+        "file": "agents.yaml",
+        "secret_file": "agents.secret.yaml",
+        "title": "Private per-agent learned skills — isolated version store and harvest policy",
+        "owners": [],
+        "readers": [
+          "lib/agent-lifecycle/_primary-prompt.mjs",
+          "lib/agent-lifecycle/skill.mjs"
+        ],
+        "aliases": [],
+        "public_keys": [],
+        "scope": "root",
+        "inherits_root": true,
+        "merge": "per_key",
+        "defaults": null,
+        "source": "core"
+      },
+      {
         "id": "config:agent_tray",
         "block": "agent_tray",
         "family": "agents",
@@ -5054,6 +5251,27 @@
         "merge": "per_key",
         "defaults": ".agents/skills/sk-agent-tray/config.defaults.yaml",
         "source": "core"
+      },
+      {
+        "id": "config:aws_kms",
+        "block": "aws_kms",
+        "family": "aws",
+        "file": "aws.yaml",
+        "secret_file": "aws.secret.yaml",
+        "title": "aws_kms",
+        "owners": [
+          "sk-aws-kms"
+        ],
+        "readers": [],
+        "aliases": [],
+        "public_keys": [
+          "AWS_KMS_KEY_ID"
+        ],
+        "scope": "any",
+        "inherits_root": false,
+        "merge": "per_key",
+        "defaults": ".agents/skills/sk-aws-kms/config.defaults.yaml",
+        "source": "skill"
       },
       {
         "id": "config:bridge",
@@ -5444,6 +5662,29 @@
         "source": "core"
       },
       {
+        "id": "config:memory_sources",
+        "block": "memory_sources",
+        "family": "memory",
+        "file": "memory.yaml",
+        "secret_file": "memory.secret.yaml",
+        "title": "Local memory — external sources the store syncs from and publishes to",
+        "owners": [],
+        "readers": [
+          "lib/memory-lifecycle/doctor.mjs",
+          "lib/memory-lifecycle/import.mjs",
+          "lib/memory-lifecycle/publish.mjs",
+          "lib/memory-lifecycle/source.mjs",
+          "lib/memory-lifecycle/sync.mjs"
+        ],
+        "aliases": [],
+        "public_keys": [],
+        "scope": "root",
+        "inherits_root": true,
+        "merge": "whole_block",
+        "defaults": null,
+        "source": "core"
+      },
+      {
         "id": "config:office",
         "block": "office",
         "family": "agents",
@@ -5653,6 +5894,27 @@
         "inherits_root": true,
         "merge": "per_key",
         "defaults": ".agents/skills/sk-slack-connector/config.defaults.yaml",
+        "source": "skill"
+      },
+      {
+        "id": "config:snyk",
+        "block": "snyk",
+        "family": "snyk",
+        "file": "snyk.yaml",
+        "secret_file": "snyk.secret.yaml",
+        "title": "snyk",
+        "owners": [
+          "sk-shp-snyk-test"
+        ],
+        "readers": [],
+        "aliases": [],
+        "public_keys": [
+          "org_id"
+        ],
+        "scope": "any",
+        "inherits_root": false,
+        "merge": "per_key",
+        "defaults": ".agents/skills/sk-shp-snyk-test/config.defaults.yaml",
         "source": "skill"
       },
       {

@@ -1,0 +1,86 @@
+id: 011-help-not-authoritative
+target_skill: sk-skill-manager
+created: 2026-08-28T05:40:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6. Raised INDEPENDENTLY
+  by both the mid-tier and high-tier discovery passes; the roster count was measured at the gate.
+kind: instructions
+observation: >-
+  SKILL.md:39-40 states a rule that is false as written, and the file itself breaks it nine times:
+    "**Never hardcode a flag list.** Every verb's real surface is `sidekicks skill --help` /
+     `sidekicks framework --help`. A copied flag roster in a skill body is drift waiting to happen."
+  Two measured problems.
+  (1) `--help` is not the real surface. SKILL.md:350-352 makes `--category` mandatory — "Publish a
+  family with `--category <family>`, never `--preset` … The intent gate refuses a preset-driven
+  publish — correctly, but only after the wrong command was typed." But `node bin/sidekicks skill
+  --help` prints the export row as `export <skill>... | --preset <p> [--output <path> |
+  --destination <name>] [--with-deps] [--scope runtime|all] [--source-repo <url>] [--dry-run]
+  [--strict] [--json]` — no `--category` (source: `lib/sk-cli/help.mjs:60`). The flag is real and
+  load-bearing: `lib/skill-lifecycle/export.mjs:238` lists `category` among the value-taking flags
+  and `:250-267` implements the selector. So an agent obeying the rule checks `--help`, does not
+  find `--category`, and reaches for `--preset` — the one command this skill's EXPORT section
+  explicitly forbids, and which the intent gate then refuses.
+  (2) The file does exactly what the rule forbids: nine hardcoded flag rosters, at SKILL.md lines
+  279, 337, 420, 569, 658, 676, 688, 689 and 758 (`grep -nE 'node bin/sidekicks skill [a-z-]+ .*\[--'`).
+  Those rosters are useful — they are each mode's usage line — so the defect is the absolute rule,
+  not the rosters. As it stands the skill states a prohibition it does not follow and points at an
+  authority that is incomplete for the one flag it mandates.
+  Skill-attributable: both contradicting statements are this skill's own. The `--help` gap itself
+  lives in `lib/sk-cli/help.mjs`, outside this skill's folder, and is reported to the operator
+  separately — this artifact only fixes what the skill says about it.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/SKILL.md`, replace the absolute rule at :39-40 with the true
+  one, and note the known gap where it bites:
+    1. :39-40 becomes, in substance: keep each mode's short usage line, but do not treat any roster —
+       this file's or `--help`'s — as exhaustive; confirm a flag against the verb's implementation in
+       `lib/skill-lifecycle/` when it matters, because a copied roster drifts and `--help` is not
+       generated from the parser.
+    2. Add one clause at :350: `--category` is implemented (`lib/skill-lifecycle/export.mjs:250-267`)
+       but is currently absent from `skill --help` (`lib/sk-cli/help.mjs:60`) — so its absence there
+       is not evidence the flag is gone.
+  Text-only edit to one file; the nine usage lines stay. No verb, behaviour or safety rule changes.
+expected_effect: >-
+  The skill stops stating a rule it breaks nine times, and stops routing an agent toward `--preset`
+  for a family publish — the exact wrong command its own EXPORT section says the intent gate will
+  refuse. A reader who cannot find `--category` in `--help` now knows why.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTIONS accepted from lens 1: the --category selector is implemented at
+# lib/skill-lifecycle/export.mjs:250-264 (the artifact's :250-267 also swept in the "name at least
+# one skill" usage error at :265-270); the --category mandate in SKILL.md spans :350-353, not
+# :350-352. The nine-roster line list (279, 337, 420, 569, 658, 676, 688, 689, 758) was confirmed
+# exact. After applying 007 the count is EIGHT: 007 deliberately removed the duplicated
+# `skill offload` roster at what was line 676, which is that finding's intent, not a regression.
+#
+# STANDING CAVEAT raised by lens 2 and accepted: the clause added at :350 naming --category as
+# "currently missing from skill --help" is itself a frozen claim of exactly the shape finding 006
+# exists to fix, and nothing tests it, so it will rot silently the moment help.mjs is corrected.
+# The durable fix is the one-line framework change below, after which this clause should be dropped.
+# OPERATOR NOTE, outside this skill: add `--category <family>` to the skill export args string at
+# lib/sk-cli/help.mjs:60.

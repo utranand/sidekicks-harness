@@ -1,0 +1,47 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 026-catch-block-halt-omits-the-stage-the-contract-promises
+target_skill: sk-commander
+created: 2026-08-28T03:20:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 3 (mid-tier probe on the Resume / ralph / Run-summary sections, gated at verify_tier=high). Anchors re-read by the gate: references/commander-workflow-template.js:560-569 against SKILL.md''s "Halt, don''t fake success" bullet and run-procedure step 6.'
+kind: instructions
+observation: >-
+  SKILL.md states the halt contract in absolute terms — "**Halt, don't fake success** — the script returns
+  `{ status: 'halted', stage, reason, summary }` on any unrecoverable failure (including a missing
+  precondition caught by `try/catch`)" — and run-procedure step 6 tells the runner to use it: "On a halt,
+  the returned `stage`/`reason` and the run ID are what the user needs to fix and resume."
+  The template's `catch` block does not honour that shape. Every in-`try` halt carries the stage, e.g.
+  line 554: `return { status: 'halted', stage: 3, reason: s3.error, stages, summary, event_sidecar: ev }`.
+  The catch block (line 568) returns `{ status: 'halted', reason, stages, summary, event_sidecar: ev }` —
+  no `stage` key at all. The exception path is exactly the one SKILL.md singles out as included ("a missing
+  precondition caught by `try/catch`"), and it is also where an `event-sidecar-diverged` throw lands
+  (lines 565-567), which the skill dedicates a whole section to. The template's own comment at line 166
+  already writes the narrower shape without `stage`, so the two halves of the skill disagree in writing.
+  Consequence: a runner following step 6 reads `result.stage` for a precondition or diverged halt and gets
+  `undefined`, so the report names no stage for precisely the failures that are hardest to place — and the
+  `stages` array, which does hold the answer, is not what step 6 points at.
+  Skill-attributable: both the promise and the code are the skill's own, and SKILL.md instructs authors to
+  keep the helpers verbatim, so a run cannot fix it by writing the script differently.
+proposal: >-
+  Make one shape true. Preferred, because it keeps the documented contract intact: in
+  references/commander-workflow-template.js's catch block, include the stage — `stage: <the last stage
+  index that was in flight, or null>` — deriving it from the `stages` array (the last entry whose status is
+  not `todo`) so a precondition or diverged halt names where it stopped, and update the template's line-166
+  comment to the same shape.
+  Acceptable alternative if the catch block must stay minimal: narrow both SKILL.md claims — say that a
+  halt raised by `try/catch` (a missing precondition, or `event-sidecar-diverged`) carries `reason` but no
+  `stage`, and that the failing stage is read from the `stages` array's last non-`todo` entry instead.
+  Either way edit both sides in the same change; the defect is the disagreement.
+expected_effect: >-
+  A halt's reported shape matches what the skill tells the runner to read, so the two failure modes that
+  arrive through `catch` — a missing precondition and a diverged event sidecar — are reported with a stage
+  instead of silently omitting one.
+risk: low
+status: proposed
+approved_by: null
+applied_at: null
+applied_notes: 'PARKED 2026-08-28 by sk-skill-auditor run audit-sk-commander-2026-08-28 — FAILED adversarial verification 0/2 (both returned refuters at verify_tier=high refuted it; floor_hit=false on both, so parked as UNVERIFIED, not as a safety-floor case). The two anchors are byte-exact and the count is right (every live in-try halt carries `stage`; the catch at template:568 is the only one without it), but three of the artifact''s supporting claims are WRONG and the remedy is worse than the defect. (1) ATTRIBUTION ERROR, mine: the artifact says "SKILL.md instructs authors to keep the helpers verbatim, so a run cannot fix it" — the catch block sits BELOW the template''s own boundary comment `// STAGES — adapt everything below to the parsed sequence` (template:396), outside the keep-verbatim helper region banner at template:220, and its neighbouring hardcoded `stage: 0/1/2/3` returns are plainly illustration for the worked three-stage example. (2) NO CONSUMER: `grep -rn ''\.stage\b'' lib scripts .agents/skills/sk-commander` finds nothing reading the Workflow result''s `stage`. The only reader is the commander model, which always receives `stages` (a full per-stage status snapshot, which SKILL.md itself names as the authority for placing a halt and for filling `events.reconcile`) plus `reason` — strictly more information than the missing key — and the diverged throw text itself embeds the stage TITLE (template:169-170). (3) THE DOC BULLET IS SHORTHAND, not a struct contract: all four live halted returns also carry `stages` and `event_sidecar`, which the bullet under-lists, so the code already ''diverges'' in the other direction. (4) THE PREFERRED FIX IS UNSOUND: deriving ''the last entry whose status is not todo'' mixes numbering spaces (the in-try `stage:` is a hand-written 1-based LABEL, the array gives a 0-based INDEX), and it yields NOTHING in the exact case the artifact targets — a missing precondition can throw from `reconcileOnResume()`, the first statement inside the try (template:426), while every stage is still `todo`. In the `transition()` throw path it can also name a stage that had just been set `done`, which printed beside `status: ''halted''` reads as ''stage N failed''. WHAT A HUMAN COULD DO INSTEAD (both refuters converged on this, and it is a +1-line change): add one clause to SKILL.md step 6 — ''a halt raised by try/catch (missing precondition, event-sidecar-diverged) carries no `stage`; read the failing stage from `stages`'' — and optionally write `stage: null` at template:568 to document the absence honestly. Never take the code-deriving direction. Not a duplicate of 012 (same class, distinct instance), but a mismatch with no consumer and no failure mode is what the rubric says to drop rather than pad.'
+changes:
+  files: []
+  version_from: null
+  version_to: null
+  commit: null

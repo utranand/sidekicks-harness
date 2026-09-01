@@ -1,0 +1,50 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 019-verification-cli-steps-fan-out-into-worktrees-that-cannot-build
+target_skill: sk-commander
+created: 2026-08-28T02:06:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 0 (high-tier discovery panel, gated at verify_tier=high). Evidence re-run by the gate: `grep -rniE "node_modules|link-deps|yarn install|npm install|npm ci" .agents/skills/sk-commander/` returns ZERO matches across the whole skill dir.'
+kind: instructions
+observation: >-
+  Two of the skill's own instructions combine into an action CLAUDE.md forbids as a hard rule.
+  SKILL.md:177-179 endorses fanning verification CLI steps out across services:
+  "(Verification CLI steps — `npm test`/`lint`/`build` — only touch one service, so they fan out across
+  services safely, like a developer wave.)" SKILL.md:165-168 then classifies exactly that shape —
+  members with different `work_dir`s — as cross-scope and mandates "Run each member with
+  **`isolation: 'worktree'`**". So a fanned-out `npm test` / `npm run build` wave runs each member inside
+  a freshly created git worktree.
+  CLAUDE.md's hard rule "Never install or build inside a worktree — symlink `node_modules`, run
+  everything in the main checkout" forbids both halves of what such a member must then do: a fresh
+  worktree carries no `node_modules`, so the command fails until something installs, and the step brief
+  (commander-workflow-template.js:292-306) tells the agent to make the command succeed — which is the
+  "reflexive `yarn install`" the rule names. The skill never mentions this anywhere: `node_modules`,
+  `link-deps`, `npm install`, `yarn install` and `npm ci` have zero occurrences in the entire skill
+  directory, so a sequence author following SKILL.md verbatim gets the forbidden action with no warning.
+  The template repeats the endorsement at commander-workflow-template.js:445
+  ("A verification gate is the same: { run: 'npm test', work_dir: 'projects/acme/services/svc-a/src' }").
+  This is the skill's own defect, not a bad input's: both instructions are the skill's, and the sequence
+  author is following them.
+proposal: >-
+  ADD a constraint (this softens nothing). In SKILL.md, replace the parenthetical at 177-179 with a
+  carve-out that names the rule: a verification/build CLI step (`npm test`, `lint`, `build`, `tsc`,
+  any install) MUST NOT be a cross-scope wave member, because a `isolation: 'worktree'` member starts
+  with no `node_modules` and CLAUDE.md's "never install or build inside a worktree" hard rule forbids the
+  install that would follow — serialize such steps in the main checkout, or (when a worktree is genuinely
+  required) link the deps first with `sidekicks worktree link-deps <worktree-path>` and never install
+  inside the tree. Add the same one-line caveat beside the existing nested-repo caveat at SKILL.md:258-262,
+  add it to the step-3 pre-flight list (SKILL.md:556-562) as a classify-and-serialize item (information,
+  not a halt), and correct the template comment at commander-workflow-template.js:445 so it no longer
+  presents a build command as a free wave member.
+expected_effect: >-
+  The skill stops instructing a shape that violates a CLAUDE.md hard rule; build/test gates serialize in
+  the main checkout where the toolchain lives, so a fanned-out verification wave no longer fails on a
+  missing `node_modules` or "fixes" itself with a forbidden install.
+risk: medium
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T02:35:00+07:00
+applied_notes: 'Applied as ONE edit, reshaped per the refuters: the endorsing parenthetical became a paragraph stating that verification/build/install `run:` steps are EXEMPT from worktree isolation (a raw run: step never executes project use / service use, so it has no settings.json race), that they fan out plain-parallel in the MAIN checkout and never as isolation:worktree members (fresh worktree = no node_modules, no src/ for a nested-repo service), quoting CLAUDE.md''s hard rule, and that a verification stage belongs AFTER the post-barrier merge. Deliberately NOT applied: the 258-262 duplicate, the pre-flight list item, and the template comment change (that comment sits in the sequential single-step example, not a wave). The companion defect at its source is filed separately as sk-sequence-planner artifact 005 and left for a human. || APPLY: auto-verified 2026-08-28: 3 refuters at verify_tier=high, 3/3 non-refuted, floor_hit=false on all three (the change only ADDS a constraint). Independently confirmed: 20 service src/ trees carry package.json; the isolation runtime creates a plain git worktree with no node_modules and, for a nested-repo service, no checked-out src/ at all; AGENTS.md''s rule covers tests and builds, not only installs (''dev server, tests, builds and type checks execute in the primary local checkout''); enforce-branch-safety.mjs only prompts on install-class subcommands and never on `npm test`. APPLIED SHAPE, per the refuters'' corrections: ONE edit at SKILL.md:177-179 (the 258-262 duplicate, the pre-flight item and the template:445 change are all dropped — :445 sits in the sequential single-step example, not a wave), and the carve-out EXEMPTS verification/build CLI steps from worktree isolation rather than serializing them, because a raw `run:` step never executes `sidekicks project use` and so has no settings.json race at all. Open scope gap recorded for a human: sk-sequence-planner SKILL.md:220 and :365 carry the identical endorsement and that skill owns wave authoring.'
+changes:
+  files: [SKILL.md, skill.manifest.yaml, VERSION.json]
+  version_from: 1.3.0
+  version_to: 1.4.0
+  commit: null

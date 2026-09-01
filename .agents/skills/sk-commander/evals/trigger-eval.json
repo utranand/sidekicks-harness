@@ -1,0 +1,22 @@
+[
+  { "query": "run the command-sequence at projects/acme/artifacts/command-sequence/stop-acme-prod-services-direct.yaml", "should_trigger": true },
+  { "query": "orchestrate these steps end to end: sk-bmad-pm, then sk-bmad-validate-prd, then sk-bmad-developer, all on projects/acme/services/api/src", "should_trigger": true },
+  { "query": "projects/acme/services/svc-a/src/docs/pipeline.yaml — go", "should_trigger": true },
+  { "query": "execute steps 1-5 of this sequence and fan stage 2 out across the three services in parallel", "should_trigger": true },
+  { "query": "run this pipeline overnight unattended, keep going even if the session exits: run.commander.yaml", "should_trigger": true },
+  { "query": "the prior sequence run halted in stage 2 with member 2c failed — resume it from the workflow journal", "should_trigger": true },
+  { "query": "build all three services at once from this numbered step list, each with its own work_dir", "should_trigger": true },
+  { "query": "kick off the plan in projects/acme/services/svc-a/src/docs/pipeline.yaml", "should_trigger": true },
+  { "query": "chain these: first `sidekicks service add git@github.com:acme/foo.git foo`, then plan it with sk-bmad-pm, then npm test — run the whole thing", "should_trigger": true },
+  { "query": "pipeline these work_dirs in parallel — svc-a, svc-b and svc-c each get a developer run, then review svc-a", "should_trigger": true },
+  { "query": "draft a command-sequence that plans and then builds the reporting service", "should_trigger": false },
+  { "query": "validate this sequence before we run it — does stage 2 have a dependency inside the wave?", "should_trigger": false },
+  { "query": "lint my pipeline.yaml and tell me whether any two steps share a docs_dir", "should_trigger": false },
+  { "query": "what would a sequence for this migration look like?", "should_trigger": false },
+  { "query": "queue these five tasks and work through them one at a time, resumable across sessions", "should_trigger": false },
+  { "query": "deliver the implementation plan at docs/plan.md end to end, phase by phase", "should_trigger": false },
+  { "query": "delegate this refactor to the codex CLI headlessly and collect the result when it finishes", "should_trigger": false },
+  { "query": "run this single prompt through the gemini CLI and show me its output", "should_trigger": false },
+  { "query": "assign the database drift check to dana and wait for her reply", "should_trigger": false },
+  { "query": "arm a ralph loop so this session restarts itself if it exits", "should_trigger": false }
+]

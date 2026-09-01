@@ -1,0 +1,83 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/005-broken-guide-links.yaml
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 005-broken-guide-links
+target_skill: sk-skill-manager
+created: 2026-08-28T05:10:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6 (dead/contradictory
+  content). Evidence produced by resolving every `../../../docs/...` link in SKILL.md against disk
+  and by `find docs -name <file>` for each target.
+kind: instructions
+observation: >-
+  Seven of the nine `../../../docs/guide/*.md` links in SKILL.md point at paths that do not exist;
+  four distinct documents are affected, and each is reachable at a different real path:
+    - `docs/guide/skill-architecture.md` (SKILL.md:36, :864) -> really `docs/guide/pending-update/skill-architecture.md`
+    - `docs/guide/settings-vs-configuration.md` (SKILL.md:122, :870) -> really `docs/guide/v1.5/settings-vs-configuration.md`
+    - `docs/guide/authoring-scope-aware-skills.md` (SKILL.md:184, :866) -> really `docs/guide/pending-update/authoring-scope-aware-skills.md`
+    - `docs/guide/framework-settings.md` (SKILL.md:868) -> really `docs/guide/v1.5/framework-settings.md`
+  Only `docs/guide/skill-import-adapters.md` (SKILL.md:653, :847) resolves. `ls docs/guide/`
+  returns `infographic legacy pending-update skill-import-adapters.md v1.5` — the flat layout these
+  links assume no longer exists. This is skill-attributable rather than a repo-wide drift: a
+  repo-wide grep shows `docs/guide/skill-architecture.md` is referenced by NO other SKILL.md, and
+  the repo's own CLAUDE.md already cites the correct `docs/guide/pending-update/` and
+  `docs/guide/v1.5/` paths for the same four documents. Nothing under `tests/` asserts that a
+  SKILL.md's relative doc links resolve, so the drift is silent. The cost is concrete and lands on
+  this skill's most load-bearing instruction: line 33-37 says "Read the structure guide, do not
+  restate it ... lives in [docs/guide/skill-architecture.md]" — the one file the skill tells every
+  run to read instead of re-deriving skill anatomy, and the link is dead. The same is true of
+  ARCHITECT's prerequisite (line 184) and the settings-vs-configuration gate every mode applies
+  (line 122).
+proposal: >-
+  In `.agents/skills/sk-skill-manager/SKILL.md`, repoint the four broken documents at their real
+  paths, at all eight sites (lines 36, 122, 184, 864, 866, 868, 870):
+    - `../../../docs/guide/skill-architecture.md` -> `../../../docs/guide/pending-update/skill-architecture.md`
+    - `../../../docs/guide/authoring-scope-aware-skills.md` -> `../../../docs/guide/pending-update/authoring-scope-aware-skills.md`
+    - `../../../docs/guide/settings-vs-configuration.md` -> `../../../docs/guide/v1.5/settings-vs-configuration.md`
+    - `../../../docs/guide/framework-settings.md` -> `../../../docs/guide/v1.5/framework-settings.md`
+  Update the visible link TEXT to match the new path so a reader who copies the label still lands
+  correctly. Leave `docs/guide/skill-import-adapters.md` alone — it resolves today. Text-only edit
+  to one file; no behaviour, flag, verb or safety rule changes.
+expected_effect: >-
+  The four guides the skill routes to actually open. The "read the structure guide, do not restate
+  it" instruction, the ARCHITECT preamble and the settings-vs-configuration gate stop being
+  unreachable pointers that push a run toward re-deriving from memory the content this skill
+  deliberately refuses to carry.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTIONS accepted from lens 1 (recorded rather than quietly fixed):
+#   - The observation originally said "eight of the nine" links were broken. The true figure is
+#     SEVEN broken of nine link targets — 864/866/868/870 ARE the References list, so the original
+#     proposal's "all eight sites (lines ... and the References list)" double-counted them. Both the
+#     observation and the proposal were corrected before apply; the applied edit touched exactly
+#     seven sites, which the post-apply link check confirmed.
+#   - OPERATOR NOTE, outside this skill: the same dead flat path appears in three framework
+#     comments — lib/skill-lifecycle/heal.mjs:167, lib/skill-registry/profile.mjs:54 and
+#     lib/skill-package/portable.mjs:131. Not fixed here; this artifact's scope is the skill folder.

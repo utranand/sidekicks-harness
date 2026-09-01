@@ -1,0 +1,81 @@
+id: 019-agent-tray-browses-under-ops
+target_skill: sk-skill-manager
+created: 2026-08-28T08:50:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, round 2 (low tier, categories angle),
+  rubric dimension 6. Re-verified at the gate against audit-groups.yaml, categories.yaml and the
+  live published browse pages.
+kind: assets
+observation: >-
+  `sk-agent-tray` browses on the published `ops` page instead of the `agents` page, and
+  `assets/categories.yaml` — the file whose whole purpose is to let publication membership differ
+  from audit membership — does not correct it.
+  Evidence: `sk-skill-auditor/assets/audit-groups.yaml:134` lists `sk-agent-tray` under `ops:`,
+  alongside `sk-cluster-ops`, `sk-security-remediation` and `sk-packager`. Its `agents:` group lists
+  the other eight `sk-agent-*` skills (standby, creator, master, journal, bridge, schedule-planner,
+  dry-run, mission-loop) and not the tray. Because a publication category defaults to the skill's
+  audit group, and `categories.yaml` declares an explicit `members:` list for exactly one family
+  (`framework`, at line 48), the tray inherits `ops`. Confirmed on the live public destination:
+  `categories/ops/README.md` contains `sk-agent-tray`, and `categories/agents/README.md` does not.
+  The blurbs make the mismatch plain. `ops` reads "Cluster ops, security remediation, packaging, UI
+  capture, run and artifact doctors" — none of which is a menu-bar status app for delegate agents.
+  `agents` reads "Persistent delegate agents: creation, standby loops, mailbox bridge, journals,
+  scheduling" — which is what the tray is for. So a reader browsing the published `agents` family
+  sees eight of the nine agent skills and is given no reason to think a ninth exists.
+  This is precisely the case `categories.yaml` was built for. SKILL.md's own taxonomy section says
+  the publication layer is separate because the `framework` family's "members audit under four
+  different groups and browse as one", and that "before it, changing what the public repo showed
+  meant changing what the auditor swept". The mechanism exists and is simply not applied here.
+  Skill-attributable: `assets/categories.yaml` is this skill's own bundled asset and its resolution
+  rule is this skill's to maintain.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/assets/categories.yaml`, add an explicit `members:` list to the
+  `agents:` family — mirroring the `framework:` pattern already in the file — naming the eight
+  current `agents` audit-group skills plus `sk-agent-tray`. Do NOT move the skill between audit
+  groups: `ops` may well be the right sweep for it, and the entire point of the publication layer is
+  that browse membership can differ from audit membership without disturbing audit coverage.
+  Note in the family's comment why the override exists (the tray audits under `ops` but belongs on
+  the agents browse page), matching how the `framework` family documents its own exception.
+  After the edit, regenerate the destination browse pages with
+  `scripts/skill-repo-readmes-public.mjs` on the next publish; the change is inert until then.
+expected_effect: >-
+  The published agents family shows all nine agent skills rather than eight, and a reader browsing
+  for delegate-agent tooling finds the tray instead of meeting it under "cluster ops, security
+  remediation, packaging". Audit coverage is unchanged.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T09:40:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane, with the
+  verifiers' corrections folded in (below) rather than the proposal as filed. Post-apply checks:
+  `node --check` passes on the script; the fixed logic, replayed against live `git status`, now
+  detects the dirty skill it previously missed (0 -> 1); the resolver replayed over the edited
+  categories.yaml resolves sk-agent-tray to `agents`; the bundle baseline was re-recorded and the
+  second `skill manifest --apply` run was a clean no-op; `skill doctor` OK at 0 errors / 2 notices
+  and `skill verify` OK — both the pre-run baseline.
+changes:
+  files: [assets/categories.yaml, skill.manifest.yaml]
+  version_from: 0.5.1
+  version_to: 0.5.2
+  commit: null
+
+# VERIFICATION RECORD — three independent adversarial refuters, each told to refute and to default to
+# refuted when uncertain: lens A (factual correctness of every citation), lens B (is the proposal
+# correctly aimed / would it make things worse), and a deciding third vote briefed to attack the
+# angles the first two might have missed. Result: refuted=false, floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified and below the floor -> auto-applied.
+
+# CORRECTION ACCEPTED — it changed what was applied. The proposal said to list all nine agent skills
+# under `members:`. Two verifiers objected, and the deciding vote settled the load-bearing question
+# from the code: `categoryOf()` (lib/skill-lifecycle/export.mjs) matches a skill NAME anywhere in
+# categories.yaml and returns the enclosing family; a skill named nowhere falls through to its audit
+# group. So `members:` ADDS to the audit-group default — it does NOT replace it. Listing all nine was
+# therefore redundant AND contrary to this file's own header ("their membership IS their audit group,
+# so listing it here would be a second copy to keep in step for no gain"), creating exactly the
+# two-places-to-maintain burden that convention exists to avoid. Applied instead: `members:` naming
+# ONLY sk-agent-tray, the single member whose family cannot be derived, with a comment saying why.
+# The other eight continue to resolve via groupOf() and are unaffected — confirmed by replaying the
+# resolver over the edited file: sk-agent-tray now resolves to `agents`.
+# The change is INERT until the next publish regenerates the destination browse pages; both README
+# generators ignore `members:` and read membership from catalog.yaml's already-resolved `category`.

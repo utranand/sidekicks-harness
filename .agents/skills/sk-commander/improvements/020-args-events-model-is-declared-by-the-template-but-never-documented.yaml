@@ -1,0 +1,45 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+id: 020-args-events-model-is-declared-by-the-template-but-never-documented
+target_skill: sk-commander
+created: 2026-08-28T02:07:00+07:00
+source: 'sk-skill-auditor run audit-sk-commander-2026-08-28, round 0 (high-tier discovery panel, gated at verify_tier=high). Anchors re-read by the gate: commander-workflow-template.js:79-90, 412; SKILL.md:353, 607, 290-292.'
+kind: instructions
+observation: >-
+  The bundled template declares an `args.events.model` field and asserts as fact that the commander
+  populates it: commander-workflow-template.js:79-80 documents the shape
+  "{ runDir, runId, workItem, model: '<optional low-tier model id>', reconcile }", and lines 87-90 say
+  "A LOW-tier model is the right lane for an event emitter (it runs one literal command and reports the
+  exit code). The commander passes an id it has verified exists in this runtime; absent, the agent
+  inherits the session model", backed by `const EVENT_MODEL = (EV && EV.model) || ''` used at lines 153
+  and 209. SKILL.md — the only instruction telling the commander what to put in `args` — never mentions
+  it: the three documented shapes are `events: { runDir, runId, workItem }` (SKILL.md:353), the same at
+  step 5 (SKILL.md:607), and the resume shape listing only runDir/runId/workItem/reconcile
+  (SKILL.md:290-292). So the template's assertion is false and the `EVENT_MODEL` branch is dead code:
+  every event append spawns an agent on the session model. The cost is per transition, not per run —
+  `transition()` calls `emit()` on each stage's `inprogress` and `done|failed`, so a 7-stage sequence
+  pays roughly 14 top-tier agent spawns to write one-line JSONL entries.
+  Wholly internal contradiction between two files of the same skill; no input can cause it.
+proposal: >-
+  Additive fix, matching the template's stated design intent: document `model` in SKILL.md's
+  `args.events` shape at line 353 (and in the step-5 shape at line 607) as an OPTIONAL low-tier model id
+  for the event emitters, with one sentence saying to verify the id resolves in this runtime before
+  passing it (CLAUDE.md's tier table: Low = mechanical/bulk fan-out) and that omitting it makes the
+  emitters inherit the session model. Do not change the template's helpers.
+  (If pinning is judged unwanted instead, the alternative is to delete `model` from
+  commander-workflow-template.js:79-80, 87-90, 90, 153, 209 and 412 so nothing claims a field the
+  commander never sends — but the additive fix is preferred, since the template's comment states the
+  low-tier lane is the right one.)
+expected_effect: >-
+  The template's claim becomes true and its low-tier emitter lane becomes reachable, so the diagnostic
+  sidecar stops paying session-model spawns per stage transition; SKILL.md and the template agree on the
+  `args.events` contract.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T02:35:00+07:00
+applied_notes: 'Applied WIDENED per the correctness refuter: `model` documented in ALL THREE args.events shapes — the resume shape, the Run-events binding block and run-procedure step 5 — because EVENT_MODEL is consumed on the resume path too (template:209). Phrased as an optional LOW-TIER model resolved per CLAUDE.md''s tier table with the template''s own "verify it resolves in this runtime" guard preserved, cross-referencing the per-step model? field rather than restating tier guidance; omitting it inherits the session model. Answers the dissenting refuter''s Rule 6 objection. The template was not changed. || APPLY: auto-verified 2026-08-28: 3 refuters at verify_tier=high, 2/3 non-refuted, floor_hit=false on all three. Confirmed by repo-wide search: nothing outside the template and its verbatim harness copy ever sets events.model, so EVENT_MODEL is unreachable; lib/run-events/*.mjs has zero occurrences of ''model'' and run-event.mjs hardcodes actor.id, so no consumer can tell which model appended; the ~14-spawns-per-7-stage-run cost claim verifies. The dissenting refuter argued direction (B) — delete the field — on Rule 6 grounds (a vendor id baked into a path where emit() has no try/catch), and was outvoted; its concern is answered in the applied wording, which expresses the field as a low-TIER id resolved per CLAUDE.md''s tier table and keeps the template''s own ''verify it resolves in this runtime'' guard. APPLIED SHAPE widened per the correctness refuter: document the field in ALL THREE shapes (SKILL.md:290-292 as well as :353 and :607) because EVENT_MODEL is consumed on the resume path at template:209.'
+changes:
+  files: [SKILL.md, skill.manifest.yaml, VERSION.json]
+  version_from: 1.3.0
+  version_to: 1.4.0
+  commit: null

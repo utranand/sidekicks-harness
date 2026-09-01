@@ -1,0 +1,96 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/sk-skill-manager/improvements/004-trigger-eval-set.yaml
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: 004-trigger-eval-set
+target_skill: sk-skill-manager
+created: 2026-08-28T05:06:12+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28 — step 2b.1 of the triggering benchmark.
+  Measured evidence: `auditor.sh score` exits 4 with
+  "auditor: no eval set at .agents/skills/sk-skill-manager/evals/trigger-eval.json"; `ls
+  .agents/skills/sk-skill-manager/` shows no `evals/` directory, while 27 of the repo's 122 skills
+  ship the `evals/trigger-eval.json` the scorer requires (35 have an `evals/` directory at all; the
+  other 8 carry skill-creator's `evals.json`, which `auditor.sh score` does not accept).
+kind: evals
+observation: >-
+  sk-skill-manager ships no `evals/trigger-eval.json`, so dimension 1 of the audit rubric
+  (description triggering) cannot be MEASURED for it — the auditor's scorer refuses to run
+  (exit 4) and the only remaining judgement would be an unmeasured opinion, which the rubric
+  forbids filing. This matters more for this skill than for most: its description is a
+  1131-character mode roster naming ten modes and six sibling skills it is NOT for, so
+  over-triggering against `sk-skill-offload`, `sk-packager`, `sk-inherit`, `sk-skill-auditor`,
+  `sk-self-improve` and `sk-parity-keeper` is the exact failure the description is written to
+  prevent — and nothing today verifies that it does. Improvement 003 already trimmed this
+  description once (1161 -> 1013 chars) with no committed query set to confirm the trim did not
+  cost triggering; it has since grown back to 1131, over the 1024 host cap, unmeasured.
+proposal: >-
+  Add `.agents/skills/sk-skill-manager/evals/trigger-eval.json` — a 20-query triggering benchmark
+  set, 10 `should_trigger: true` and 10 `should_trigger: false` near-misses, in the same schema the
+  repo's other 35 eval sets use (a flat JSON array of `{query, should_trigger}`). The 10 positives
+  cover one distinct mode each (CREATE, HEAL, EXPORT, IMPORT, REMOVE-local, REMOVE-destination,
+  DISCOVER, REVIEW, ADVISE, BOOTSTRAP) so a description edit that drops a mode shows up as a
+  measurable miss rather than passing silently. The 10 negatives are deliberate near-misses owned
+  by the six siblings the description already disclaims plus sk-agent-creator, sk-config-doctor and
+  sk-sequence-planner — they share this skill's vocabulary ("skill", "publish", "improve", "wire")
+  but a neighbour should win. Exact content is the file authored by the audit run at
+  scratchpad path trigger-eval.json; copy it verbatim to `evals/trigger-eval.json`. Purely
+  additive — no existing file is touched.
+expected_effect: >-
+  Dimension 1 becomes measurable for this skill instead of unmeasurable: `auditor.sh score` runs,
+  the current description gets a baseline number, and any future description edit (starting with
+  the pending over-cap trim) can be shown not to cost triggering rather than assumed not to.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T05:50:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator, on the autonomous-verified lane
+  (adversarial self-verification 2 of 3 non-refuted, 0 of 3 floor flags — full tally in the
+  VERIFICATION RECORD below). Purely additive: `evals/trigger-eval.json` created, no existing file
+  touched apart from the frontmatter version. Checks run after the apply: the JSON parses and
+  carries 20 queries at a 10/10 should/should-not split; SKILL.md still parses; the frontmatter
+  description is unchanged at 1131 chars (the over-cap trim is a separate finding and is measured
+  against this set, not bundled here); every bundled asset path still resolves.
+  skill-creator's `quick_validate.py` reports "Unexpected key(s) in SKILL.md frontmatter:
+  sidekicks, user-invocable, version" — that is the upstream generic validator disagreeing with this
+  repo's own frontmatter convention, which all 122 skills here share; it is pre-existing, unrelated
+  to this change, and was not "fixed".
+changes:
+  files: [evals/trigger-eval.json, SKILL.md]
+  version_from: 0.3.0
+  version_to: 0.3.1
+  commit: null
+
+# NOTE for APPLY — lane accuracy. sk-skill-auditor's step 2b.1 names this filing `kind: assets`,
+# but the destination is `evals/`, NOT `assets/`, so it is OUTSIDE the additive auto-apply lane
+# (`risk: low` + `kind: assets` + a new file under the target's `assets/`). It is recorded here as
+# the funnel template's dedicated `kind: evals` so APPLY routes it through skill-creator's eval
+# harness rather than the assets lane. In autonomous mode it rides the auto-verified lane like any
+# other finding; in classic mode it waits for a human.
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification, 3 independent
+# refuters at the strong tier, each prompted to refute and to default to refuted when uncertain:
+#   vote 1 (high, whole-finding angle):   refuted=false  floor_hit=false
+#   vote 2 (mid, query-correctness angle): refuted=TRUE  floor_hit=false — objected that
+#     "our config blocks are undeclared — run config doctor and fix the drift" is mislabelled as a
+#     near-miss: sk-skill-manager's own VALIDATE table reads `config doctor  # undeclared blocks,
+#     credentials in committed files` and its CREATE/VALIDATE sections use "drift" throughout, while
+#     sk-config-doctor's SKILL.md contains no occurrence of "drift" and covers connector-credential
+#     VALUES. The objection was ACCEPTED, not overruled: that query was replaced before apply with
+#     "the database connector cannot see my staging env alias — check my config", which sits
+#     squarely in sk-config-doctor's documented domain and borrows none of this skill's vocabulary.
+#   vote 3 (mid, mechanical angle):      refuted=false  floor_hit=false
+# Tally 2 of 3 non-refuted = verified; 0 of 3 floor flags = below the safety floor.
+#
+# Known, deliberately-kept label: "park sk-office-viz — turn it off but keep the files around" is
+# recorded should_trigger:false because the frontmatter description — the only text the scorer sees —
+# disclaims offloading, and sk-skill-offload's description claims that phrasing verbatim. Vote 1
+# flagged that SKILL.md's body contradicts this (routing table row + a local OFFLOAD section); that
+# contradiction is filed separately as 007-offload-routing-contradiction, whose proposal resolves it
+# in the direction this label already assumes.
+#
+# Expected day-one miss: "set up a new private skills repository ... and register it as a
+# destination" is correctly owned (BOOTSTRAP), but the current description never mentions BOOTSTRAP,
+# so the baseline should score it as a miss. That is a measured description gap, not a mislabel.
+

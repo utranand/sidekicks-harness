@@ -11,13 +11,18 @@
 //     (with forward slashes) so it travels and still drives scope alignment. This is what lets a
 //     generated bundle carry `work_dir: .` and be relocated anywhere inside the repo.
 //   • Any other relative value (`projects/…`, `.sidekicks/…`, a bare name) is REPO-RELATIVE already —
-//     passed through unchanged. Note `.sidekicks/…` is NOT leading-dot (it does not start with `./`),
-//     so it is correctly left alone.
+//     passed through as-is apart from `\` -> `/` normalisation. Note `.sidekicks/…` is NOT leading-dot
+//     (it does not start with `./`), so it is correctly left alone.
 //   • An absolute value is passed through unchanged.
 //   • An empty / undefined value returns '' (the step omits the anchor).
 //
 // Cross-platform: pure node:path, tolerates `/` and `\` inputs, always emits `/` (POSIX) output so the
-// baked YAML/brief reads the same on macOS and Windows.
+// baked YAML/brief reads the same on macOS and Windows. Every RELATIVE branch normalises `\` -> `/`
+// (before resolving, and before returning a passthrough), so a bundle authored on Windows with `.\…`,
+// `..\…` or `projects\…` anchors resolves identically on macOS. Accepted trade-off: a POSIX
+// directory whose name legally CONTAINS a backslash (`./weird\name`) is now read as a path separator.
+// That is accepted because such an anchor could never resolve on Windows at all, and CLAUDE.md mandates
+// ONE implementation that runs on both hosts.
 
 import path from 'node:path';
 import { realpathSync } from 'node:fs';
@@ -33,14 +38,22 @@ export function isLeadingDot(value) {
  * @param {string} value     the step's raw anchor (work_dir/docs_dir/artifacts_dir)
  * @param {string} seqFile   absolute path to the command-sequence FILE (its dirname is the anchor base)
  * @param {string} repoRoot  absolute repo root (nearest ancestor with .sidekicks/)
- * @returns {string}         resolved value: repo-relative (POSIX) for leading-dot; unchanged otherwise
+ * @returns {string}         resolved value: repo-relative (POSIX) for leading-dot; POSIX-normalised
+ *                          passthrough for any other relative value; absolute and empty exactly as-is
  */
 export function resolveAnchor(value, seqFile, repoRoot) {
   if (value == null || value === '') return '';
   if (path.isAbsolute(value)) return value;          // absolute → as-is
-  if (!isLeadingDot(value)) return value;            // repo-relative (projects/…, .sidekicks/…) → as-is
+  // Repo-relative (projects/…, .sidekicks/…) → as-is, but emit POSIX separators so a Windows-authored
+  // `projects\acme\src` is not baked into the Workflow script with backslashes still in it.
+  if (!isLeadingDot(value)) return value.replace(/\\/g, '/');
   const seqDir = path.dirname(path.resolve(seqFile));
-  const abs = path.resolve(seqDir, value);           // anchor the leading-dot value to the file's folder
+  // Anchor the leading-dot value to the file's folder. Normalise `\` -> `/` FIRST: `isLeadingDot`
+  // accepts `.\…` / `..\…`, but `path.resolve` does not treat `\` as a separator on POSIX, so `..\sib`
+  // would survive as ONE literal segment and bake a corrupt — but non-empty, so unguarded — anchor.
+  // `/` is a valid separator on both hosts, so this is a no-op on Windows. NOT path.win32/path.posix:
+  // the value's separator flavour is unknown at parse time.
+  const abs = path.resolve(seqDir, value.replace(/\\/g, '/'));
   const rel = path.relative(path.resolve(repoRoot), abs);
   // Express repo-relative with POSIX separators; '.' (the repo root itself) stays '.'.
   return rel === '' ? '.' : rel.split(path.sep).join('/');

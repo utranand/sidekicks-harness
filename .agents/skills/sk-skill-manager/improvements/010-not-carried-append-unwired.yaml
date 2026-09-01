@@ -1,0 +1,98 @@
+id: 010-not-carried-append-unwired
+target_skill: sk-skill-manager
+created: 2026-08-28T05:38:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6 (dead content). Raised
+  by the high-tier discovery pass, which honoured the rubric's carve-out and grepped the whole skill
+  directory plus the whole repo including untracked files; re-verified at the gate.
+kind: instructions
+observation: >-
+  `assets/not-carried-withholding.md` is a bundled asset with ZERO live references, and the
+  consequence it exists to prevent has already happened at the published destination.
+    - Deadness (whole-dir grep, per the rubric carve-out): `grep -rn not-carried-withholding
+      .agents/skills/sk-skill-manager/` returns exactly one hit — `skill.manifest.yaml:88`, a sha256
+      bundle record, not a use. A whole-repo grep including untracked files adds only three more
+      sha256/hash records (the harness and skills-repo copies of the same manifest, and
+      `inherit.json:118`). No script reads it and no SKILL.md line names it.
+    - The consuming flag exists: `scripts/skill-repo-not-carried.mjs:49` parses `--append`, and
+      `:168-170` appends each named file verbatim after the generated rollup. Its own comment at
+      `:43-49` records precisely why: "Without this the addendum had to be hand-appended after the
+      script ran, which meant the next regeneration silently dropped it — the exact durability trap
+      this script was moved here to escape."
+    - But nothing passes it. SKILL.md:307 invokes the script as
+      `node .agents/skills/sk-skill-manager/scripts/skill-repo-not-carried.mjs --report <export.json>
+      --out <root>` — no `--append` — and the script's own `Usage:` header at `:18-19` omits the
+      flag too, so neither surface a caller reads mentions it.
+    - Measured outcome at the configured public destination
+      (`projects/global/services/sidekicks-skills/src/NOT-CARRIED.md`): `grep -c Withheld` returns
+      **0**. The published rollup carries no withholding section at all — the durability trap the
+      flag was built to escape is live in the published tree right now.
+    - The asset is not merely idle: it is inside the export set and is recorded in `inherit.json`,
+      so every consumer of the public skills repo and every forged runtime inherits the same unwired
+      file.
+  Skill-attributable: the asset, the invocation that omits the flag, and the script's own Usage
+  header are all this skill's own files.
+proposal: >-
+  Wire the asset rather than delete it — the script, the asset and the stated reason all agree it
+  should be passed:
+    1. SKILL.md BOOTSTRAP step 5 (line 307): add `--append
+       .agents/skills/sk-skill-manager/assets/not-carried-withholding.md` to the
+       `skill-repo-not-carried.mjs` invocation, alongside the existing public-only note.
+    2. Add `assets/not-carried-withholding.md` to SKILL.md's **References** list with one line
+       saying what it is (the withholding addendum appended verbatim to a public destination's
+       NOT-CARRIED.md, so a regeneration cannot silently drop it).
+    3. Add `--append <file>` to the script's own `Usage:` header at
+       `scripts/skill-repo-not-carried.mjs:18-19`, so the flag is discoverable from the script too.
+  Additive documentation plus one flag added to a documented command line; no verb, behaviour or
+  safety rule changes, and the script's existing refusal of a `dry_run: true` report (`:73-75`) is
+  untouched.
+expected_effect: >-
+  The withholding addendum survives regeneration as designed instead of being an asset nothing
+  invokes, and the next public NOT-CARRIED.md regeneration carries the section that is missing
+  today. The skill stops shipping and publishing a file with no caller.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md, scripts/skill-repo-not-carried.mjs]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# APPLY ORDER (raised by the harm/regression verifier, accepted): this artifact edits SKILL.md:307,
+# which sits INSIDE the 266-330 BOOTSTRAP block that 012 proposes to move to
+# references/bootstrap-destination.md. Apply 010 BEFORE 012 so 012's move carries the edited line
+# across. Applying 012 first would relocate the line and leave 010 editing a line that is no longer
+# there — one change silently reverting the other.
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTIONS accepted from lens 1:
+#   - The observation's "a whole-repo grep ... adds only three more sha256/hash records" is wrong.
+#     A --hidden whole-repo grep also surfaces six NON-hash hits under
+#     artifacts/runs/get-things-done/aap-113-skill-repo-sync/ (tasks.yaml x2,
+#     inputs/export-public-fix.sequence.yaml:169 and :246, delivery-report.md x3) — including one
+#     sequence that DID pass --append, but with a run-local COPY of the file, not this bundled
+#     asset. All sit on the temporary runs surface, so none is a live caller and the deadness
+#     conclusion stands; only the grep-scope sentence was overstated.
+#   - --append is applied at scripts/skill-repo-not-carried.mjs:168-174, not :168-170.
+#   - Lens 1 additionally found that aap-113-skill-repo-sync's own delivery report (lines 1797-1815)
+#     records the committed NOT-CARRIED.md as having once been byte-identical to an --append
+#     regeneration — i.e. the durability trap demonstrably fired at some point after that.

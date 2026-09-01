@@ -3,7 +3,8 @@
 //
 // Claude Code SessionStart hook that auto-loads THIS repo's local memory store
 // into the session context — the same "it just knows" behavior the host/global
-// MEMORY.md gets, but for the committed, git-travelled `sidekicks memory` store.
+// MEMORY.md gets, but for the LOCAL, git-ignored `sidekicks memory` store (which reaches
+// other checkouts through `memory publish` / `memory sync`, not through git).
 // Pairs with scripts/enforce-local-memory.mjs (which makes project memory
 // local-only): writes go local, and this makes them show up automatically.
 //
@@ -123,7 +124,7 @@ async function main() {
     if (!listing || listing.startsWith('No local-memory entries')) process.exit(0);
     emit(
       `# Project local memory (sidekicks memory)\n\n`
-      + `This project keeps committed, git-travelled memory in its local store (distinct from the host/global `
+      + `This project keeps LOCAL-ONLY, git-ignored memory in its central store (distinct from the host/global `
       + `~/.claude memory). Project memory is LOCAL-ONLY here — register decisions with \`sidekicks memory add\` `
       + `and read full entries with \`sidekicks memory show <slug>\`. Effective entries for the active scope:\n\n`
       + listing + `\n`
@@ -132,15 +133,37 @@ async function main() {
   }
 
   const map = sk(repoRoot, ['memory', 'map']);
-  // The empty-store message starts with "No local-memory entries" — stay silent.
-  if (!map || map.startsWith('No local-memory entries')) process.exit(0);
+  // The empty-store message starts with "No local-memory entries".
+  if (!map || map.startsWith('No local-memory entries')) {
+    // An empty store is silent EXCEPT in the one case where it is a mistake rather than a fact: the
+    // store is git-ignored, so a fresh clone starts empty while its knowledge sits in whatever
+    // sources the committed registry names. Saying nothing there is how a session runs a whole task
+    // without the memory that would have changed it. It stays a HINT — hydrating pulls from a
+    // remote, and starting a network clone unasked at session start is not this hook's call.
+    const registered = sk(repoRoot, ['memory', 'source', 'list', '--json']);
+    let names = [];
+    try { names = (JSON.parse(registered || '{}').sources ?? []).map((s) => s.name); } catch { names = []; }
+    if (names.length) {
+      emit(
+        '# Project local memory (sidekicks memory) — EMPTY, not hydrated\n\n'
+        + 'The memory store (.sidekicks/memory/) is git-ignored and holds no entries in this '
+        + `checkout, but ${names.length} external source(s) are registered: ${names.join(', ')}.\n\n`
+        + 'Hydrate before relying on "there is no memory about this":\n\n'
+        + '  node bin/sidekicks memory sync\n'
+      );
+      return;
+    }
+    process.exit(0);
+  }
 
   const parts = [
     '# Project local memory (sidekicks memory) — index only',
     '',
-    'Committed, git-travelled memory lives in this repo\'s central store (distinct from the '
-      + 'host/global ~/.claude memory). Project memory is LOCAL-ONLY here — register decisions with '
-      + '`sidekicks memory add`.',
+    'Memory lives in this repo\'s central store (distinct from the host/global ~/.claude memory). '
+      + 'Project memory is LOCAL-ONLY here — register decisions with `sidekicks memory add`, never in '
+      + 'the per-CLI global store. The store is also git-ignored: it reaches other checkouts through '
+      + '`sidekicks memory publish` / `sync` against a registered source (`memory source list`), not '
+      + 'through this repo.',
     '',
     map,
     '',

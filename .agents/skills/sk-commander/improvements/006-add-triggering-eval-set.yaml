@@ -64,12 +64,12 @@ expected_effect: >-
   than leaving it unmeasured, and any future description rewrite can be scored against the same set
   before it is adopted.
 risk: low
-status: proposed
-approved_by: null
-applied_at: null
-applied_notes: null
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T02:35:00+07:00
+applied_notes: 'skill-creator created evals/trigger-eval.json (20 entries, 10/10, schema-exact) with the verification amendment: the first query now names the fictional projects/acme/artifacts/command-sequence/stop-acme-prod-services-direct.yaml instead of a real shp-sk PROD stop-sequence path (refuter A). Verified independently: JSON parses, 20 entries, 10 true / 10 false, every item exactly {query, should_trigger}, no shp-sk string anywhere. `sidekicks skill manifest sk-commander --apply` re-recorded the derived bundle so the new file is baselined and `skill export` does not fail stale (refuter A ground (d)). `skill doctor sk-commander` = 0 errors, 1 pre-existing duplicate-basename notice. || APPLY: auto-verified 2026-08-28 by sk-skill-auditor run audit-sk-commander-2026-08-28: 3 independent refuters at verify_tier=high, 2/3 non-refuted, floor_hit=false on all three. Refuter A refuted on one repairable ground: the derived `bundle:` map in skill.manifest.yaml covers evals/, so an unrecorded new file makes bundleFileList() report stale/unrecorded and flips `sidekicks skill export sk-commander` to EXIT_VALIDATION — the apply therefore ends with `sidekicks skill manifest sk-commander --apply`. Refuters B and C confirmed schema-exactness against trigger_eval.py (flat array, item[''query''] / item[''should_trigger'']) and every should_trigger label against the named neighbours'' own descriptions. Two amendments folded in below, per A and B.'
 changes:
-  files: []
-  version_from: null
-  version_to: null
+  files: [evals/trigger-eval.json, skill.manifest.yaml, VERSION.json]
+  version_from: 1.3.0
+  version_to: 1.4.0
   commit: null

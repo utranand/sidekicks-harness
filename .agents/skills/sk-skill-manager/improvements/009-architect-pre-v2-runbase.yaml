@@ -1,0 +1,74 @@
+id: 009-architect-pre-v2-runbase
+target_skill: sk-skill-manager
+created: 2026-08-28T05:36:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6. Raised by the
+  high-tier discovery pass; re-verified at the gate against `scope run-base --json` and AGENTS.md.
+kind: instructions
+observation: >-
+  ARCHITECT — the mode whose entire job is judging whether another skill's anchors are right —
+  teaches the PRE-v2 run-path shape, and contradicts this same file 130 lines above it:
+    - SKILL.md:57-59 (runs layout v2): "Runs written before runs layout v2 stay frozen at
+      `<artifacts-base>/artifacts/runs/skill-manager/` — valid read and resume targets, never write
+      targets."
+    - SKILL.md:192-194 (ARCHITECT check 2): "Is `RUNBASE` its own? `artifacts/runs/<skill-id>/…`
+      must name **this** skill."
+    - SKILL.md:195-196 (ARCHITECT check 3): "Is anything stacked? `artifacts/runs/<skill-id>/runs/
+      <engine>/…` is forbidden"
+  The measured v2 shape is different: `node bin/sidekicks scope run-base sk-skill-manager --json`
+  returns `run_base: .../artifacts/runs/_adhoc/sk-skill-manager` with `facet: skill-manager`, and
+  AGENTS.md defines `RUNBASE=<project>/artifacts/runs/<work-item>/<facet>` with `_adhoc/<skill-id>`
+  when there is no work item, and "never a second run layer beneath a facet
+  (`runs/<item>/<facet>/runs/…` is always wrong)". So an ARCHITECT review run applying check 2 as
+  written would flag a CORRECTLY-anchored v2 skill as wrong (its path is `runs/_adhoc/<skill-id>`,
+  not `runs/<skill-id>`), and would PASS a skill that hand-joins the frozen pre-v2 path — the exact
+  defect ARCHITECT exists to catch, inverted. This is skill-attributable and unusually costly
+  because the mode is advisory: its output becomes other skills' anchors.
+proposal: >-
+  Rewrite ARCHITECT checks 2 and 3 in runs-layout-v2 terms in
+  `.agents/skills/sk-skill-manager/SKILL.md`:
+    - Check 2 becomes: does the skill's preamble pass THIS skill's id to `sidekicks scope run-base`,
+      and is the returned `$RUNBASE` consumed rather than re-joined? Keep the existing sentence that
+      a copy-pasted preamble carrying another skill's id is the observed failure mode and silently
+      files one skill's runs under another's — that part is still exactly right.
+    - Check 3 becomes: no second run layer beneath the facet — `runs/<item>/<facet>/runs/…` is
+      always wrong.
+    - Add one line: a hand-joined `artifacts/runs/<skill-id>/` is itself the defect — that is the
+      frozen pre-v2 shape, a read/resume target only.
+  Text-only edit to one file. Adds no permission, softens no guard; ARCHITECT remains advisory and
+  still repairs only through sk-self-improve -> skill-creator (SKILL.md:198-200 unchanged).
+expected_effect: >-
+  ARCHITECT stops grading against a superseded layout — it passes correct v2 anchoring and catches
+  the pre-v2 hand-join it currently endorses. The file stops contradicting its own runs-layout
+  section.
+risk: medium
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTION accepted from lens 1: the "Apply a repair through sk-self-improve ->
+# skill-creator. Never hand-edit the target skill" sentence is at SKILL.md:201-202, not :198-200.
+# It was confirmed present and untouched after the apply.

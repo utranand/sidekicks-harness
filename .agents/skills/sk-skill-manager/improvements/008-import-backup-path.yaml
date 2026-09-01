@@ -1,0 +1,76 @@
+id: 008-import-backup-path
+target_skill: sk-skill-manager
+created: 2026-08-28T05:34:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, rubric dimension 6 (contradictory
+  content). Raised by the high-tier discovery pass; re-verified at the gate against
+  lib/skill-lifecycle/_shared.mjs, import.mjs and remove.mjs.
+kind: instructions
+observation: >-
+  SKILL.md states the force-overwrite backup location twice and the two statements disagree, and the
+  one a reader is most likely to act on is the wrong one:
+    - IMPORT (SKILL.md:596-597): "A `--force` overwrite always backs the previous copy up under
+      `$ARTIFACTSDIR/backups/<stamp>/<skill>/` first"
+    - REMOVE's unwiring table (SKILL.md:707): "deleted, after a full copy to
+      `artifacts/runs/skill-manager/backups/<stamp>/<skill>/`"
+  The CLI settles it against IMPORT. `lib/skill-lifecycle/_shared.mjs:120-130` defines
+  `backupSkillDir()` with the literal `const backupRel = join('artifacts', 'runs', 'skill-manager',
+  'backups', stamp, name)` resolved against `repoRoot`, and `remove.mjs:310` repeats the same
+  literal; `import.mjs:483` calls `backupSkillDir(repoRoot, localDir, stamp, row.skill)`. Grepping
+  those three files for `artifacts_dir` / `artifactsDir` returns ZERO hits — the backup location is
+  a fixed repo-root path the CLI chooses, and no caller-supplied `artifacts_dir=` or `work_item=`
+  can move it. The same evidence falsifies a third sentence, SKILL.md:44-45: "REVIEW's pick list,
+  DISCOVER's search index, and IMPORT's force-overwrite backups are all generated run output (facet
+  `skill-manager`), resolved the standard way — never hand-joined." The first two are; the backups
+  are hand-joined, by the CLI, at a pre-v2 path this same section (SKILL.md:57-59) calls a read-only
+  frozen target. The cost is concrete and lands on the sentence that says why it matters: IMPORT
+  calls the backup "the only thing that makes a wrong import recoverable — say where it went", so a
+  run that predicts `$ARTIFACTSDIR/backups/...` tells the user to look somewhere the file is not,
+  after a destructive overwrite. Skill-attributable: all three sentences are this skill's own.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/SKILL.md`, make all three sites agree with the CLI:
+    1. SKILL.md:596-597 — replace `$ARTIFACTSDIR/backups/<stamp>/<skill>/` with the literal
+       `artifacts/runs/skill-manager/backups/<stamp>/<skill>/` (repo-root, chosen by the verb), and
+       keep the existing instruction to read the path back from the verb's report rather than
+       predicting it.
+    2. SKILL.md:44-45 — drop backups from the list of `RUNBASE`-resolved output, leaving REVIEW's
+       pick list and DISCOVER's search index (which genuinely do honour `artifacts_dir=`/`work_item=`).
+    3. Add one sentence to the same section: the two verbs that back a skill folder up
+       (`skill import --force`, `skill remove --apply`) write a fixed repo-root pre-v2 path set by
+       `lib/skill-lifecycle/_shared.mjs`, unaffected by `artifacts_dir=` — so read it from the report.
+  Text-only edit to one file. No verb, flag, behaviour or safety rule changes; the backup itself and
+  REMOVE's dry-run-by-default `--apply` gate are untouched.
+expected_effect: >-
+  A run that has just force-overwritten or deleted a skill tells the user the path the backup is
+  actually at. The "never hand-joined" claim stops covering a case that is hand-joined, so the
+  runs-layout section is true as written.
+risk: low
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T06:05:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane. Post-apply
+  checks: SKILL.md frontmatter parses; every bundled asset/reference/doc path resolves; the full
+  guard inventory (REMOVE's dry-run-by-default and its "--force does not open that door", BOOTSTRAP's
+  git-init refusal, the .agents/skills-ignore refusal, the inside-this-repo path refusal, EXPORT's
+  "never push from a verb" and its no-credentials rule, IMPORT's "writes nothing outside .sidekicks/",
+  CREATE's "a hard stop is not a setting", ARCHITECT's "never hand-edit the target skill") was
+  re-checked present after the edits; every removed line in the diff was traced to a filed finding.
+changes:
+  files: [SKILL.md]
+  version_from: 0.3.1
+  version_to: 0.4.0
+  commit: null
+
+# VERIFICATION RECORD — sk-skill-auditor autonomous adversarial self-verification. Three INDEPENDENT
+# refuters, each given a different lens and each instructed to refute and to default to refuted when
+# uncertain, over findings 005-012 as a batch:
+#   lens 1 — factual correctness of the observation (strong tier)
+#   lens 2 — would applying the proposal make the skill worse / is it aimed at the wrong layer
+#   lens 3 — the safety floor and git-reversibility (the conservative gate; ONE flag parks a change)
+# Result for this finding: refuted=false on all three lenses; floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified AND below the floor -> auto-applied on
+# the autonomous-verified lane. Every auto-apply is git-reversible; the git diff is the review.
+
+# CITATION CORRECTION accepted from lens 1: backupSkillDir() spans _shared.mjs:120-131, not
+# :120-130; the hardcoded literal itself is at :123, as quoted.

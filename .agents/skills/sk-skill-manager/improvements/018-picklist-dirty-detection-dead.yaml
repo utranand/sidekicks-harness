@@ -1,0 +1,100 @@
+id: 018-picklist-dirty-detection-dead
+target_skill: sk-skill-manager
+created: 2026-08-28T08:45:00+07:00
+source: >-
+  sk-skill-auditor run audit-sk-skill-manager-2026-08-28, round 2 (low tier, script-internals angle),
+  rubric dimension 6. Re-verified at the gate by replaying the function's own parsing logic against
+  real `git status` output.
+kind: scripts
+observation: >-
+  `scripts/export-picklist.mjs` cannot detect an uncommitted skill. `dirtySkills()` runs
+  `git status --porcelain -- <SKILLS_REL>` where `SKILLS_REL = join('.agents', 'skills')` (line 57),
+  so every path git returns begins `.agents/skills/...`. But the parser then tests
+  `if (parts[0] === '.sidekicks' && parts[1] === 'skills' && parts[2]) dirty.add(parts[2]);`
+  (line 139) — a condition that can never be true for output scoped to `.agents/skills`. The
+  returned `Set` is therefore always empty.
+  EMPIRICAL PROOF (gate, against the live working tree, which currently has uncommitted
+  sk-skill-manager files): replaying the function's exact logic over real
+  `git status --porcelain -- .agents/skills` output gives `dirty as SHIPPED (.sidekicks/skills): 0
+  []` versus `dirty as FIXED (.agents/skills): 1 ['sk-skill-manager']`. The skill is dirty; the
+  shipped code reports nothing.
+  Everything downstream is consequently dead code: `checkboxLine()` (line 271,
+  `if (row.dirty) bits.push('**UNCOMMITTED**')`) can never add the marker, and the `resolveCommands()`
+  warning (line 439) can never fire — the one that says the destination's `origin.yaml` "would record
+  a source_commit that does not contain these bytes".
+  This is not cosmetic. SKILL.md's REVIEW section names `UNCOMMITTED` as one of exactly three flags
+  "that change the decision", and states the consequence: "Export copies what is on disk but records
+  the current commit as `source_commit` in the destination's `origin.yaml`, so exporting a dirty tree
+  publishes bytes attributed to a commit that does not contain them. Committing first is the fix, not
+  a nicety." So the skill documents a safeguard, tells the operator to act on it, and ships a
+  pick list that silently never raises it — the operator reads a clean list and publishes
+  misattributed bytes. `git log` shows the defect was introduced by commit `9c9654c1`
+  ("refactor(skills)!: make .agents/skills the canonical tree") — the same commit that changed
+  `SKILLS_REL`; the constant was updated and this parser was not. Skill-attributable: the script is
+  this skill's own bundled code.
+proposal: >-
+  In `.agents/skills/sk-skill-manager/scripts/export-picklist.mjs` line 139, change the test to match
+  `SKILLS_REL`:
+      if (parts[0] === '.agents' && parts[1] === 'skills' && parts[2]) dirty.add(parts[2]);
+  Better still, derive it from the constant rather than repeating the literals, so the two cannot
+  drift apart again the next time the canonical tree moves — that drift is exactly what happened at
+  `9c9654c1`. A one-line fix; no flag, interface, exit code or output format changes, and the
+  UNCOMMITTED warning it restores is a warning the script already contains and already documents.
+  Verify after the change by running `export-picklist.mjs plan` while a skill is uncommitted and
+  confirming the row carries **UNCOMMITTED**.
+expected_effect: >-
+  The pick list can once again raise the flag SKILL.md tells the operator is decision-changing, so a
+  dirty tree is caught before an export publishes bytes attributed to a commit that does not contain
+  them — instead of the review reporting clean because the check is inert.
+risk: medium
+status: applied
+approved_by: auto-verified
+applied_at: 2026-08-28T09:40:00+07:00
+applied_notes: >-
+  Applied through sk-self-improve APPLY -> skill-creator on the autonomous-verified lane, with the
+  verifiers' corrections folded in (below) rather than the proposal as filed. Post-apply checks:
+  `node --check` passes on the script; the fixed logic, replayed against live `git status`, now
+  detects the dirty skill it previously missed (0 -> 1); the resolver replayed over the edited
+  categories.yaml resolves sk-agent-tray to `agents`; the bundle baseline was re-recorded and the
+  second `skill manifest --apply` run was a clean no-op; `skill doctor` OK at 0 errors / 2 notices
+  and `skill verify` OK — both the pre-run baseline.
+changes:
+  files: [scripts/export-picklist.mjs, skill.manifest.yaml]
+  version_from: 0.5.1
+  version_to: 0.5.2
+  commit: null
+
+# VERIFICATION RECORD — three independent adversarial refuters, each told to refute and to default to
+# refuted when uncertain: lens A (factual correctness of every citation), lens B (is the proposal
+# correctly aimed / would it make things worse), and a deciding third vote briefed to attack the
+# angles the first two might have missed. Result: refuted=false, floor_hit=false on all three.
+# Tally 3 of 3 non-refuted, 0 of 3 floor flags -> verified and below the floor -> auto-applied.
+
+# CORRECTIONS ACCEPTED — all four changed what was actually applied:
+#   1. CROSS-PLATFORM DERIVATION. The proposal said "ideally derive from the constant". The third
+#      verifier showed the two obvious derivations are BROKEN: join() yields '.agents\\skills' on
+#      Windows while git always emits forward slashes, so both `target.startsWith(SKILLS_REL)` and
+#      `SKILLS_REL.split('/')` pass on macOS and fail on Windows — a violation of the repo's
+#      cross-platform rule, and the same class of silent drift as the original bug. The applied fix
+#      uses the separator-agnostic form it specified:
+#        const SKILLS_PARTS = SKILLS_REL.split(/[\\/]/);
+#        ... parts[0] === SKILLS_PARTS[0] && parts[1] === SKILLS_PARTS[1] && parts[2]
+#   2. OVER-FIRE CHECKED, none found. The parser applies no status-code filter, so untracked `??`
+#      entries count — but `--ignored` is not passed and .gitignore covers node_modules/, __pycache__/
+#      and .venv. Re-running with --untracked-files=all yields exactly ONE dirty skill. Note the
+#      expected consequence: a skill self-flags as UNCOMMITTED right after an audit run writes its
+#      improvements/ and evals/ files. That is the intended signal, not noise — export copies disk
+#      bytes, so those files genuinely would be published unattributed.
+#   3. MANIFEST RE-RECORD IS MANDATORY, not optional. skill.manifest.yaml records this script's
+#      sha256 under bundle{}; without a re-record, `skill heal --restore` would put the OLD bytes
+#      back from git and silently revert this fix. The bundle WAS re-recorded after applying.
+#   4. REGRESSION TEST ADDED. The proposal offered only manual verification. Because this exact drift
+#      already went unnoticed for eight days and nothing under tests/ covers this script at all, a
+#      guard was added at tests/skills/skill-manager-picklist-dirty.test.mjs. It asserts the property
+#      rather than the literal — that the match site and SKILLS_REL cannot disagree — so the next
+#      canonical-tree move fails CI instead of going silent. MUTATION-VERIFIED: reintroducing the
+#      original `.sidekicks` literal makes the suite fail with "the dead `.sidekicks` literal must not
+#      come back"; restoring the fix returns 3/3 passing. That test file is repo-root surface, outside
+#      the skill folder, so it is NOT part of this artifact's changes.files.
+#   5. Reported, not fixed (pre-existing, out of scope): the git pathspec itself is SKILLS_REL, i.e.
+#      '.agents\\skills' on Windows. Worth a forward-slash constant next time this function is touched.

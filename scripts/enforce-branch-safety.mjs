@@ -12,11 +12,15 @@
 // HEAD under a running process swaps files beneath it; `git stash`, `reset --hard`,
 // `restore` and `clean` delete uncommitted work outright.
 //
-// Two decision strengths, evaluated per git invocation inside the command:
+// It also guards the OTHER worktree failure — the one that costs bandwidth and disk rather
+// than work: a fresh worktree starts with no `node_modules`, and the reflexive install there
+// re-downloads a dependency set that already exists in the main checkout next door.
 //
-//   ASK — a CONCURRENCY RISK only the user can weigh, because only they know what else
-//   is live in this checkout. The hook notifies and hands the call to them; approving
-//   the prompt is the go-ahead.
+// Two decision strengths, evaluated per invocation inside the command:
+//
+//   ASK — a risk only the user can weigh, because only they know what else is live in this
+//   checkout, or whether this branch's dependencies really diverged. The hook notifies and
+//   hands the call to them; approving the prompt is the go-ahead.
 //     1.  HEAD move with tracked changes present — `git switch <b>`, `git checkout <b>`,
 //         `git switch -c`, `git checkout -b`. Whether a process IS running here is the
 //         user's knowledge, not the hook's.
@@ -25,6 +29,13 @@
 //         prompt names the resolved destination path. Creating or checking out a
 //         PROTECTED branch gets its own reason on top — git locks a branch to one
 //         worktree, so the primary checkout can no longer return to it.
+//     5.  A package-manager INSTALL inside a linked worktree — `yarn`/`yarn install`,
+//         `npm install|ci|add`, `pnpm add`, `bun install`, … (CLAUDE.md → "Never install
+//         or build inside a worktree"). The fix named in the prompt is
+//         `sidekicks worktree link-deps`, which links the main checkout's tree instead.
+//         Builds and scripts are NOT matched — only commands that fetch a dependency tree.
+//         Whether the branch's package.json/lockfile genuinely diverged is the user's call,
+//         which is why this asks rather than denies: nothing is destroyed either way.
 //
 //   DENY — unconditional loss or breakage, with nothing for a human to weigh:
 //     2.  Destructive to the working tree with tracked changes present — `git stash`
@@ -36,7 +47,12 @@
 //         asks above, since a deny outranks them.
 //
 // Classes 1-3 pass untouched on a clean tree: the risk only exists when there is
-// uncommitted work to lose. Class 4 applies always — it does not depend on tree state.
+// uncommitted work to lose. Classes 4 and 5 apply always — neither depends on tree state.
+//
+// Class 5 rides in this hook rather than in one of its own because the alternative is a new
+// framework id plus four per-CLI wirings (Rule 6) for a single classifier. The cost of that
+// choice, stated because it is real: `sidekicks framework disable hook.enforce-branch-safety`
+// now switches off the install guard too.
 //
 // The reason is ALSO written to stderr on every non-allow decision, so a CLI whose hook
 // contract understands only allow/deny still surfaces the notification to the agent —
@@ -64,7 +80,7 @@
 //   node scripts/enforce-branch-safety.mjs --command "<shell command>" [--cwd <dir>]
 //   node scripts/enforce-branch-safety.mjs --event  # hook-shaped JSON on stdin, gate bypassed for tests
 
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, realpathSync, lstatSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { isAbsolute, resolve as resolvePath, relative, basename } from 'node:path';
 
@@ -305,6 +321,123 @@ function localBranchExists(dir, branch) {
   return !r.error && r.status === 0;
 }
 
+/**
+ * Package managers whose install-class subcommands download a dependency tree.
+ *
+ * A bare `yarn` (no subcommand) installs, which is why the set below is keyed on the binary and
+ * the subcommand is allowed to be absent for yarn only.
+ */
+const PACKAGE_MANAGER = /^(?:yarn|npm|pnpm|bun)(?:\.(?:exe|cmd|ps1))?$/i;
+
+/** Subcommands that fetch and write a dependency tree. `run`, `build`, `test`, … are NOT here. */
+const INSTALL_SUBCOMMANDS = new Set([
+  'install', 'i', 'ci', 'add', 'rebuild', 'update', 'up', 'upgrade', 'import', 'dedupe',
+]);
+
+/** Flags after which the next token is a directory, for the package managers above. */
+const PM_DIR_FLAGS = new Set(['--cwd', '-C', '--dir', '--prefix']);
+
+/**
+ * Is `dir` inside a LINKED worktree, and if so where is the main checkout?
+ *
+ * Decided by git, not by the `../worktrees/<slug>` path convention — the convention is this repo's
+ * habit, and a service repo's worktree may sit anywhere. In a main checkout the git dir and the
+ * common git dir are the same directory; in a linked worktree the git dir is
+ * `<common>/worktrees/<name>`. `--path-format=absolute` is required because the bare answers use
+ * different spellings in the two cases (`.git` vs an absolute path), which would compare unequal
+ * for every main checkout.
+ *
+ * @param {string} dir
+ * @returns {{main: string}|null} null when `dir` is not in a linked worktree (or git cannot say).
+ */
+function linkedWorktreeOf(dir) {
+  const r = spawnSync(
+    'git',
+    ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'],
+    { shell: false, encoding: 'utf8', windowsHide: true }
+  );
+  if (r.error || r.status !== 0) return null;
+  const [gitDir, commonDir] = String(r.stdout || '').split(/\r?\n/).map((s) => s.trim());
+  if (!gitDir || !commonDir) return null;
+  if (realOf(gitDir) === realOf(commonDir)) return null; // the main checkout itself
+  return { main: resolvePath(commonDir, '..') };
+}
+
+/**
+ * Classify ONE package-manager invocation — class 5.
+ *
+ * The rule (CLAUDE.md → "Never install or build inside a worktree"): a worktree that installs its
+ * own `node_modules` re-downloads a dependency set that already exists in the main checkout next
+ * door, paying for it twice in bandwidth and in disk. The fix is a directory link, which
+ * `sidekicks worktree link-deps` creates cross-platform.
+ *
+ * ASK, not deny: there IS something for a human to weigh — a branch whose `package.json` or
+ * lockfile genuinely diverged needs its own tree, and only the operator knows whether this is that
+ * branch. Nothing is destroyed either way, which is what separates this from the deny classes.
+ *
+ * @param {string[]} argv - argv with the package manager at [0], env assignments already stripped.
+ * @param {string} cwd    - the directory this invocation would run in.
+ * @returns {{decision: 'ask', reason: string}|null}
+ */
+function classifyInstall(argv, cwd) {
+  const head = basename(String(argv[0] ?? ''));
+  if (!PACKAGE_MANAGER.test(head)) return null;
+
+  const manager = head.replace(/\.(?:exe|cmd|ps1)$/i, '').toLowerCase();
+
+  let dir = cwd;
+  let sub = null;
+  for (let i = 1; i < argv.length; i += 1) {
+    const tok = String(argv[i]);
+    if (tok === '-h' || tok === '--help' || tok === '--version') return null;
+    if (PM_DIR_FLAGS.has(tok) && argv[i + 1] != null) {
+      dir = isAbsolute(argv[i + 1]) ? argv[i + 1] : resolvePath(dir, argv[i + 1]);
+      i += 1;
+      continue;
+    }
+    const eq = /^(--cwd|--dir|--prefix)=(.+)$/.exec(tok);
+    if (eq) {
+      dir = isAbsolute(eq[2]) ? eq[2] : resolvePath(dir, eq[2]);
+      continue;
+    }
+    if (tok.startsWith('-')) continue;
+    if (sub === null) sub = tok.toLowerCase();
+  }
+
+  // A bare `yarn` installs; every other manager needs an explicit install-class subcommand.
+  const installs = sub === null ? manager === 'yarn' : INSTALL_SUBCOMMANDS.has(sub);
+  if (!installs) return null;
+
+  const wt = linkedWorktreeOf(dir);
+  if (!wt) return null; // main checkout, or not a repo — installing there is the intended path
+
+  const spelled = sub === null ? manager : `${manager} ${sub}`;
+  const modules = resolvePath(dir, 'node_modules');
+  let already = '';
+  try {
+    if (lstatSync(modules).isSymbolicLink()) {
+      already =
+        '\nThis worktree\'s `node_modules` is ALREADY a link to the main checkout. Installing here ' +
+        'replaces that link with a second real tree — the exact duplication the link avoided.';
+    }
+  } catch { /* no node_modules yet — the ordinary case */ }
+
+  return {
+    decision: 'ask',
+    reason:
+      `PERMISSION NEEDED: \`${spelled}\` would install a SECOND dependency tree inside a linked ` +
+      `worktree (CLAUDE.md → "Never install or build inside a worktree"). The main checkout at\n` +
+      `  ${wt.main}\nalready has one, and linking to it costs nothing:\n` +
+      `  node bin/sidekicks worktree link-deps\n` +
+      '(POSIX symlink / NTFS junction, every package dir, and it never deletes an existing ' +
+      'install.) Builds, tests and the dev server run in the MAIN checkout.' + already +
+      '\nThe one case that justifies installing here is a branch whose package.json or lockfile ' +
+      'genuinely diverged from the main checkout — `link-deps` names those files when it warns. ' +
+      'Only the user can decide that, so ask them: approving this prompt IS that yes, and ' +
+      '`SIDEKICKS_BRANCH_SAFETY=off` is its standing form.',
+  };
+}
+
 const FIX_WORKTREE =
   'Create the work branch in a SIBLING WORKTREE instead — it never touches this checkout\'s HEAD ' +
   'or its uncommitted files:\n' +
@@ -510,7 +643,9 @@ function classify(argv, cwd) {
 function decide(command, cwd = process.cwd(), depth = 0) {
   if (!command) return null;
   const text = String(command);
-  if (!/\bgit\b/i.test(text)) return null;
+  // Cheap pre-filter, widened for class 5: the hook now also guards package-manager installs
+  // inside a linked worktree, and those commands name no `git` at all.
+  if (!/\bgit\b/i.test(text) && !/\b(?:yarn|npm|pnpm|bun)\b/i.test(text)) return null;
 
   let dir = cwd;
   for (const seg of segments(text)) {
@@ -553,7 +688,17 @@ function decide(command, cwd = process.cwd(), depth = 0) {
       }
     }
 
+    // The override authorizes THIS invocation, whichever class it falls into, and only as a real
+    // leading assignment on it (its own, or one carried by the `env`/wrapper that runs it).
+    const overridden = [...prefix, ...inner].some(isOverrideAssignment);
+
     if (!isGit(argv[0])) {
+      // Class 5 — a package-manager install inside a linked worktree. Checked here because these
+      // commands never contain the word `git`, so the git-only paths below cannot see them.
+      if (!overridden) {
+        const installDecision = classifyInstall(argv, dir);
+        if (installDecision) return installDecision;
+      }
       // Fail closed rather than fall through to allow: the segment names git, but it is hidden
       // inside a substitution this tokenizer cannot see through, so nothing here can honestly
       // say the command is safe.
@@ -571,9 +716,7 @@ function decide(command, cwd = process.cwd(), depth = 0) {
       continue;
     }
 
-    // The override authorizes THIS invocation, and only as a real leading assignment on it
-    // (its own, or one carried by the `env`/wrapper that runs it).
-    if ([...prefix, ...inner].some(isOverrideAssignment)) continue;
+    if (overridden) continue;
 
     const d = classify(argv, dir);
     if (d) return d;

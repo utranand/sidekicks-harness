@@ -94,8 +94,8 @@ a parallel group. Every step is one of two shapes:
   cwd (defaults to the repo root). A step carries `skill` **or** `run`, never both.
 
 **File-relative anchors (relocatable bundles).** A `work_dir`, `docs_dir`, or `artifacts_dir` whose
-value is `.` or `..`, or begins with `./` or `../` (a **leading-dot relative path**), is resolved **relative to
-the directory of the command-sequence file** — not the repo root. This is what lets a generated bundle
+value is `.` or `..`, or begins with `./`, `../`, `.\` or `..\` (a **leading-dot relative path**), is
+resolved **relative to the directory of the command-sequence file** — not the repo root. This is what lets a generated bundle
 (launcher + SQL + its own `*.commander.yaml`, all carrying `work_dir: .`) be moved anywhere inside the
 repo and still run. Any other relative value (`projects/…`, `.sidekicks/…`, a bare name) stays
 **repo-root-relative** as before; absolute stays absolute. Real repo-relative paths never start with
@@ -142,8 +142,12 @@ for all of them.
 file using the same numbered-line shape as (A) is equally valid.
 
 **Top-level keys.** Besides `steps:`, a file may carry `persistence: ralph` (an unattended-run hint —
-see *Unattended runs*) and a `jira: { card, env }` block (the tracking card progress mirrors to — see
-[Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card)). Both are top-level only.
+see *Unattended runs*), a `jira: { card, env }` block (the tracking card progress mirrors to — see
+[Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card)), and `work_item: <slug>` — the
+runs-layout-v2 work item the **whole run** belongs to, which is what binds `WORK_ITEM` for the run
+folder and the event sidecar (see [Run events](#run-events--the-diagnostic-sidecar)). All three are
+top-level only, and a `work_item=` handed in by an orchestrating caller **wins** over the file's own.
+The per-step `work_item?` above is unchanged — it stays what that step's own skill anchors to.
 
 > The full input-format spec, the fillable templates, and the *when-to-parallelize* rules live with the
 > **sk-sequence-planner** (`assets/*.template.yaml`, `assets/command-sequence.inline.txt`). If a
@@ -174,9 +178,18 @@ only *within* a parallel group with members targeting different scopes.
 commands (`sidekicks project create/add/remove/use/set-remote`, `service add/pull/remove/use`) write the shared
 `.sidekicks/` registry, not a disjoint `projects/<svc>/` subtree. Two in isolated worktrees would commit
 conflicting registry edits and the post-wave merge would conflict. So **registry-mutating CLI steps must
-be sequential — never fan them out**; sequence them as their own early stages. (Verification CLI steps —
-`npm test`/`lint`/`build` — only touch one service, so they fan out across services safely, like a
-developer wave.)
+be sequential — never fan them out**; sequence them as their own early stages.
+
+**Verification / build / install CLI steps are EXEMPT from worktree isolation.** A raw `run:` step —
+`npm test`, `lint`, `build`, `tsc`, any install — never executes `sidekicks project use` /
+`service use`, so it has no shared `.sidekicks/settings.json` race to isolate against, and each such
+command touches only its own service tree. So fan such steps out **plain-parallel in the main
+checkout** — never as `isolation: 'worktree'` members. A freshly created worktree carries no
+`node_modules` (and for a service that is its own repo/submodule, no checked-out `src/` at all), and
+CLAUDE.md's hard rule forbids the install that would follow: *"Never install or build inside a
+worktree … dev server, tests, builds and type checks execute in the primary local checkout."* Place a
+verification stage **after** the post-barrier branch merge of any preceding cross-scope wave — run
+before that merge, it tests a tree the wave's changes have not reached.
 
 **A shared `docs_dir` is the same class of hazard — worktrees do NOT fix it.** Two bmad steps carrying
 the **same** `docs_dir` (in the step field or embedded in their instructions) write the same
@@ -222,7 +235,9 @@ Things the template already encodes for you (don't re-derive them):
   bleed into another's. **For a CLI step** the brief tells the agent to run *exactly* that command in its
   `work_dir` (no improvising), set `ok=true` only on exit 0 — or when the command's effect already holds
   (a re-run `service add` reporting "already exists" is a benign success, keeping the 3× retry
-  idempotent) — and return the stdout/stderr tail.
+  idempotent) — and put the exit/stderr detail in `error` when it fails. Only **failure** detail is
+  captured: the `STEP` schema has no success-output field, and a stdout tail never rides in `handoff`
+  (one line, interpolated into every later brief).
 - **Cross-scope isolation + integration** — worktree members commit their disjoint subtree to a named
   branch; after the wave's barrier, one `integrate` agent merges those branches into the working tree
   (disjoint subtrees ⇒ no conflict) and removes the worktrees. A merge conflict there is proof the wave
@@ -288,6 +303,7 @@ so the script's `reconcileOnResume()` fires before its first transition:
 ```
 Workflow({ scriptPath: "<path>", resumeFromRunId: "<wf_id>", args: { runStamp: "<same stamp>",
   events: { runDir: "<repo-relative run dir>", runId: "<same run id>", workItem: "<slug>",
+            model: "<optional low-tier model id — the resume path uses it too>",
             reconcile: { currentState: "stage-1:done|stage-2:failed", legacyJson: "<the stages array as JSON>",
                          expectEvent: "step.failed", expectStep: "stage-2" } } } })
 ```
@@ -322,10 +338,18 @@ engine** for it.
 **The run dir and the run id** — resolved once, in your shell, at [step 1](#run-procedure-do-this):
 
 ```bash
+WORK_ITEM="<the work item this run belongs to: a work_item= handed in by an orchestrating caller WINS; else the sequence's own top-level work_item, or the value every step shares; empty when there is none>"
+STAGES_N="<the stage count — fill it from the parse (step 2); leave the --detail off if you are opening the sidecar before you have it>"
 RUNDIR="$(node "$ROOT/bin/sidekicks" scope run-base sk-commander ${WORK_ITEM:+"$WORK_ITEM"})"
 RUNREL="${RUNDIR#"$ROOT"/}"          # repo-relative — never bake a machine-absolute path into the script
 RUNID="commander-$STAMP"             # portable, stable across resumes of the same run
 ```
+
+**Bind those two explicitly — they are not ambient.** Both come from the parse
+([step 2](#run-procedure-do-this)): the sequence's top-level `work_item` and its stage count. Leave
+`WORK_ITEM` empty when the sequence carries none (the `${WORK_ITEM:+…}` form below then simply omits the
+flag). Skip the binding and it is left implicit, so a run can fall into `_adhoc/sk-commander` even when
+its sequence names a work item.
 
 **The five legs, in the order the framework fixes them** (`lib/run-events/schema.mjs`
 `DUAL_WRITE_STEPS`). All of them go through the skill's own helper, which builds the intent and hands
@@ -343,15 +367,27 @@ the write to the CLI:
 RE="$ROOT/.agents/skills/sk-commander/scripts/run-event.mjs"
 node "$RE" preflight --run-dir "$RUNDIR" --json     # exit 0 = on; exit 4 = OFF for this run
 node "$RE" append --run-dir "$RUNDIR" --run-id "$RUNID" --event run.created --status pending \
-  --work-item "$WORK_ITEM" --detail stages=<n> --json
+  ${WORK_ITEM:+--work-item "$WORK_ITEM"} --detail "stages=$STAGES_N" --json
 node "$RE" append --run-dir "$RUNDIR" --run-id "$RUNID" --event run.started --status running --json
 ```
+
+Make the whole `--work-item` **flag** conditional, not just its value, and keep `--detail` quoted:
+unquoted `stages=<n>` is shell **redirection**, not a placeholder — the shell reads `<n>` and `>` and
+creates a file named `--json`.
 
 Then pass the binding into the Workflow and the template does the rest:
 
 ```
-args: { runStamp, jira: { card, env }, events: { runDir: "<RUNREL>", runId: "<RUNID>", workItem: "<slug>" } }
+args: { runStamp, jira: { card, env }, events: { runDir: "<RUNREL>", runId: "<RUNID>", workItem: "<slug>",
+        model: "<optional low-tier model id>" } }
 ```
+
+`events.model` is **optional**: a **low-tier** model for the event emitters, which each run one literal
+command and report an exit code (CLAUDE.md's tier table — Low = mechanical/bulk fan-out). Resolve that
+tier to an id that exists in *this* runtime and verify it resolves before passing it; omit the field and
+the emitters inherit the session model. It is the per-step `model?` field above applied to the sidecar's
+own writes — read that for how a pin behaves — and the [resume](#resume--via-the-workflow-journal) path
+passes it again with the rest of `args.events`.
 
 **The two failure modes are answered differently, and the difference is the whole design:**
 
@@ -454,8 +490,9 @@ Invoke the skill "<skill>" to accomplish ONE step of a larger orchestrated seque
 - Context from earlier stages (already complete): <one line per prior step: what it produced + paths;
   omit if first stage>
 
-Pass work_dir=<work_dir> (docs_dir=<docs_dir> and work_item=<work_item>, when set) to the skill so it
-anchors there, then run it to completion. Report tersely
+Pass the anchors above that have a value (`work_dir=…`, `docs_dir=…`, `work_item=…`) to the skill so it
+anchors there; if none are set, pass no anchor flags and let the skill use its own scope resolution.
+Then run it to completion. Report tersely
 for an orchestrator, not a human: (a) success or failure (success ONLY if the skill's success condition
 is genuinely met), (b) the absolute paths you wrote/changed, (c) the one-line handoff for the next stage.
 
@@ -478,8 +515,8 @@ steps, or run anything else.
 cd into the working directory (if given) and run the command. Report tersely for an orchestrator:
 (a) success or failure — ok=true ONLY if it exited 0, OR its effect already holds (e.g. a `service add`
 that reports the target already exists is a benign success on a re-run), (b) any paths it created/changed,
-(c) a one-line handoff (the command and its outcome) for the next stage. Put the stdout/stderr tail in
-the handoff on success or the error on failure.
+(c) a one-line handoff (the command and its outcome) for the next stage. On failure, put the
+stderr/exit detail in the error field.
 ```
 
 **Worktree addendum** (append for cross-scope members):
@@ -543,7 +580,9 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
    **Check whether you have a `Workflow` tool** — if not, switch to the
    [Fallback](#fallback--when-the-workflow-tool-isnt-available) for steps 4–6 (everything else is identical).
 2. **Parse the sequence** from the inline list or command file into an ordered list of stages (single
-   steps and parallel groups). **Read the top-level `jira:` block** if present. If there is **none** and
+   steps and parallel groups). **Read the top-level `jira:` block** if present, and pick up the
+   top-level `work_item:` and the **stage count** — those two bind `WORK_ITEM` and `STAGES_N` for the
+   sidecar ([Run events](#run-events--the-diagnostic-sidecar)). If there is **none** and
    the user hasn't said to skip tracking, ask **once**: *"Track this run on a Jira card? Give me the
    issue key + env alias, or say none."* A card (given or already bound) turns on mirroring; "none"/skip
    leaves it off. Never block the run on the answer. See
@@ -568,9 +607,9 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
    "draft a sequence", "what would this look like", "validate this" — that's the
    sk-sequence-planner; hand it over instead of running.)
    3a. **Resolve file-relative anchors** (only when the sequence came from a **file**). For every step,
-   rewrite any leading-dot `work_dir` / `docs_dir` / `artifacts_dir` (`.`, `..`, `./…`, `../…`; also
-   `docs_dir=` / `artifacts_dir=` embedded in instruction text) to a **repo-relative** path before
-   authoring the script — the Workflow runtime has no filesystem access, so this must happen now, in
+   rewrite any leading-dot `work_dir` / `docs_dir` / `artifacts_dir` (`.`, `..`, `./…`, `../…`, `.\…`,
+   `..\…`; also `docs_dir=` / `artifacts_dir=` embedded in instruction text) to a **repo-relative** path
+   before authoring the script — the Workflow runtime has no filesystem access, so this must happen now, in
    your shell. The bundled helper is deterministic + cross-platform and passes repo-relative and
    absolute values through unchanged — but it takes ONE **already-extracted** anchor value as `$VALUE`,
    it does **not** parse tokens. So resolve each anchor by where it lives:
@@ -604,7 +643,9 @@ run ID/scriptPath (there is none); cite the worktree paths of any un-integrated 
 5. **If a card is bound, post the `started` bookend** (card → in-progress) *before* launching — see
    [Jira tracking](#jira-tracking--mirror-each-step-to-the-bound-card) — **append `run.started`** when
    events are on, then **run it** via the `Workflow` tool with
-   `args: { runStamp, jira: { card, env }, events: { runDir, runId, workItem } }` (omit `jira` when
+   `args: { runStamp, jira: { card, env }, events: { runDir, runId, workItem, model } }` (`model` is the
+   optional low-tier emitter model described in [Run events](#run-events--the-diagnostic-sidecar) — omit
+   it and the emitters inherit the session model; omit `jira` when
    unbound, omit `events` when preflight said the sidecar is unavailable). It runs in the background and
    notifies you on completion; the user can watch live with `/workflows`.
 6. **On completion**, read the workflow's returned `{ status, summary, event_sidecar, … }` and report

@@ -311,8 +311,14 @@ Timestamps: run \`date -u +%Y-%m-%dT%H:%M:%SZ\` at the very start of your work (
   const dd = step.docs_dir || 'none — the skill defaults its artifacts to its own run base (runs layout v2: a work_item facet, else _adhoc/<skill-id>/docs)'
   const wi = step.work_item || 'none — the skill self-derives one, or falls back to _adhoc/'
   const inputs = (step.inputs && step.inputs.length) ? step.inputs.join(', ') : 'none'
+  const wdSuffix = step.work_dir ? ' work_dir=' + step.work_dir : ''
   const docsSuffix = step.docs_dir ? ' docs_dir=' + step.docs_dir : ''
   const workItemSuffix = step.work_item ? ' work_item=' + step.work_item : ''
+  // Every anchor token disappears when unset, so no case renders a placeholder as a flag VALUE.
+  const anchorFlags = [wdSuffix, docsSuffix, workItemSuffix].join('').trim()
+  const anchorLine = anchorFlags
+    ? `Pass ${anchorFlags} to the skill so it anchors there`
+    : 'Pass no anchor flags — let the skill use its own scope resolution'
   return `Invoke the skill "${step.skill}" to accomplish ONE step of a larger orchestrated sequence.
 
 - work_dir: ${wd}
@@ -323,7 +329,7 @@ Timestamps: run \`date -u +%Y-%m-%dT%H:%M:%SZ\` at the very start of your work (
 - Context from earlier stages (already complete):
 ${ctx}
 
-Pass work_dir=${step.work_dir || '(omit)'}${docsSuffix}${workItemSuffix} to the skill so it anchors there, then run the skill to
+${anchorLine}, then run the skill to
 completion. Report tersely for an orchestrator, not a human: set ok=true ONLY if the skill's success
 condition is genuinely met; list absolute paths in outputs; give a one-line handoff for the next stage.
 

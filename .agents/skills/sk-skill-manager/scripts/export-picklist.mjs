@@ -55,6 +55,9 @@ import { dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from
 import { fileURLToPath } from 'node:url';
 
 const SKILLS_REL = join('.agents', 'skills');
+// SKILLS_REL's segments, split separator-agnostically so dirtySkills() can compare against the
+// constant instead of repeating its literals (see the comment at the comparison site).
+const SKILLS_PARTS = SKILLS_REL.split(/[\\/]/);
 
 function fail(msg) {
   process.stderr.write(`export-picklist: ${msg}\n`);
@@ -136,7 +139,13 @@ function dirtySkills(root) {
     // Handle a rename's "old -> new" form by taking the destination.
     const target = path.includes(' -> ') ? path.split(' -> ').pop() : path;
     const parts = target.split(/[\\/]/);
-    if (parts[0] === '.sidekicks' && parts[1] === 'skills' && parts[2]) dirty.add(parts[2]);
+    // Compare against SKILLS_REL's own segments, never a literal: this check silently died at
+    // 9c9654c1 (the .sidekicks/skills -> .agents/skills rename) because the constant moved and the
+    // literal here did not, leaving dirtySkills() permanently empty and the UNCOMMITTED flag dead
+    // for eight days. Split the constant the same separator-agnostic way the path above is split —
+    // join() yields '.agents\\skills' on Windows while git always emits forward slashes, so
+    // startsWith(SKILLS_REL) or a '/'-only split would break on one platform or the other.
+    if (parts[0] === SKILLS_PARTS[0] && parts[1] === SKILLS_PARTS[1] && parts[2]) dirty.add(parts[2]);
   }
   return dirty;
 }

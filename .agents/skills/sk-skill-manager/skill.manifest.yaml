@@ -79,12 +79,18 @@ not_required:
       why: 'named in SKILL.md only to explain WHY this skill claims criterion.new-skill-checklist through that file''s owners[] array rather than redeclaring it in skill.yaml. The skill never reads or runs the module, and a lifted copy loses nothing: the sentence explaining the mechanism travels with SKILL.md.'
     - path: lib/skill-lifecycle/known-gaps.mjs
       why: 'named in SKILL.md only to explain why anchor validation is a judgement mode rather than a repo-wide audit check, the shrink-only ratchet being the constraint. Citing the module that holds a rule is not reading it.'
+    - path: lib/skill-lifecycle/_shared.mjs
+      why: 'named in SKILL.md only to say WHERE the fixed backup path artifacts/runs/skill-manager/backups/<stamp>/<skill>/ is hand-joined, so a reader knows artifacts_dir= cannot move it. The skill never reads or runs the module; naming the file that implements a path is not depending on it.'
+    - path: lib/skill-lifecycle/remove.mjs
+      why: 'named in SKILL.md alongside _shared.mjs as the SECOND hand-join of the same backup literal — skill remove uses its own local backupSkill() rather than the shared helper. Cited to locate the behaviour, never read or invoked by this skill.'
+    - path: lib/skill-lifecycle/export.mjs
+      why: 'named in SKILL.md only to say that --category is genuinely implemented there even though sidekicks skill --help omits it, so its absence from the help roster is not read as the flag being gone. The skill drives the export VERB through bin/sidekicks, never this module directly.'
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:e271724e0f7ab5fa4bc90c9b84a940774781d07832dcbd54d0f83be6acf2d47e
+  SKILL.md: sha256:475911883d18beca8efbcd7ec8a0c4f05061e8fa049f2618e6b30172f1757a9e
   VERSION.json: sha256:206f32a6bb6d3831419e5bd2c515c43ac61081e04987da07d8d028fdaf2e13e2
-  assets/categories.yaml: sha256:713bf1feee06f3b48101391212afdffe917ecf40a708303e330d20a8c6c37257
+  assets/categories.yaml: sha256:507d1ed2da411953ded764a34929e59209a5532ba85a36776cec5e63868e2d26
   assets/not-carried-withholding.md: sha256:2b2ef8582cede5c7eb2ebeaa3f24a169869911d9e45ee1774890f4ab83177e25
   assets/repo-templates/LAYOUT.private.md: sha256:e112f53c9c8d1e48608befb46884968165f52d9db7cd2689147da4dfeb109983
   assets/repo-templates/LAYOUT.public.md: sha256:d347308d4a8cf04bf964e812d93b7bb8a6656d85ef35bbb6adbb58b3407b74d9
@@ -105,16 +111,33 @@ bundle:
   assets/repo-templates/categories/planning.md: sha256:6c69a5d1999e3b02b278bcfb2c302d72c700a2fe695e2a111fb125ee31061674
   assets/repo-templates/categories/skill-improvement.md: sha256:5dcc813f12bfc42791082eae50b296bc895c570bcad57a391a757a89130c5df4
   assets/repo-templates/gitignore: sha256:336142e039f27ceb9193cb08a27f4585f5c40084d7b8d9ccc758c1b8464ae9cf
-  config.defaults.yaml: sha256:ef7da9bae7a6b000b67f9356515c375bf218a64876827867c4cdb13891e82725
+  config.defaults.yaml: sha256:eab835e381946c18901d04701e44ca5aa7dec37196c24090c1b261ca8047d9bf
+  evals/trigger-eval.json: sha256:d8c9920372dd7d7c679ef88d0a0c03912d5e324feb1349e016ef278d7732af25
   improvements/001-export-destination-registry.yaml: sha256:a0fef4adc949db07c59239e892b296b1a1881903cf821b248f734742327c0c1c
   improvements/002-export-picklist-selection.yaml: sha256:a25e3425ae576dfa8e91d6fddb7611c50e552d5d3c1385fb103fd33f94b4f260
   improvements/003-discover-by-intent.yaml: sha256:0146084a6303928ad8c4ca3c145b3d027492517c222c38a5791b1c60dabc42da
-  improvements/INDEX.md: sha256:6baa5ab71715b970c643d6942a988adc98ad9c3a2325073cc8505fa20cc3f328
+  improvements/004-trigger-eval-set.yaml: sha256:bd627054ec81dfc5e33b4a410d789c3d31958fb6ae93fe229bdd7f0203c9ad99
+  improvements/005-broken-guide-links.yaml: sha256:34aeab40a88fc25ab1284a0d896631986c2b3adb7066fb4b0f006f95451a3d5d
+  improvements/006-stale-manifest-check-claim.yaml: sha256:6e7f351a85f9efd3a83d14b53a5e5da2781eff70dd96e3f6e8c93725fe08adfd
+  improvements/007-offload-routing-contradiction.yaml: sha256:365606e9d8a8ae4139b3f391762ed4a07801224d82c60331c5faa3d7c31c4406
+  improvements/008-import-backup-path.yaml: sha256:7195e1eceefc4a14f4dc16b00a4f1860a5b46fa7e595184e3e0d2bc17cdc3e10
+  improvements/009-architect-pre-v2-runbase.yaml: sha256:2f3bfe4a72f36e966f512e5fca67181fc70418d8d09efd0df8b4a6102a7d3c8e
+  improvements/010-not-carried-append-unwired.yaml: sha256:3fb3c130b39b942035154e7bdcdc64f76a345a5737ac8b174b3e9dd2b1567ed8
+  improvements/011-help-not-authoritative.yaml: sha256:85c376e5b8fe66078371af34ab4774ae5f03f7d7d09bf833d5b78be1315fc921
+  improvements/012-progressive-disclosure-bootstrap-settings.yaml: sha256:bab7f24508f13fd72fae5a65d84910d4ef43ac27728d206a8af131b99bf3c95d
+  improvements/013-description-trim-and-offload-boundary.yaml: sha256:b97b2542687cf320e8304b865c4d996006c99b024879b68ec6cd8dbc287be17e
+  improvements/014-repo-layout-doc-stale-at-layout-3.yaml: sha256:b80a9cb4d2cfea699162f28a1007cf9c1cc8be8202dfc972619727c0f1b4d744
+  improvements/015-repo-layout-doc-dead-source-repo-url.yaml: sha256:453c7fe4433fe274438b1b89113a6b6b69b991c205a407a968eec8a12ff80055
+  improvements/016-require-clean-bundle-inert.yaml: sha256:6350c765375dc5fab1c01aa83e92b6ba7f04d546df607ed2ddf94cfeefa770e1
+  improvements/017-eval-set-mode-coverage.yaml: sha256:1e717717abaa1207581fe454f0cb3a45e82dd63f43cabb0f6d8d258ccd36744f
+  improvements/018-picklist-dirty-detection-dead.yaml: sha256:c35045576543a8c99600eea974eb61e918740984e29df84b15d6933ff07c3bd7
+  improvements/019-agent-tray-browses-under-ops.yaml: sha256:9412ac00ef600431f11f34a26b8a18268d33a84a8c7c3d05565e3cb937ec7d5b
+  improvements/INDEX.md: sha256:7d635af3dbaeed04f00451fee6e819d7a78aea8552d7c08682679d521b9b3a3b
   references/publication-split.md: sha256:e86d7b693e3afceccb6454a4d91e519d9966217cc967a1fe85ad4fe8d67b38ce
-  references/skill-repo-layout.md: sha256:6b958be2fd0f9f8bfaba286f4d9572dea9a49b6591de47d65d2e239585520b86
+  references/skill-repo-layout.md: sha256:cf8cafdf6b2a8ae6a4842649a48d2a509645e800e3b3730cf47b0ff4e49f35c2
   scripts/category-doc.mjs: sha256:6c51394559d322d0d0b90ceff84c7f2fc05ccff4c723f97cc11ab649554a7cf0
-  scripts/export-picklist.mjs: sha256:06e777533b2729466f0403ab25ca5d64da280a9f462ee345dabd0e5e4c51770f
-  scripts/skill-repo-not-carried.mjs: sha256:6fe2e48442b9386e583ef3d035b0bc0deac0e7d07bd36da8d1add1696aadf51b
+  scripts/export-picklist.mjs: sha256:eee168c433c2fd651a439ad274996d254ed6314f7dffc76abc6d991e515f3b17
+  scripts/skill-repo-not-carried.mjs: sha256:316b261d2c887b5be6e0bada26ad082a9f11185dc76fae6e1c7f6b5462324a26
   scripts/skill-repo-readmes-private.mjs: sha256:2c32ac9860640dec9be2218dee7a3ed94dba0c1748d462f847889ed60d6f9271
   scripts/skill-repo-readmes-public.mjs: sha256:913942b4f25eab31890ba728553838349477629823afcdce8360e22b623d6862
   scripts/skill-search.mjs: sha256:63daac8ee2709c8d2fd00faae31d942e7b526c58cce2e9d1fb8a0138f3f01aeb
