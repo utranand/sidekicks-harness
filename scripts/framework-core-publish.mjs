@@ -3,7 +3,7 @@
 //
 // Publish the framework core — forge the mountable core repo from THIS repo, stamp
 // its version, and auto-write the release log. One command instead of the six-step
-// hand sequence in docs/guide/framework-as-submodule.md § Building and releasing a
+// hand sequence in docs/guide/v1.5/framework-as-submodule.md § Building and releasing a
 // core, which was easy to run with a stale --core-version or with no record of what
 // the release actually contained.
 //
@@ -41,6 +41,14 @@
 // Verbs:
 //   status              what changed since the last publish + the next version (exit 10 if pending)
 //   publish             forge + stamp + verify + append the log entry + commit locally
+//   ship                ONE command for the whole release: serve anything already cut, publish, then
+//                       serve that. A composition of the verbs below — it re-invokes this script
+//                       rather than re-implementing them, so it cannot drift from running them by
+//                       hand. Refuses a dirty core-bound tree; plan-only until --yes.
+//   release             the OUTWARD half of a publish: push the tag, push the core branch, verify
+//                       the remote actually serves it, then push the source work branch. Plan-only
+//                       until --yes. Pushes the TAG FIRST so the README can never reach the core's
+//                       default branch naming a tag the remote does not serve.
 //   verify              run every gate against an already-forged core, publish nothing
 //   verify-remote       ask the core's remote what it actually serves and record the answer
 //                       (read-only: `git ls-remote`, never a push). Nothing else here reaches a
@@ -63,6 +71,13 @@
 //                              appending a duplicate, move its tag with -f, and skip the
 //                              already-released refusals. The operator's explicit per-invocation yes,
 //                              same shape as --allow-protected — never self-granted.
+//   --branch NAME              with ship: the work branch to move a protected repo onto
+//                              (default: chore/framework-core-release)
+//   --yes                      with ship and release: actually push. Without it release prints the plan and
+//                              writes nothing. The operator's explicit per-invocation yes, the same
+//                              shape as --allow-protected and --reland — never self-granted.
+//   --allow-unlogged-tags      with release: push even though the remote already serves a tag that
+//                              has no release-log entry
 //   --dry-run                  with publish: show the forge command and the log entry, write nothing
 //   --json                     machine-readable output (status)
 //
@@ -79,6 +94,9 @@
 //   3 missing target, version conflict, or an already-released version with no recorded baseline
 //   4 forged, gated and logged, but NOT landed locally (protected branch, or a tag that would move)
 //   5 the forged tree DIVERGES from the recorded content of that already-released version
+//   6 release: a push was refused by the remote, or would not fast-forward (nothing was pushed)
+//   7 release: the pushes landed but the remote still does not serve the release
+//   8 release: refused for policy — a protected target branch, or a served-but-unlogged tag
 //  10 status: a release is pending
 //
 // Pure Node, no shell-isms beyond git/node spawns — runs identically on macOS,
@@ -976,6 +994,27 @@ async function doStatus() {
   const { base: versionBase, resumed, conflict } = releaseBase(ver);
   const next = flag("version") || bumpVersion(versionBase, bump);
 
+  // What the REMOTE has to say, read from state.json only — `status` never reaches the network.
+  // Three states, not two, and the distinction is the one state.json's own comment fixes: absence
+  // means "not verified", NEVER "verified false". A fresh clone has asked nobody, and reporting that
+  // as NOT SERVED would make every clone look like a failed release. Only a recorded negative is a
+  // negative. Before this, a never-pushed release looked identical to a published one — which is how
+  // v1.4.1 sat unpushed while every local signal said the release was done.
+  const stateNow = readJson(STATE_REL) || {};
+  const lastLocal = lastRelease(stateNow);
+  const verified = stateNow.remote_verified && lastLocal
+    && String(stateNow.remote_verified.version) === String(lastLocal.version)
+    ? stateNow.remote_verified
+    : null;
+  const negative = stateNow.remote_check && lastLocal
+    && String(stateNow.remote_check.version) === String(lastLocal.version)
+    && stateNow.remote_check.ok === false
+    ? stateNow.remote_check
+    : null;
+  const remoteState = verified ? "served" : negative ? "not_served" : "unverified";
+  // Only classified against the remote when there ARE orphans, so an ordinary status stays offline.
+  const orphanTags = unloggedTags();
+
   const result = {
     runtime: RUNTIME_NAME,
     target: portable(SRC_REL),
@@ -1004,6 +1043,13 @@ async function doStatus() {
     inventory_source: cls.inventory_source,
     delta: rows,
     next_version: next,
+    remote_state: remoteState,
+    remote_verified_version: verified ? String(verified.version) : null,
+    remote_checked_at: (verified && verified.verified_at)
+      || (negative && negative.checked_at)
+      || null,
+    unpushed_release: remoteState === "served" || !lastLocal ? null : String(lastLocal.version),
+    unlogged_tags: orphanTags,
   };
 
   if (JSON_OUT) {
@@ -1066,6 +1112,32 @@ async function doStatus() {
     } else {
       out.push("  No release owed.");
     }
+
+    out.push("");
+    if (remoteState === "served") {
+      out.push(`  remote:      SERVED — v${result.remote_verified_version} verified at ${result.remote_checked_at}`);
+    } else if (remoteState === "not_served") {
+      const first = (negative.checks || []).find((c) => c && c.ok === false);
+      out.push(`  remote:      NOT SERVED — v${lastLocal.version}: ${first ? first.detail : "the remote does not serve this release"}`);
+      out.push("               finish it: node scripts/framework-core-publish.mjs release --yes");
+    } else if (lastLocal) {
+      out.push(`  remote:      NOT VERIFIED — v${lastLocal.version} is a LOCAL release; nothing has asked the remote.`);
+      out.push("               run: node scripts/framework-core-publish.mjs verify-remote");
+    }
+
+    if (orphanTags.length) {
+      out.push("");
+      out.push(`  UNLOGGED TAGS: ${orphanTags.length} tag(s) in the core with no release-log entry —`);
+      out.push("  cut outside this script, so nothing recorded what they contain.");
+      for (const t of orphanTags) {
+        const where = t.served === true
+          ? "SERVED by the remote — do NOT delete it; backfill its log entry instead"
+          : t.served === false
+            ? "local only, never pushed — deleting it is safe"
+            : "remote unreachable, so whether it is published is unknown";
+        out.push(`    ${t.tag}  ${where}`);
+      }
+    }
     process.stdout.write(out.join("\n") + "\n");
   }
   // Exit 10 on a pending release so a hook or sequence step can gate on it; a dirty
@@ -1074,7 +1146,57 @@ async function doStatus() {
 }
 
 // ── publish ─────────────────────────────────────────────────────────────────
-function renderLogEntry({ version, prevVersion, head, branch, pending, uncommitted, when, forgeCmd, surfaceSource, cls, rows, gates }) {
+// Two file lists, never one. They answer different questions and conflating them is what made
+// v1.4.1's entry claim AGENTS.md shipped: `coreDiff` is what the release CONTAINS (hashed forged
+// trees, before vs after); `pending.files` is the SOURCE churn that justified cutting it. A source
+// path can be core-bound and still leave the forged tree untouched — that is not a bug, it is the
+// difference between a reason and a payload.
+function renderCoreDiff(coreDiff, prevVersion) {
+  const lines = [];
+  if (!coreDiff) return lines;
+  if (coreDiff.baseline === "none") {
+    lines.push(
+      "**What this release changed in the core** — baseline forge: no previously published core to " +
+        `diff against, so all ${coreDiff.fileCount} forged file(s) are new.`
+    );
+    return lines;
+  }
+  if (!coreDiff.rows.length) {
+    lines.push(
+      "**What this release changed in the core** — nothing. The forged tree is byte-identical " +
+        "(wall-clock timestamps masked) to the one that preceded it: this release is a re-forge of " +
+        "the same content. Any source churn listed below never reached the core."
+    );
+    return lines;
+  }
+  const qualifier =
+    coreDiff.baseline === "previous-release"
+      ? `against the forged tree of v${coreDiff.baselineVersion}`
+      : `against the tree ON DISK, which was DIRTY — treat this as indicative, not as a diff ` +
+        `against the previous release. A previously REFUSED ` +
+        `re-publish is the usual reason: it forges before it compares, so the next run finds the ` +
+        `tree it wrote rather than the released one`;
+  lines.push(
+    `**What this release changed in the core** — ${coreDiff.rows.length} path(s), ${qualifier}. ` +
+      "Computed by hashing the forged tree before and after the forge."
+  );
+  lines.push("");
+  lines.push("<details><summary>Core files</summary>");
+  lines.push("");
+  for (const row of coreDiff.rows.slice(0, 200)) lines.push(`- \`${row}\``);
+  if (coreDiff.rows.length > 200) lines.push(`- … and ${coreDiff.rows.length - 200} more`);
+  lines.push("");
+  lines.push("</details>");
+  lines.push("");
+  lines.push(
+    "> Counts here will not match the README's `## Changes in this release` table: that delta skips " +
+      "symlinks and masks shas, this one follows symlinks and masks only timestamps. Both are " +
+      "correct for their audience — the README's is consumer-facing, this one is release-engineering."
+  );
+  return lines;
+}
+
+function renderLogEntry({ version, prevVersion, head, branch, pending, uncommitted, when, forgeCmd, surfaceSource, cls, rows, gates, coreDiff = null }) {
   const lines = [];
   lines.push("");
   lines.push(`## v${version} — ${when.date}`);
@@ -1085,6 +1207,8 @@ function renderLogEntry({ version, prevVersion, head, branch, pending, uncommitt
       (cls ? ` Version class **${cls.kind}** — ${cls.reasons.join("; ")}.` : "")
   );
   lines.push("");
+  for (const line of renderCoreDiff(coreDiff, prevVersion)) lines.push(line);
+  if (coreDiff) lines.push("");
   if (pending.unknownBase) {
     lines.push(
       "Baseline release — no previous published commit to diff against, so the change list is not derivable."
@@ -1092,7 +1216,7 @@ function renderLogEntry({ version, prevVersion, head, branch, pending, uncommitt
   } else if (!pending.commits.length && !pending.files.length) {
     lines.push("No core-bound source change since the previous release (re-forge only).");
   } else {
-    lines.push(`**Core-bound changes** — ${pending.commits.length} commit(s), ${pending.files.length} file(s):`);
+    lines.push(`**Core-bound source changes** — ${pending.commits.length} commit(s), ${pending.files.length} file(s):`);
     lines.push("");
     lines.push("| Commit | Subject |");
     lines.push("|---|---|");
@@ -1100,7 +1224,12 @@ function renderLogEntry({ version, prevVersion, head, branch, pending, uncommitt
       lines.push(`| \`${c.sha}\` | ${c.subject.replace(/\|/g, "\\|")} |`);
     }
     lines.push("");
-    lines.push("<details><summary>Files</summary>");
+    lines.push("<details><summary>Source files changed (provenance)</summary>");
+    lines.push("");
+    lines.push(
+      "Paths in THIS repo that changed since the previous release's source commit — the REASON for " +
+        "the release, not its contents. What actually shipped is the core-file list above."
+    );
     lines.push("");
     for (const f of pending.files) lines.push(`- \`${f}\``);
     lines.push("");
@@ -1332,6 +1461,15 @@ function mountCheck() {
     const doctor = nodeStep([join(ws, "bin", "sidekicks"), "core", "doctor", "--all"], ws);
     if (!doctor.ok) {
       return { ok: false, note: "core doctor --all failed in the mounted workspace", tail: doctor.tail };
+    }
+    // The doctors answer "is this workspace healthy". They do not answer "does this workspace pass
+    // its own gates", and the two came apart: `check run quick` was red in EVERY mounted workspace
+    // while this gate was green, because catalog.check resolved framework paths against the
+    // workspace root and tests.contract named files a mount does not carry at that path. The release
+    // path already builds a real mount here; it simply never asked (INC-2026-09-04-01, F-3).
+    const check = nodeStep([join(ws, "bin", "sidekicks"), "check", "run", "quick", "--json"], ws);
+    if (!check.ok) {
+      return { ok: false, note: "check run quick failed in the mounted workspace", tail: check.tail };
     }
     return { ok: true };
   } catch (err) {
@@ -1778,11 +1916,34 @@ async function doPublish() {
     );
     out.push("");
     out.push(
-      renderLogEntry({ version, prevVersion: ver.marker, head: head.sha, branch: head.branch, pending, uncommitted, when, forgeCmd, surfaceSource: source, cls, rows, gates: null })
+      // coreDiff is null: the forge has not run, so there is no forged tree to diff against.
+      renderLogEntry({ version, prevVersion: ver.marker, head: head.sha, branch: head.branch, pending, uncommitted, when, forgeCmd, surfaceSource: source, cls, rows, gates: null, coreDiff: null })
     );
     process.stdout.write(out.join("\n") + "\n");
     process.exit(0);
   }
+
+  // The tree as it stands BEFORE the forge overwrites it. This is the only moment it can be
+  // captured, and it is what turns the log's file list from "what changed in the SOURCE repo" into
+  // "what changed in the CORE" — two different questions the log used to answer with one list, which
+  // is how v1.4.1's entry came to name AGENTS.md as shipped when the forged core carried no such
+  // change. `coreTreeClean()` decides whether the snapshot is the previous release's tree or merely
+  // whatever is on disk; the entry SAYS which, rather than presenting a dirty diff as an exact one.
+  //
+  // Deliberately a second walk rather than reusing the opportunistic snapshot at the already-released
+  // check above: that one sits before this function's dry-run exit and before the no-baseline
+  // refusal, and hoisting it would move a filesystem walk across both.
+  const preForge = normalizedTreeHash(SRC_ABS);
+  // "Is this tree the previous release?" is a cleanliness question, and which repo answers it
+  // depends on who tracks the core: its own repo when it has one, otherwise this repo's index over
+  // the target path. Asking only `coreTreeClean()` would call every non-submodule target dirty and
+  // stamp a correct diff with a false warning.
+  const preForgeDirty = targetIsOwnRepo()
+    ? !coreTreeClean()
+    : (() => {
+        const st = git(["status", "--porcelain", "--", SRC_REL]);
+        return !st.ok || st.out !== "";
+      })();
 
   // 1) Forge. Inherited from the working tree, one-way, prune-exact.
   out.push("── forge ───────────────────────────────────────────");
@@ -1850,11 +2011,29 @@ async function doPublish() {
     }
   }
 
+  // What this release changed IN THE CORE, from the two forged-tree hashes. `baseline` is carried
+  // with it so the entry can qualify itself instead of overstating: only a clean core repo whose
+  // marker names the previous release makes `preForge` that release's tree.
+  const coreDiff = {
+    rows: preForge.digest ? hashDiff(preForge.files, forged.files) : [],
+    // "none" keys off the MARKER, not off an empty directory: what makes a diff meaningful is a
+    // previously published core to diff against, and a target carrying stray files but no marker
+    // has none. Reporting those strays as a release delta would be the same overstatement in a new
+    // place.
+    baseline: !ver.marker || !preForge.digest
+      ? "none"
+      : preForgeDirty
+        ? "on-disk-dirty"
+        : "previous-release",
+    baselineVersion: ver.marker || null,
+    fileCount: Object.keys(forged.files).length,
+  };
+
   // 3) Auto log + state. Both under the service root, both portable-path only.
   mkdirSync(join(ROOT, RUN_REL), { recursive: true });
   const logPath = join(ROOT, LOG_REL);
   if (!existsSync(logPath)) writeFileSync(logPath, LOG_HEADER);
-  const entry = renderLogEntry({ version, prevVersion: ver.marker, head: head.sha, branch: head.branch, pending, uncommitted, when, forgeCmd, surfaceSource: source, cls, rows, gates });
+  const entry = renderLogEntry({ version, prevVersion: ver.marker, head: head.sha, branch: head.branch, pending, uncommitted, when, forgeCmd, surfaceSource: source, cls, rows, gates, coreDiff });
   if (RELAND) upsertLogEntry(logPath, version, entry);
   else appendFileSync(logPath, entry);
 
@@ -1967,6 +2146,15 @@ async function doPublish() {
       : "Remaining steps are OUTWARD-FACING or were not run for you:"
   );
   steps.push("");
+  steps.push("Finish it in one step, which pushes the TAG FIRST and then PROVES the remote serves it:");
+  steps.push("");
+  steps.push("```sh");
+  steps.push(`node scripts/framework-core-publish.mjs release          # the plan, pushes nothing`);
+  steps.push(`node scripts/framework-core-publish.mjs release --yes    # actually push`);
+  steps.push("```");
+  steps.push("");
+  steps.push("or by hand:");
+  steps.push("");
   steps.push("```sh");
   if (!pushOnly) {
     steps.push(`# 1) commit + tag inside the core submodule`);
@@ -1996,16 +2184,276 @@ async function doPublish() {
   steps.push(`# ${pushOnly ? "2" : "4"}) prove the remote actually serves it`);
   steps.push(`node scripts/framework-core-publish.mjs verify-remote`);
   steps.push("```");
+  steps.push("");
+  // The step the hand block never had, and half of why the release stalled: the gitlink bump and
+  // the release log sat on a work branch that was pushed nowhere, so this repo's own record of the
+  // release was as unpublished as the tag.
+  steps.push("Then, in BOTH repos — this script never pushes to a protected branch:");
+  steps.push("");
+  steps.push(`    core:   merge the release branch into main   (publishes README.md + install.sh)`);
+  steps.push(`    source: push this work branch and merge it   (lands the gitlink bump + the log)`);
   process.stdout.write(steps.join("\n") + "\n");
   // A blocked or failed local commit is not a failed release — the core is forged, verified
   // and logged — but it is unfinished, so it must not exit 0 into an unattended sequence.
   process.exit(landed && !landed.committed ? 4 : 0);
 }
 
+// ── ship ────────────────────────────────────────────────────────────────────
+// ONE command for the whole release, end to end, for an operator who does not want to remember
+// the order. It is a composition of the existing verbs and NOTHING else: it re-invokes this same
+// script rather than re-implementing publish or release, so `ship` can never drift away from what
+// running them by hand does, and every guard they carry still fires.
+//
+// The order it encodes is the order the incident proved is load-bearing:
+//
+//   1. serve whatever is ALREADY cut. `publish` refuses (exit 5) to cut the next release while the
+//      previous tag is missing from a reachable remote, so an unserved release has to be finished
+//      before a new one can start. A no-op when the remote already serves it.
+//   2. publish   — forge, gate, log, commit and tag, locally.
+//   3. serve it  — push the tag, then the branch, then verify the remote really has it.
+//
+// TWO THINGS IT WILL NOT DO FOR YOU.
+//
+// It never commits your working tree. The forge copies the WORKING TREE, so a dirty repo ships
+// files the release log's commit does not contain — a release nobody can rebuild from its own sha.
+// That is a decision about what belongs in the release, so `ship` refuses and names the files
+// rather than guessing.
+//
+// It never runs without `--yes`. Without it, `ship` prints the whole plan — the branch it would
+// move onto, the version it would cut, the refs it would push — and writes nothing.
+
+/** Re-invoke THIS script, inheriting stdio so progress and credential prompts reach the operator. */
+function selfRun(args) {
+  const self = fileURLToPath(import.meta.url);
+  const r = spawnSync(process.execPath, [self, ...args], { cwd: ROOT, stdio: "inherit" });
+  return r.status === 0 ? 0 : (r.status || 1);
+}
+
+/** The invocation's flags, minus the verb and minus anything a sub-verb must not inherit. */
+function shipPassthru(drop = []) {
+  const out = [];
+  const verbAt = argv.indexOf(VERB);
+  for (let i = 0; i < argv.length; i += 1) {
+    if (i === verbAt) continue;
+    if (drop.includes(argv[i])) continue;
+    out.push(argv[i]);
+  }
+  return out;
+}
+
+async function doShip() {
+  const yes = has("yes");
+  const state = readJson(STATE_REL) || {};
+  const last = lastRelease(state);
+
+  // ── refuse a dirty tree, in EITHER repo ───────────────────────────────────
+  const dirty = [];
+  const rootStatus = git(["status", "--porcelain"]);
+  // Only paths that would actually travel: an unrelated dirty gitlink elsewhere in the repo is not
+  // this release's business, and refusing on it would make `ship` unusable in a real checkout.
+  const bound = corePaths().paths;
+  // NOT `line.slice(3)`: git() trims its output, so the FIRST line has already lost the leading
+  // space of its two-column status and a fixed offset cuts into the path. Match the columns
+  // instead, and take the destination half of a rename.
+  const porcelainPath = (line) => {
+    const m = /^\s*\S{1,2}\s+(.+)$/.exec(line);
+    if (!m) return null;
+    const rel = m[1].trim();
+    const arrow = rel.indexOf(" -> ");
+    return arrow === -1 ? rel : rel.slice(arrow + 4);
+  };
+  for (const line of (rootStatus.out || "").split("\n")) {
+    const rel = porcelainPath(line);
+    if (!rel) continue;
+    if (bound.some((p) => rel === p || rel.startsWith(`${p}/`))) dirty.push(`this repo: ${rel}`);
+  }
+  if (targetIsOwnRepo() && !coreTreeClean()) {
+    for (const line of (git(["status", "--porcelain"], SRC_ABS).out || "").split("\n")) {
+      const rel = porcelainPath(line);
+      if (rel) dirty.push(`core: ${rel}`);
+    }
+  }
+  if (dirty.length) {
+    process.stderr.write(
+      `${dirty.length} core-bound file(s) are uncommitted, so this release would not be `
+        + "reproducible from the commit its log records — the forge copies the WORKING TREE.\n\n"
+        + dirty.slice(0, 20).map((d) => `    ${d}`).join("\n") + "\n"
+        + (dirty.length > 20 ? `    … and ${dirty.length - 20} more\n` : "")
+        + "\n  Commit them (or stash-free move them to another branch) and re-run. Deciding what "
+        + "belongs\n  in a release is not something this command guesses at.\n"
+    );
+    process.exit(3);
+  }
+
+  // ── what would happen ─────────────────────────────────────────────────────
+  const ver = publishedVersion();
+  const head = headInfo();
+  const { paths, skills } = corePaths();
+  const pending = pendingSince(ver.markerCommit || ver.stateCommit, paths);
+  const owed = pending.commits.length > 0 || pending.files.length > 0;
+  const cls = await classifyBump(skills);
+  const nextVersion = flag("version") || bumpVersion(releaseBase(ver).base, flag("bump") || cls.kind);
+
+  const rootBranch = head.branch;
+  const coreBranch = targetIsOwnRepo() ? git(["branch", "--show-current"], SRC_ABS).out : null;
+  const branchName = flag("branch") || "chore/framework-core-release";
+  const moves = [];
+  if (isProtected(rootBranch)) moves.push({ what: "this repo", from: rootBranch });
+  if (coreBranch && isProtected(coreBranch)) moves.push({ what: "the core", from: coreBranch });
+
+  const servedAlready = Boolean(
+    state.remote_verified && last && String(state.remote_verified.version) === String(last.version)
+  );
+
+  const plan = [];
+  plan.push(`ship — ${RUNTIME_NAME}`);
+  plan.push("");
+  if (last) {
+    plan.push(`  already cut:  v${last.version} — ${servedAlready ? "served by the remote" : "NOT served yet; it is pushed first"}`);
+  }
+  plan.push(owed
+    ? `  to cut:       v${nextVersion} — ${(flag("bump") || cls.kind).toUpperCase()}, ${pending.commits.length} commit(s), ${pending.files.length} file(s)`
+    : "  to cut:       nothing — no core-bound change since the last release");
+  for (const m of moves) plan.push(`  branch move:  ${m.what}: '${m.from}' is protected → switch -C ${branchName}`);
+  plan.push("");
+  plan.push("  then: publish (forge, 5 gates, log, commit + tag locally)");
+  plan.push("        release (push the TAG first, then the branch, then verify the remote serves it)");
+
+  if (!owed && servedAlready) {
+    process.stdout.write(`${plan.join("\n")}\n\nNothing to publish and nothing unserved — the remote is up to date.\n`);
+    process.exit(0);
+  }
+
+  if (!yes) {
+    plan.push("");
+    plan.push("Nothing was done. This ends in an irreversible outward push, so it needs your");
+    plan.push("explicit yes — never self-granted:");
+    plan.push("");
+    plan.push("```sh");
+    plan.push(`node scripts/framework-core-publish.mjs ship --yes${flag("bump") ? ` --bump ${flag("bump")}` : ""}`);
+    plan.push("```");
+    process.stdout.write(`${plan.join("\n")}\n`);
+    process.exit(0);
+  }
+
+  process.stdout.write(`${plan.join("\n")}\n`);
+
+  // ── 0. onto a work branch. `switch -C` is create-or-move and carries the tree across; the tree
+  //       is already known clean, which is the case that needs no separate ask.
+  for (const m of moves) {
+    const cwd = m.what === "the core" ? SRC_ABS : ROOT;
+    process.stdout.write(`\n── branch: ${m.what} → ${branchName} ─────────────────\n`);
+    const sw = git(["switch", "-C", branchName], cwd);
+    if (!sw.ok) {
+      process.stderr.write(`could not move ${m.what} onto ${branchName}: ${sw.err || sw.out}\n`);
+      process.exit(4);
+    }
+  }
+
+  // ── 1. serve what is already cut, so publish's previous-release gate can pass.
+  if (last && !servedAlready) {
+    process.stdout.write("\n── serving the previous release ────────────────────\n");
+    const code = selfRun(["release", ...shipPassthru()]);
+    if (code !== 0) process.exit(code);
+  }
+
+  // ── 2. cut it.
+  if (owed) {
+    process.stdout.write("\n── publish ─────────────────────────────────────────\n");
+    const code = selfRun(["publish", ...shipPassthru(["--yes"])]);
+    if (code !== 0) process.exit(code);
+
+    // ── 3. serve it.
+    process.stdout.write("\n── serving it ──────────────────────────────────────\n");
+    const served = selfRun(["release", ...shipPassthru()]);
+    if (served !== 0) process.exit(served);
+  }
+
+  process.stdout.write("\nshipped.\n");
+  process.exit(0);
+}
+
 // ── verify-remote ───────────────────────────────────────────────────────────
 // F-13. Nothing this script does reaches a remote, so nothing it writes can attest to one.
 // This verb is the only thing that may: it asks the remote what it actually serves and records
 // the answer. Read-only against the network (`git ls-remote`) — it never pushes.
+
+/**
+ * Ask the core's remote what refs it serves, once.
+ *
+ * Extracted so `verifyRemote`, `unloggedTags` and any future outward verb share ONE network call and
+ * ONE failure policy. A connectivity-shaped problem must read the same everywhere: it is never
+ * evidence that a ref is absent, only that the question could not be asked.
+ *
+ * @returns {{ok: true, url: string, refs: Map<string,string>} | {ok: false, url: string|null, detail: string}}
+ */
+function remoteRefs() {
+  const url = git(["remote", "get-url", "origin"], SRC_ABS);
+  if (!url.ok || !url.out) {
+    return { ok: false, url: null, detail: "the core has no 'origin' remote — nothing to verify against" };
+  }
+  const ls = git(["ls-remote", url.out], SRC_ABS);
+  if (!ls.ok) {
+    return {
+      ok: false,
+      url: url.out,
+      detail: `could not reach the remote: ${ls.err.split("\n").pop() || "ls-remote failed"}`,
+    };
+  }
+  /** @type {Map<string,string>} */
+  const refs = new Map();
+  for (const line of ls.out.split("\n")) {
+    const [sha, ref] = line.split(/\s+/);
+    if (sha && ref) refs.set(ref, sha);
+  }
+  return { ok: true, url: url.out, refs };
+}
+
+/** The commit a remote serves for `<tag>`, peeling an annotated tag object. Null when absent. */
+function remoteTagSha(refs, tag) {
+  return refs.get(`refs/tags/${tag}^{}`) || refs.get(`refs/tags/${tag}`) || null;
+}
+
+/**
+ * Local `v*` tags in the core repo with no section in the release log, CLASSIFIED against the remote.
+ *
+ * Listing them is not enough, and the difference is not academic. Of the four unlogged tags this
+ * repo carried, three were local-only (deletable) and `v1.2.1` was SERVED by the remote — deleting
+ * that one would have broken every workspace pinned to `--ref v1.2.1`. A served unlogged tag is a
+ * LOG repair; a local-only one is a tag deletion. One code path has to tell them apart.
+ *
+ * `served` is null when the remote could not be asked: unknown, never "absent".
+ *
+ * @returns {Array<{tag: string, version: string, served: boolean|null}>}
+ */
+function unloggedTags() {
+  if (!targetIsOwnRepo()) return [];
+  const tags = git(["tag", "-l", "v*"], SRC_ABS);
+  if (!tags.ok || !tags.out) return [];
+
+  const logged = new Set();
+  const logAbs = join(ROOT, LOG_REL);
+  if (existsSync(logAbs)) {
+    for (const line of readFileSync(logAbs, "utf8").split("\n")) {
+      const m = /^##\s+v(\d+\.\d+\.\d+)/.exec(line);
+      if (m) logged.add(m[1]);
+    }
+  }
+
+  const orphans = tags.out
+    .split("\n")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((tag) => ({ tag, version: tag.replace(/^v/, "") }))
+    .filter((t) => /^\d+\.\d+\.\d+$/.test(t.version) && !logged.has(t.version));
+  if (orphans.length === 0) return [];
+
+  const remote = remoteRefs();
+  return orphans.map((t) => ({
+    ...t,
+    served: remote.ok ? Boolean(remoteTagSha(remote.refs, t.tag)) : null,
+  }));
+}
 
 /**
  * Compare the local release against what the core's remote actually serves.
@@ -2029,32 +2477,20 @@ function verifyRemote() {
   // unknown rather than checked — a check that cannot run must not be scored either way.
   const branch = last.core_branch || null;
 
-  const url = git(["remote", "get-url", "origin"], SRC_ABS);
-  if (!url.ok || !url.out) {
-    checks.push({ ref: "origin", expected: null, remote: null, ok: false,
-      detail: "the core has no 'origin' remote — nothing to verify against" });
-    return { ok: false, version, checks };
-  }
-
   // The commit the release actually landed on, read from the CORE repo's own tag/branch.
   const localTag = git(["rev-parse", `${tag}^{commit}`], SRC_ABS);
   const expectedSha = localTag.ok ? localTag.out : null;
 
-  const ls = git(["ls-remote", url.out], SRC_ABS);
-  if (!ls.ok) {
-    checks.push({ ref: url.out, expected: expectedSha, remote: null, ok: false,
-      detail: `could not reach the remote: ${ls.err.split("\n").pop() || "ls-remote failed"}` });
+  const remote = remoteRefs();
+  if (!remote.ok) {
+    checks.push({ ref: remote.url || "origin", expected: expectedSha, remote: null, ok: false,
+      detail: remote.detail });
     return { ok: false, version, checks };
   }
-  /** @type {Map<string,string>} */
-  const refs = new Map();
-  for (const line of ls.out.split("\n")) {
-    const [sha, ref] = line.split(/\s+/);
-    if (sha && ref) refs.set(ref, sha);
-  }
+  const refs = remote.refs;
 
   // A tag may be annotated: refs/tags/<t> is the tag object and refs/tags/<t>^{} the commit.
-  const remoteTag = refs.get(`refs/tags/${tag}^{}`) || refs.get(`refs/tags/${tag}`) || null;
+  const remoteTag = remoteTagSha(refs, tag);
   checks.push({
     ref: `refs/tags/${tag}`,
     expected: expectedSha,
@@ -2095,6 +2531,289 @@ function verifyRemote() {
   }
 
   return { ok: checks.every((c) => c.ok), version, checks };
+}
+
+// ── release ─────────────────────────────────────────────────────────────────
+// The outward half, and the reason this incident happened: `publish` forges, gates, commits and
+// tags — all local — and the two steps that make a release EXIST for consumers (push the tag, merge
+// the branch) were printed prose with no automation and no gate at the moment they were skipped.
+// v1.4.1 was tagged locally, `push origin HEAD` was run, `push origin v1.4.1` was not, and the
+// generated README told every consumer to install `--ref v1.4.1`.
+//
+// THE ORDER IS THE FIX. The tag is pushed BEFORE the branch, and the README only becomes visible on
+// the core's default branch through a MERGE that is strictly later than both. So "the README
+// advertises a tag the remote does not serve" stops being a thing that can happen, rather than a
+// thing a check catches afterwards.
+//
+// Three outward refs, and this verb owns only two of them:
+//
+//   refs/tags/v<version>        pushed here — what `--ref` resolves to
+//   refs/heads/<core_branch>    pushed here — carries the release commit
+//   refs/heads/main (core)      OPERATOR ONLY, via a merge — publishes README.md + install.sh
+//
+// Never `--tags` / `--follow-tags`: this repo carried four unpushed tags, three of which should
+// never reach the remote. A release pushes ONE tag, by name.
+
+/** Would this push create a ref, fast-forward it, or clobber history? Read-only. */
+function pushKind(refs, fullRef, localSha) {
+  const remoteSha = refs.get(fullRef) || refs.get(`${fullRef}^{}`) || null;
+  if (!remoteSha) return { kind: "create", remoteSha: null };
+  if (remoteSha === localSha) return { kind: "already", remoteSha };
+  const ancestor = git(["merge-base", "--is-ancestor", remoteSha, localSha], SRC_ABS);
+  return { kind: ancestor.ok ? "fast-forward" : "non-fast-forward", remoteSha };
+}
+
+function doRelease() {
+  const state = readJson(STATE_REL) || {};
+  const last = lastRelease(state);
+  if (!last) {
+    process.stderr.write(
+      `no local release recorded in ${portable(STATE_REL)} — there is nothing to publish.\n` +
+        "  cut one first:  node scripts/framework-core-publish.mjs publish\n"
+    );
+    process.exit(3);
+  }
+  if (!targetIsOwnRepo()) {
+    process.stderr.write(
+      "the core target is not its own git repository, so it has no remote to publish to.\n"
+    );
+    process.exit(3);
+  }
+
+  const version = String(last.version);
+  const tag = `v${version}`;
+  const coreBranch = last.core_branch || git(["branch", "--show-current"], SRC_ABS).out;
+
+  // ── 1. Preflight, entirely read-only ───────────────────────────────────────
+  const localTag = git(["rev-parse", `${tag}^{commit}`], SRC_ABS);
+  if (!localTag.ok || !localTag.out) {
+    process.stderr.write(
+      `${tag} does not exist in the core repo, so this release was never landed locally.\n` +
+        `  run:  node scripts/framework-core-publish.mjs publish --version ${version}\n`
+    );
+    process.exit(3);
+  }
+  const tagSha = localTag.out;
+
+  if (!coreBranch) {
+    process.stderr.write(
+      "the core repo is on a detached HEAD, so there is no branch to push. Check the release " +
+        "branch out first — pushing HEAD would leave the release commit on no branch at all.\n"
+    );
+    process.exit(3);
+  }
+  if (isProtected(coreBranch)) {
+    process.stderr.write(
+      `the core is on '${coreBranch}', which is protected. A protected branch receives work only ` +
+        "through a merge or PR you approve — never a push from a script.\n" +
+        "  cut the release onto a work branch and merge it there instead.\n"
+    );
+    process.exit(8);
+  }
+  const branchSha = git(["rev-parse", coreBranch], SRC_ABS);
+  if (!branchSha.ok || !branchSha.out) {
+    process.stderr.write(`could not resolve '${coreBranch}' in the core repo.\n`);
+    process.exit(3);
+  }
+
+  const rootBranch = git(["branch", "--show-current"]).out;
+  const sourceProtected = isProtected(rootBranch);
+
+  const remote = remoteRefs();
+  if (!remote.ok) {
+    // Unlike `publish`, an unreachable remote IS fatal here: this verb's entire job is to change
+    // what the remote serves, and it cannot report success without having seen it.
+    process.stderr.write(`${remote.detail}\n`);
+    process.exit(6);
+  }
+
+  const tagPlan = pushKind(remote.refs, `refs/tags/${tag}`, tagSha);
+  const branchPlan = pushKind(remote.refs, `refs/heads/${coreBranch}`, branchSha.out);
+
+  if (tagPlan.kind === "non-fast-forward" || branchPlan.kind === "non-fast-forward") {
+    const which = tagPlan.kind === "non-fast-forward" ? tag : coreBranch;
+    process.stderr.write(
+      `the remote's ${which} is not an ancestor of the local one, so pushing it would DISCARD ` +
+        "commits the remote already serves. Refusing before touching anything.\n" +
+        "  fetch and reconcile in the core repo first; this script never force-pushes.\n"
+    );
+    process.exit(6);
+  }
+
+  // Never counts the version it is CURRENTLY serving: a release cut by hand has no log entry, and
+  // refusing to publish it because it has no log entry would leave it permanently unservable. The
+  // guard is about OTHER releases whose published history and log disagree.
+  const orphans = unloggedTags().filter((t) => t.served === true && t.version !== version);
+  if (orphans.length && !has("allow-unlogged-tags")) {
+    process.stderr.write(
+      `the remote already serves ${orphans.length} tag(s) with no release-log entry: ` +
+        `${orphans.map((t) => t.tag).join(", ")}.\n` +
+        "  Published history and the log disagree, and pushing another release widens the gap.\n" +
+        "  Backfill their log entries (they are SERVED — deleting them breaks anyone pinned to " +
+        "them), or pass --allow-unlogged-tags.\n"
+    );
+    process.exit(8);
+  }
+
+  // ── 2. The plan. Nothing outward happens without --yes ─────────────────────
+  const describe = (p) => (p.kind === "already"
+    ? "already serves this commit"
+    : p.kind === "create" ? "create" : `fast-forward from ${(p.remoteSha || "").slice(0, 12)}`);
+  const lines = [];
+  lines.push(`release v${version} — ${remote.url}`);
+  lines.push("");
+  lines.push(`  refs/tags/${tag}`.padEnd(52) + describe(tagPlan));
+  lines.push(`  refs/heads/${coreBranch}`.padEnd(52) + describe(branchPlan));
+  const rootHasRemote = (() => { const r = git(["remote", "get-url", "origin"]); return r.ok && Boolean(r.out); })();
+  if (rootBranch && !sourceProtected && rootHasRemote) {
+    lines.push(`  ${portable(".")} @ ${rootBranch}`.padEnd(52) + "push (source repo)");
+  }
+  lines.push("");
+  lines.push("  The TAG is pushed FIRST, on purpose: the README on the core's default branch names");
+  lines.push(`  --ref ${tag}, and it only gets there through a merge that is later than both pushes.`);
+
+  if (!has("yes")) {
+    lines.push("");
+    lines.push("Nothing was pushed. These are outward-facing and irreversible, so they need your");
+    lines.push("explicit yes — the same shape as --allow-protected and --reland, never self-granted:");
+    lines.push("");
+    lines.push("```sh");
+    lines.push("node scripts/framework-core-publish.mjs release --yes");
+    lines.push("```");
+    process.stdout.write(lines.join("\n") + "\n");
+    process.exit(0);
+  }
+
+  process.stdout.write(lines.join("\n") + "\n\n── pushing ─────────────────────────────────────────\n");
+
+  // ── 3-4. The pushes. stdio inherited so a credential helper can prompt ─────
+  const pushed = [];
+  const push = (label, args, result) => {
+    process.stdout.write(`  ${label}\n`);
+    const r = spawnSync("git", ["-C", SRC_ABS, "push", "origin", ...args], {
+      encoding: "utf8", stdio: "inherit",
+    });
+    if (r.status !== 0) {
+      process.stderr.write(`\npush of ${label} was refused by the remote (exit ${r.status}).\n`);
+      process.exit(6);
+    }
+    pushed.push(result);
+  };
+
+  if (tagPlan.kind !== "already") {
+    push(`refs/tags/${tag}`, [`refs/tags/${tag}`], { ref: `refs/tags/${tag}`, sha: tagSha, result: tagPlan.kind });
+  } else {
+    pushed.push({ ref: `refs/tags/${tag}`, sha: tagSha, result: "already" });
+  }
+  if (branchPlan.kind !== "already") {
+    // By NAME, never HEAD: a detached HEAD or a different checked-out branch must not decide what
+    // ships. `push origin HEAD` is exactly the line that shortened to a bare `git push` twice before.
+    push(`refs/heads/${coreBranch}`, [coreBranch], { ref: `refs/heads/${coreBranch}`, sha: branchSha.out, result: branchPlan.kind });
+  } else {
+    pushed.push({ ref: `refs/heads/${coreBranch}`, sha: branchSha.out, result: "already" });
+  }
+
+  // ── 5. Prove it. A push that reported success is a claim, not evidence ─────
+  process.stdout.write("\n── verifying ───────────────────────────────────────\n");
+  const res = verifyRemote();
+  for (const c of res.checks) process.stdout.write(`  ${c.ok ? "ok  " : "FAIL"}  ${c.ref}  ${c.detail}\n`);
+
+  const stamp = nowBangkok().stamp;
+  const fresh = readJson(STATE_REL) || {};
+  fresh.schema = 3;
+  fresh.remote_verified = res.ok
+    ? { version: res.version, verified_at: stamp, refs: res.checks.map((c) => ({ ref: c.ref, sha: c.remote })) }
+    : null;
+  fresh.remote_check = { version: res.version, checked_at: stamp, ok: res.ok,
+    checks: res.checks.map((c) => ({ ref: c.ref, ok: c.ok, detail: c.detail })) };
+
+  if (!res.ok) {
+    writeFileSync(join(ROOT, STATE_REL), `${JSON.stringify(fresh, null, 2)}\n`);
+    process.stderr.write(
+      "\nthe pushes reported success but the remote still does not serve this release.\n" +
+        "  Nothing is rolled back — a landed tag is not a problem, and undoing it would be.\n" +
+        "  Investigate the remote, then re-run:  node scripts/framework-core-publish.mjs verify-remote\n"
+    );
+    process.exit(7);
+  }
+
+  // ── 6. The source side. Its work branch, never a protected one ─────────────
+  let sourcePushed = null;
+  // A source checkout with no `origin` is a legitimate shape (a local-only clone), and by this
+  // point the CORE is already served — the release succeeded. Treating "this workspace has no
+  // remote" as a failed release would misreport the thing that actually happened.
+  const sourceRemote = git(["remote", "get-url", "origin"]);
+  const sourceHasRemote = sourceRemote.ok && Boolean(sourceRemote.out);
+  if (rootBranch && !sourceProtected && !sourceHasRemote) {
+    process.stdout.write(`\n  ${portable(".")} has no 'origin' — nothing to push the source branch to.\n`);
+  }
+  if (rootBranch && !sourceProtected && sourceHasRemote) {
+    process.stdout.write(`\n  ${portable(".")} @ ${rootBranch}\n`);
+    const r = spawnSync("git", ["push", "origin", rootBranch], { cwd: ROOT, encoding: "utf8", stdio: "inherit" });
+    if (r.status !== 0) {
+      process.stderr.write(`\npush of the source branch '${rootBranch}' was refused (exit ${r.status}).\n`);
+      process.exit(6);
+    }
+    sourcePushed = rootBranch;
+  }
+
+  const merges = [
+    { repo: "core", from: coreBranch, into: "main",
+      why: "publishes README.md + install.sh at the raw URL the README's one-liner fetches" },
+  ];
+  if (sourcePushed) {
+    merges.push({ repo: "source", from: sourcePushed, into: "main",
+      why: "lands the gitlink bump and the release log" });
+  }
+
+  fresh.remote_release = {
+    version, pushed_at: stamp, pushed_by: "release",
+    refs: pushed, source_branch_pushed: sourcePushed, merges_outstanding: merges,
+  };
+  writeFileSync(join(ROOT, STATE_REL), `${JSON.stringify(fresh, null, 2)}\n`);
+  appendPublishedBlock(version, { stamp, refs: pushed, sourcePushed, merges });
+
+  const out = [""];
+  out.push(`v${version} is SERVED by ${remote.url}.`);
+  out.push("");
+  if (sourceProtected) {
+    out.push(`  NOTE: this repo is on '${rootBranch}', which is protected — the source branch was`);
+    out.push("  NOT pushed. Move the release commit onto a work branch and push that.");
+    out.push("");
+  }
+  out.push("  Still outstanding, and yours alone — this script never pushes to a protected branch:");
+  for (const m of merges) out.push(`    ${m.repo}: merge ${m.from} -> ${m.into}   (${m.why})`);
+  process.stdout.write(out.join("\n") + "\n");
+  process.exit(0);
+}
+
+/**
+ * Record the outward half in the release log, under the version's existing section.
+ *
+ * The log said a release was CUT and nothing said it had SHIPPED, so the document that is supposed
+ * to be the record of a release was silent about the only property a consumer can observe.
+ */
+function appendPublishedBlock(version, { stamp, refs, sourcePushed, merges }) {
+  const logAbs = join(ROOT, LOG_REL);
+  if (!existsSync(logAbs)) return;
+  const text = readFileSync(logAbs, "utf8");
+  const head = new RegExp(`^## v${version.replace(/\./g, "\\.")}\\b.*$`, "m").exec(text);
+  if (!head) return;
+
+  const after = text.indexOf("\n## ", head.index + 1);
+  const end = after === -1 ? text.length : after;
+  if (/\*\*Published\*\*/.test(text.slice(head.index, end))) return;   // idempotent re-run
+
+  const block = ["", "**Published** — pushed and verified at " + stamp + ":", ""];
+  for (const r of refs) block.push(`- \`${r.ref}\` at \`${(r.sha || "").slice(0, 12)}\` (${r.result})`);
+  if (sourcePushed) block.push(`- source branch \`${sourcePushed}\` pushed`);
+  block.push("");
+  block.push("Outstanding merges (never performed by this script):");
+  block.push("");
+  for (const m of merges) block.push(`- ${m.repo}: \`${m.from}\` -> \`${m.into}\` — ${m.why}`);
+  block.push("");
+
+  writeFileSync(logAbs, text.slice(0, end) + block.join("\n") + text.slice(end));
 }
 
 function doVerifyRemote() {
@@ -2157,6 +2876,12 @@ switch (VERB) {
   case "verify":
     doVerify();
     break;
+  case "release":
+    doRelease();
+    break;
+  case "ship":
+    await doShip();
+    break;
   case "verify-remote":
     doVerifyRemote();
     break;
@@ -2165,10 +2890,11 @@ switch (VERB) {
     break;
   default:
     process.stderr.write(
-      `unknown verb '${VERB}'. Use: status | publish | verify | verify-remote | log  ` +
+      `unknown verb '${VERB}'. Use: status | publish | release | ship | verify | verify-remote | log  ` +
         `(flags: --target DIR, --name NAME, --preset NAME, --remote URL, ` +
         `--bump patch|minor|major, --version X.Y.Z, --ref REF, --no-tests, --no-mount-check, ` +
-        `--no-commit, --allow-protected, --allow-unpushed, --dry-run, --json)\n`
+        `--no-commit, --allow-protected, --allow-unpushed, --yes, --allow-unlogged-tags, ` +
+        `--dry-run, --json)\n`
     );
     process.exit(2);
 }

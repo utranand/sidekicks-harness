@@ -1167,18 +1167,30 @@ function buildChecks() {
       } else {
         const owed = (st.pending_commits || 0) + (st.pending_files || 0);
         const dirty = st.uncommitted_core_files || 0;
-        const ok = owed === 0 && dirty === 0 && st.version_agrees !== false;
+        // A release nobody pushed looked exactly like a published one on every orientation, which is
+        // how v1.4.1 sat tagged-but-unserved while the README told consumers to install it. Only a
+        // RECORDED negative counts: absence means "not verified", never "verified false".
+        const notServed = st.remote_state === "not_served";
+        const unlogged = Array.isArray(st.unlogged_tags) ? st.unlogged_tags : [];
+        const ok = owed === 0 && dirty === 0 && st.version_agrees !== false && !notServed;
         const bits = [`published v${st.published_version || "?"}`];
         if (owed) bits.push(`${st.pending_commits} commit(s) since`);
         if (dirty) bits.push(`${dirty} uncommitted core-bound file(s)`);
         if (st.version_agrees === false) bits.push("log/marker version MISMATCH");
+        if (notServed) bits.push(`v${st.unpushed_release} NOT SERVED by the remote`);
+        else if (st.remote_state === "unverified") bits.push("remote not verified");
+        if (unlogged.length) bits.push(`${unlogged.length} unlogged tag(s)`);
         checks.push({
           ok,
           label: "Framework core (release debt)",
           detail: ok
             ? `${bits.join(", ")} — in sync, no release owed`
             : `${bits.join(", ")} — next would be v${st.next_version || "?"}`,
-          fix: ok ? null : "node scripts/framework-core-publish.mjs status   (then … publish)",
+          fix: ok
+            ? null
+            : notServed
+              ? "node scripts/framework-core-publish.mjs release          (then … release --yes)"
+              : "node scripts/framework-core-publish.mjs status   (then … publish)",
           apply: null, // publishing is outward-facing — never automatic
         });
       }

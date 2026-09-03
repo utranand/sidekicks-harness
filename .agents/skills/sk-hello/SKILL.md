@@ -136,7 +136,7 @@ it, in two modes.
 Some skills this repo *uses* are not ours to redistribute. They are declared as host plugins in
 `.claude/settings.json` (`enabledPlugins` + `extraKnownMarketplaces`) and installed from upstream —
 the skill folder itself does not travel in a distributed framework core (see
-[docs/guide/framework-as-submodule.md](../../../docs/guide/framework-as-submodule.md)).
+[docs/guide/v1.5/framework-as-submodule.md](../../../docs/guide/v1.5/framework-as-submodule.md)).
 
 The **Host plugins** readiness row is that guidance: it names each declared plugin the host is
 missing and prints the exact `claude plugin marketplace add …  &&  claude plugin install …` pair,

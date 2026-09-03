@@ -52,9 +52,9 @@ requires:
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:f11c1febd69326b4bd14465a1387dcee48be7db8f25f7be5b6a4127489318ad2
+  SKILL.md: sha256:30d274fe0bf6e5a759e97f2306086a9d7b396305ba2610430f314471ada89629
   VERSION.json: sha256:9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af
   improvements/001-trim-description-under-cap.yaml: sha256:d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599
   improvements/INDEX.md: sha256:a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5
   scripts/capability.mjs: sha256:f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3
-  scripts/readiness.mjs: sha256:38f297db6481b27c09ac8207970d86b7befce611dc19bf2e83a37b967c984419
+  scripts/readiness.mjs: sha256:ab5b7e7e523b8b7451fa85a5c5154ca34d923a88fe28ba79953aba747fe5ec73
