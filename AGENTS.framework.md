@@ -10,7 +10,7 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `5af6b56f` on 2026-09-02T01:47:40+07:00 (Asia/Bangkok). It is regenerated on every
+> `55e01621` on 2026-09-03T22:29:37+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
 > instructions in `AGENTS.local.md` and reference it from here — add a line reading
 > `@AGENTS.local.md` below. That reference is what makes them survive, and it works on every CLI:

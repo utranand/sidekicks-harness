@@ -2257,10 +2257,10 @@
     ]
   },
   "skills": {
-    "active_count": 126,
+    "active_count": 128,
     "parked_count": 18,
-    "edge_count": 126,
-    "hard_edge_count": 104,
+    "edge_count": 127,
+    "hard_edge_count": 105,
     "mutual_composition": [
       {
         "cycle": [
@@ -2571,6 +2571,16 @@
         "hard_depends_on": [
           "sk-validation-gate"
         ],
+        "informational_refs": []
+      },
+      {
+        "id": "sk-argocd-ops",
+        "folder": "sk-argocd-ops",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-argocd-ops",
+        "hard_depends_on": [],
         "informational_refs": []
       },
       {
@@ -3316,6 +3326,18 @@
         "manifest": true,
         "logical_id": "sk-shp-dev-frontend",
         "hard_depends_on": [],
+        "informational_refs": []
+      },
+      {
+        "id": "sk-shp-export-table",
+        "folder": "sk-shp-export-table",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-shp-export-table",
+        "hard_depends_on": [
+          "sk-database-connector"
+        ],
         "informational_refs": []
       },
       {
@@ -4965,6 +4987,15 @@
         "parked_source": false
       },
       {
+        "from": "sk-shp-export-table",
+        "from_folder": "sk-shp-export-table",
+        "to_folder": "sk-database-connector",
+        "how": "subprocess",
+        "kind": "hard",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
         "from": "sk-shp-snyk-test",
         "from_folder": "sk-shp-snyk-test",
         "to_folder": "sk-security-remediation",
@@ -5093,12 +5124,16 @@
     ]
   },
   "config": {
-    "family_count": 13,
-    "block_count": 47,
+    "family_count": 14,
+    "block_count": 48,
     "families": [
       {
         "family": "agents",
         "block_count": 9
+      },
+      {
+        "family": "argocd",
+        "block_count": 1
       },
       {
         "family": "aws",
@@ -5251,6 +5286,25 @@
         "merge": "per_key",
         "defaults": ".agents/skills/sk-agent-tray/config.defaults.yaml",
         "source": "core"
+      },
+      {
+        "id": "config:argocd_ops",
+        "block": "argocd_ops",
+        "family": "argocd",
+        "file": "argocd.yaml",
+        "secret_file": "argocd.secret.yaml",
+        "title": "argocd_ops",
+        "owners": [
+          "sk-argocd-ops"
+        ],
+        "readers": [],
+        "aliases": [],
+        "public_keys": [],
+        "scope": "project",
+        "inherits_root": false,
+        "merge": "per_key",
+        "defaults": ".agents/skills/sk-argocd-ops/config.defaults.yaml",
+        "source": "skill"
       },
       {
         "id": "config:aws_kms",
