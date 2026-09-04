@@ -22,6 +22,17 @@
 //      actually stamped, not what someone meant to stamp), bumped semver-wise, and
 //      passed back as --core-version. `status` shows the next version before you commit.
 //
+//      THE SOURCE package.json IS NOT THE CORE VERSION AND IS NOT STALE. It has now
+//      been reported as a defect by two consecutive audits (INC-2026-09-04-01 F-5,
+//      INC-2026-09-04-02 N-9), so it is written down here rather than re-litigated a
+//      third time. The forge STAMPS the forged package.json with --core-version
+//      (inherit.mjs writeCoreDistribution), so a mounted CLI's `--version` is correct
+//      today; the source file versions the source repo, which is a different artifact
+//      with a different release cadence and no consumer. Syncing them would create a
+//      second version source the release path has to keep true, to remove a mismatch
+//      that misleads nobody who reads this paragraph. Decided by the operator,
+//      2026-09-04 (Asia/Bangkok).
+//
 //   3. DRIFT DETECTION. `status` answers "does the core owe a release?" by diffing
 //      core-bound paths since the last published source commit. That is what makes the
 //      logging automatic rather than remembered — sk-hello's readiness step
@@ -397,9 +408,11 @@ function targetIsOwnRepo() {
 /**
  * The last LOCAL release recorded in state.json.
  *
- * The key is `last_local_release`, not `last_publish` (F-13). A run of this script forges, gates,
- * commits and tags — all local and all reversible. It never pushes: that stays the operator's call
- * (CLAUDE.md § irreversible / outward-facing actions). Calling the result "published" made local
+ * The key is `last_local_release`, not `last_publish` (F-13). `publish` forges, gates, commits and
+ * tags — all local and all reversible — and never pushes, so what it records is a LOCAL fact and
+ * the name says so. Pushing is `release`'s job and needs the operator's explicit `--yes` per
+ * invocation (CLAUDE.md § irreversible / outward-facing actions); the merges onto a protected
+ * branch stay the operator's alone. Calling the result "published" made local
  * state read as a claim about the world, and it was wrong — state.json said v2.0.0 was published
  * while the GitHub remote still served v1.1.5 with no v2.0.0 tag at all. `last_publish` is still
  * READ so an existing state file keeps classifying; only the write side moved.
@@ -1014,6 +1027,7 @@ async function doStatus() {
   const remoteState = verified ? "served" : negative ? "not_served" : "unverified";
   // Only classified against the remote when there ARE orphans, so an ordinary status stays offline.
   const orphanTags = unloggedTags();
+  const phantomHistory = historyWithoutLog(stateNow);
 
   const result = {
     runtime: RUNTIME_NAME,
@@ -1050,6 +1064,8 @@ async function doStatus() {
       || null,
     unpushed_release: remoteState === "served" || !lastLocal ? null : String(lastLocal.version),
     unlogged_tags: orphanTags,
+    // The mirror image of unlogged_tags: history claiming a release the log has no section for.
+    history_without_log: phantomHistory,
   };
 
   if (JSON_OUT) {
@@ -1137,6 +1153,21 @@ async function doStatus() {
             : "remote unreachable, so whether it is published is unknown";
         out.push(`    ${t.tag}  ${where}`);
       }
+    }
+
+    if (phantomHistory.length) {
+      out.push("");
+      out.push(`  HISTORY WITHOUT A LOG ENTRY: ${phantomHistory.length} version(s) that `
+        + `${portable(STATE_REL)} records as released and ${portable(LOG_REL)} has no section for.`);
+      out.push("  `history` is appended from whatever the core marker said at each cut, so a hand-forge");
+      out.push("  that stamped a version it never released leaves an entry nothing else backs. It is not");
+      out.push("  cosmetic: publishedVersions() reads it, so a re-publish of one of these is graded a");
+      out.push("  re-land and refused without --reland.");
+      for (const h of phantomHistory) {
+        out.push(`    v${h.version}${h.source_commit ? `  (source ${h.source_commit})` : ""}`);
+      }
+      out.push("  Fix by backfilling the log entry if the release was real, or by removing the history");
+      out.push("  row if it never was — an operator decision either way; this never edits it.");
     }
     process.stdout.write(out.join("\n") + "\n");
   }
@@ -1467,9 +1498,30 @@ function mountCheck() {
     // while this gate was green, because catalog.check resolved framework paths against the
     // workspace root and tests.contract named files a mount does not carry at that path. The release
     // path already builds a real mount here; it simply never asked (INC-2026-09-04-01, F-3).
-    const check = nodeStep([join(ws, "bin", "sidekicks"), "check", "run", "quick", "--json"], ws);
+    //
+    // `full`, not `quick` — asking only the cheapest profile is how the SECOND round of the same bug
+    // shipped. v1.4.2 passed this gate with a green `quick` while `parity` named two suites living
+    // in repo-root tests/, which travels into no core, so `check run full` was red in every consumer
+    // install and `release` scored 9/13 (INC-2026-09-04-02, N-3). `full` adds parity, the whole test
+    // suite and skill.doctor --strict inside the mount. Not `release`: its `core.mounted` gate would
+    // build a core from this core, and `package.clean` is covered directly below instead.
+    const check = nodeStep([join(ws, "bin", "sidekicks"), "check", "run", "full", "--json"], ws);
     if (!check.ok) {
-      return { ok: false, note: "check run quick failed in the mounted workspace", tail: check.tail };
+      return { ok: false, note: "check run full failed in the mounted workspace", tail: check.tail };
+    }
+    // `package.clean` is release-profile only, so `full` does not reach it — and it is the gate that
+    // died in a mount with "validateSource: lib/sk-cli not found", taking two more down with it as
+    // BLOCKED. Ask it directly rather than recursing through the whole release profile.
+    const pkg = nodeStep(
+      [join(ws, "bin", "sidekicks"), "package", "create", "--output", join(ws, "..", "pkg-smoke"), "--dry-run"],
+      ws
+    );
+    if (!pkg.ok) {
+      return {
+        ok: false,
+        note: "package create could not resolve the framework from the mounted workspace",
+        tail: pkg.tail,
+      };
     }
     return { ok: true };
   } catch (err) {
@@ -2055,10 +2107,13 @@ async function doPublish() {
       {
         schema: 2,
         comment:
-          "Last LOCAL release of the framework core. Written by scripts/framework-core-publish.mjs; "
-          + "paths are repo-relative. This script forges, gates, commits and tags — all local and all "
-          + "reversible — and never pushes. Nothing here is evidence that any remote serves this "
-          + "version: that is `remote_verified`, which only `--verify-remote` writes.",
+          "Framework-core release state. Written by scripts/framework-core-publish.mjs; paths are "
+          + "repo-relative. `last_local_release` is what `publish` cut — it forges, gates, commits "
+          + "and tags, all local and all reversible, and never pushes — so its presence is NOT "
+          + "evidence that any remote serves this version. That evidence is `remote_verified`, "
+          + "written by `verify-remote`, and by `release`/`ship` once they have pushed and "
+          + "re-checked. schema 2 carries no `remote_release`; schema 3 adds it, recording which "
+          + "refs a release actually pushed and which merges it deliberately left to the operator.",
         runtime: RUNTIME_NAME,
         target_rel: portable(SRC_REL),
         // Renamed from `last_publish` (F-13): local state called v2.0.0 "published" while the
@@ -2098,9 +2153,10 @@ async function doPublish() {
           configuration: cls.source.configuration || [],
           gates: gates.map((g) => ({ name: g.name, result: g.result, note: g.note || null })),
         },
-        // Null until someone runs `--verify-remote` AFTER pushing. Absence means "not verified",
-        // never "verified false" — the distinction matters, because the failure this records was
-        // reporting an unpushed release as published.
+        // Null until the release is pushed AND re-checked — by `release`/`ship`, or by a bare
+        // `verify-remote` after a hand push. Absence means "not verified", never "verified false"
+        // — the distinction matters, because the failure this records was reporting an unpushed
+        // release as published.
         remote_verified: prevState.remote_verified && prevState.remote_verified.version === version
           ? prevState.remote_verified
           : null,
@@ -2453,6 +2509,36 @@ function unloggedTags() {
     ...t,
     served: remote.ok ? Boolean(remoteTagSha(remote.refs, t.tag)) : null,
   }));
+}
+
+/**
+ * Versions `state.json.history` claims were released that the release log has no section for.
+ *
+ * `history` is APPEND-ONLY from whatever the core marker said at each cut (see doPublish), which
+ * makes it an honest record of a hand-cut past and a poor ledger: it carried a phantom `1.2.3` that
+ * no tag, no log entry and no remote ref ever backed, sitting out of order before `1.2.0`, while
+ * `1.2.1` — a version the remote really does serve — was missing from it entirely
+ * (INC-2026-09-04-02, N-9). Nothing reported the disagreement, so it survived two incidents.
+ *
+ * This is a REPORT, never a repair: `history` feeds publishedVersions() (the re-land guard) and
+ * referenceContent()'s first rung, so an entry that turns out to be wrong is an operator decision.
+ *
+ * @param {object|null} state
+ * @returns {{version: string, source_commit: string|null}[]}
+ */
+function historyWithoutLog(state) {
+  const history = Array.isArray(state && state.history) ? state.history : [];
+  if (history.length === 0) return [];
+  const logAbs = join(ROOT, LOG_REL);
+  if (!existsSync(logAbs)) return [];
+  const logged = new Set();
+  for (const line of readFileSync(logAbs, "utf8").split("\n")) {
+    const m = /^##\s+v(\d+\.\d+\.\d+)/.exec(line);
+    if (m) logged.add(m[1]);
+  }
+  return history
+    .filter((h) => h && h.version && !logged.has(String(h.version)))
+    .map((h) => ({ version: String(h.version), source_commit: h.source_commit ? String(h.source_commit) : null }));
 }
 
 /**

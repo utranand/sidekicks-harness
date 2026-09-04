@@ -21,7 +21,7 @@
 //   Codex CLI   → reads SKILL.md inline, so no PreToolUse fires on skill activation;
 //                 its shell calls still match the command path.
 // Antigravity has no tool-call event at all — there the SessionStart map text carries
-// the instruction instead (documented in tests/multi-cli-parity.test.mjs).
+// the instruction instead (documented in lib/framework-lifecycle/tests/multi-cli-parity.test.mjs).
 //
 // It NEVER blocks a tool call and never denies: it either adds context or says nothing.
 // Any error is swallowed and treated as "no trigger". Zero npm dependencies.

@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".sidekicks/hooks/rtk-hook.sh"
+            "command": "\"$GEMINI_PROJECT_DIR/.sidekicks/hooks/rtk-hook.sh\""
           },
           {
             "type": "command",

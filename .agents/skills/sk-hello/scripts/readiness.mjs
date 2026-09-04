@@ -1100,10 +1100,26 @@ function buildChecks() {
         // activations resolve to nothing, which reads as "skill is broken".
         detail = `bmad/ ✓ but NO command stubs on any CLI — /bmad:… activations will not resolve | ${who}`;
         fix = `re-run the BMAD installer in this repo to wire the IDE commands (clone: ${BMAD_REPO})`;
+      } else if (!tree && stubs && !skills.length) {
+        // Stubs, no tree, AND no bmad skill: nothing here ever wanted them. That is not a missing
+        // install, it is PACKAGING RESIDUE — the forge copied the command trees wholesale, so a
+        // consumer's menu filled with `/bmad:*` entries that load a tree the core does not carry
+        // (INC-2026-09-04-02, N-4). Prescribing `git clone BMAD-METHOD` here told the consumer to
+        // install a whole framework to satisfy stubs they never asked for, to fix a defect they
+        // cannot reach: the payload belongs to whoever forged the runtime.
+        detail =
+          `${stubs} command stub(s) present (${surfaces}) but NO bmad skill and no bmad/ tree — ` +
+          "every stub loads {project-root}/bmad/core/tasks/workflow.xml and fails at step 1. " +
+          "Nothing here needs them: this is packaging residue, not a missing install";
+        fix = MOUNTED_CORE
+          ? "report it to whoever forged this core — `inherit verify` fails on it (agents and "
+            + "commands travel by ownership). Until then the stubs are inert; deleting "
+            + ".claude/commands/bmad and .gemini/commands/bmad-*.toml in this workspace is safe"
+          : "remove the orphaned stubs (.claude/commands/bmad, .gemini/commands/bmad-*.toml), or "
+            + `install the skills that own them. Only install BMAD (${BMAD_REPO}) if you actually want it`;
       } else if (!tree && stubs) {
-        // The dangling-stub state: this is what a freshly mounted framework core
-        // looks like, and the failure it produces names a missing file, not a
-        // missing install — so say the real cause here.
+        // Stubs and bmad SKILLS, but no tree: this one really is a missing install, and the failure
+        // it produces names a missing file rather than a missing install — so say the real cause.
         detail =
           `${stubs} command stub(s) present (${surfaces}) but bmad/ module tree MISSING — ` +
           `every stub loads {project-root}/bmad/core/tasks/workflow.xml and will fail at step 1 | ${who}`;

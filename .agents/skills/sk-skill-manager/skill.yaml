@@ -18,3 +18,12 @@ config:
   block: skill_manager
   family: skills
   defaults: config.defaults.yaml
+
+# The settings-split detector fires on the paragraph that TEACHES the exemption mechanism: the line
+# quotes "Python is ALWAYS the repo-root `.venv`" as its own worked example of a framework-owned
+# restatement. Recording it here is the documented answer to the notice — and the example is itself
+# one of the four kinds it names, so the exemption and the prose agree.
+settings_split:
+  policy_exempt:
+    - quote: "the framework already owns (\"Python is ALWAYS the repo-root `.venv`\")"
+      why: "not a policy of this skill. It is a QUOTED EXAMPLE inside the paragraph that documents when a policy statement is not declarable, and the thing quoted is a framework-core rule (rule.single-venv) that CLAUDE.md already owns. Declaring a criterion here would mint a second, skill-local copy of a rule the framework states once - which is precisely the duplication this gate exists to prevent."

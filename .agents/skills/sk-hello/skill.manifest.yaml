@@ -57,4 +57,4 @@ bundle:
   improvements/001-trim-description-under-cap.yaml: sha256:d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599
   improvements/INDEX.md: sha256:a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5
   scripts/capability.mjs: sha256:f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3
-  scripts/readiness.mjs: sha256:ab5b7e7e523b8b7451fa85a5c5154ca34d923a88fe28ba79953aba747fe5ec73
+  scripts/readiness.mjs: sha256:a706889383272f1e919673bf80a251ab4832bbe29a6bf9c6ee54a922eaddf2d7

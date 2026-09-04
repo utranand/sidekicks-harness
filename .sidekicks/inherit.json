@@ -4,8 +4,8 @@
   "direction": "one-way: sidekicks source -> this runtime",
   "source": {
     "repo": "sidekicks",
-    "commit": "4ad2d4e3",
-    "inherited_at": "2026-09-04T04:00:30+07:00",
+    "commit": "dcf15e16",
+    "inherited_at": "2026-09-04T11:08:10+07:00",
     "tool": "sk-inherit"
   },
   "options": {
@@ -17,16 +17,16 @@
       "origin": "active",
       "version": "1.7.0",
       "source_path": ".agents/skills/sk-hello",
-      "source_commit": "4ad2d4e3",
-      "inherited_at": "2026-09-04T04:00:30+07:00",
+      "source_commit": "dcf15e16",
+      "inherited_at": "2026-09-04T11:08:10+07:00",
       "files": {
         "SKILL.md": "30d274fe0bf6e5a759e97f2306086a9d7b396305ba2610430f314471ada89629",
         "VERSION.json": "9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af",
         "improvements/001-trim-description-under-cap.yaml": "d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599",
         "improvements/INDEX.md": "a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5",
         "scripts/capability.mjs": "f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3",
-        "scripts/readiness.mjs": "ab5b7e7e523b8b7451fa85a5c5154ca34d923a88fe28ba79953aba747fe5ec73",
-        "skill.manifest.yaml": "0367a49f3cbaa46a94505fb19dac87cea6dc9edaeba8a4dfdc6526a0cd573f67"
+        "scripts/readiness.mjs": "a706889383272f1e919673bf80a251ab4832bbe29a6bf9c6ee54a922eaddf2d7",
+        "skill.manifest.yaml": "886fa252d67fa3e8cec2cca29de2b103200e6f545387c2ff630a24a3a897f6f0"
       }
     },
     "skills/sk-cli": {
@@ -34,8 +34,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-cli",
-      "source_commit": "4ad2d4e3",
-      "inherited_at": "2026-09-04T04:00:30+07:00",
+      "source_commit": "dcf15e16",
+      "inherited_at": "2026-09-04T11:08:10+07:00",
       "files": {
         "SKILL.md": "339bbc3ed4999dc91550811ea86f99d994dba6d5d1bf71f04c06b8092d7f95d8",
         "VERSION.json": "23ae847800c72cb55557e9a52d3d9e1f5f5650f218db63c1b8ab7ade771c1646",
@@ -48,8 +48,8 @@
       "origin": "active",
       "version": "1.4.1",
       "source_path": ".agents/skills/sk-commander",
-      "source_commit": "4ad2d4e3",
-      "inherited_at": "2026-09-04T04:00:30+07:00",
+      "source_commit": "dcf15e16",
+      "inherited_at": "2026-09-04T11:08:10+07:00",
       "files": {
         "SKILL.md": "66397e830f26d1fa4f69c2b7ef2695e03135325552b2366aa9915b3dce929339",
         "VERSION.json": "1916895f28fd3fd5d28af2efd7e9f1b27d541964256734b8cd89e86ba94734b9",
@@ -95,8 +95,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-scope-switch",
-      "source_commit": "4ad2d4e3",
-      "inherited_at": "2026-09-04T04:00:30+07:00",
+      "source_commit": "dcf15e16",
+      "inherited_at": "2026-09-04T11:08:10+07:00",
       "files": {
         "SKILL.md": "0c429429f6d535e538680bd0d701a954c4737260a85b72d18d5dbbd7a1a60d17",
         "VERSION.json": "2f8fffddaf0f59c6711434d2b4477beb3d19f847fdb02f09826ce348b3a4e405"
@@ -107,8 +107,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-config-doctor",
-      "source_commit": "4ad2d4e3",
-      "inherited_at": "2026-09-04T04:00:30+07:00",
+      "source_commit": "dcf15e16",
+      "inherited_at": "2026-09-04T11:08:10+07:00",
       "files": {
         "SKILL.md": "198908336a007135039fa971f60708ebebc5dd30e779afd01b4e822b964ece46",
         "VERSION.json": "86a579f1dc8a18d070e0e6a1f68488a04c94d19384c9f2c25888ce11f82fdf72",
@@ -120,8 +120,8 @@
       "origin": "active",
       "version": "1.6.0",
       "source_path": ".agents/skills/sk-skill-manager",
-      "source_commit": "4ad2d4e3",
-      "inherited_at": "2026-09-04T04:00:30+07:00",
+      "source_commit": "dcf15e16",
+      "inherited_at": "2026-09-04T11:08:10+07:00",
       "files": {
         "SKILL.md": "475911883d18beca8efbcd7ec8a0c4f05061e8fa049f2618e6b30172f1757a9e",
         "VERSION.json": "206f32a6bb6d3831419e5bd2c515c43ac61081e04987da07d8d028fdaf2e13e2",
@@ -176,8 +176,8 @@
         "scripts/skill-repo-readmes-private.mjs": "2c32ac9860640dec9be2218dee7a3ed94dba0c1748d462f847889ed60d6f9271",
         "scripts/skill-repo-readmes-public.mjs": "913942b4f25eab31890ba728553838349477629823afcdce8360e22b623d6862",
         "scripts/skill-search.mjs": "63daac8ee2709c8d2fd00faae31d942e7b526c58cce2e9d1fb8a0138f3f01aeb",
-        "skill.manifest.yaml": "35da3a2d5257b607f6110ccdee6ff3dfed5b6b350990fccff2c73b68b14f1366",
-        "skill.yaml": "54e6ae0288bab42e1a3f7309fea10170f342d74e960c2dc6e9bf9bd7eb422cba"
+        "skill.manifest.yaml": "c26abd4dfe3fd9e7fab7740dadf2aec58cb3aa8da7cac3912afeb65dd813e62d",
+        "skill.yaml": "2bda30ad9a34a9cc4b5d55737733f11a49ba0dacd40337dc9220293cf1923468"
       }
     }
   },

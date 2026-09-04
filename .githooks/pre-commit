@@ -44,7 +44,7 @@ if [ -z "$node_bin" ]; then
   exit 1
 fi
 
-mirror_test="$repo_root/tests/agent-context-mirror.test.mjs"
+mirror_test="$repo_root/lib/framework-lifecycle/tests/agent-context-mirror.test.mjs"
 
 mirror_failed() {
   echo "✖ pre-commit: agent-context mirror is broken." >&2
@@ -52,7 +52,7 @@ mirror_failed() {
   echo "  If you meant to change agent instructions, edit AGENTS.md instead, then:" >&2
   echo "      ln -sf AGENTS.md CLAUDE.md && ln -sf AGENTS.md GEMINI.md" >&2
   if [ -f "$mirror_test" ]; then
-    echo "  Details: $node_bin --test tests/agent-context-mirror.test.mjs" >&2
+    echo "  Details: $node_bin --test lib/framework-lifecycle/tests/agent-context-mirror.test.mjs" >&2
   fi
   exit 1
 }

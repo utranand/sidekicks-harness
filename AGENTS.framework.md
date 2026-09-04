@@ -10,29 +10,45 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `4ad2d4e3` on 2026-09-04T04:00:34+07:00 (Asia/Bangkok). It is regenerated on every
-> `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Put runtime-specific
-> instructions in `AGENTS.local.md` and reference it from here — add a line reading
-> `@AGENTS.local.md` below. That reference is what makes them survive, and it works on every CLI:
-> `CLAUDE.md` and `GEMINI.md` mirror this file, so all of them follow the pointer (Rule 6). A
-> `CLAUDE.local.md` would be auto-loaded by Claude Code alone and invisible to the rest.
+> `dcf15e16` on 2026-09-04T11:08:14+07:00 (Asia/Bangkok). It is regenerated on every
+> `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Where your own
+> instructions go depends on how this runtime is being used:
+>
+> - **Mounted at `.sidekicks-core/` by a workspace** — the usual case. They belong in that
+>   workspace's own `AGENTS.md`, below the managed block `sidekicks core init` writes.
+>   `sidekicks core update` never touches anything below it. This tree is read-only; nothing you
+>   write inside it survives an update.
+> - **Cloned standalone** — put them in `AGENTS.local.md` beside this file and add a line reading
+>   `@AGENTS.local.md` below.
+>
+> Either way the reference works on every CLI: `CLAUDE.md` and `GEMINI.md` mirror this file, so all
+> of them follow the pointer (Rule 6). A `CLAUDE.local.md` would be auto-loaded by Claude Code alone
+> and invisible to the rest.
 
 ## What this runtime is
 
-A standalone, self-contained Sidekicks runtime carrying **6 skill(s)** and the core
-substrate needed to run them — the `sidekicks` CLI (`bin/` + `lib/`), the boundary contract, and the
-hook scripts. It is a **complete copy**: nothing here links back to the repo it was inherited from,
-so this runtime works on a fresh clone with no other repo present. Whether it also carries a Python
-venv depends on its skills; the answer for THIS runtime is under *Operational rules* below.
+A self-contained Sidekicks runtime carrying **6 skill(s)** and the core substrate
+needed to run them — the `sidekicks` CLI (`bin/` + `lib/`), the boundary contract, and the hook
+scripts. It is a **complete copy**: nothing here links back to the repo it was inherited from, so it
+needs no other repo present. Whether it also carries a Python venv depends on its skills; the answer
+for THIS runtime is under *Operational rules* below.
 
-`git clone` + `node bin/sidekicks --help` is all it takes to start.
+It runs two ways, and the difference decides where your files go:
+
+- **Mounted** — a workspace carries it as a git submodule at `.sidekicks-core/` and drives it through
+  `bin/sidekicks`. This tree is READ-ONLY and version-pinned; the workspace around it holds the
+  projects, the config, the memory and your own skills. `node bin/sidekicks core status` says which
+  version is pinned.
+- **Standalone** — `git clone` + `node bin/sidekicks --help` is all it takes, and the runtime root
+  is also the workspace root.
 
 ## Inheritance is one-way
 
 The Sidekicks source repo is the single source of truth. Updates flow **into** this runtime and
 never out of it:
 
-- Skills are refreshed by running `sk-inherit` **in the source repo**, not here.
+- Skills are refreshed by running `sk-inherit` **in the source repo**, not here. A mounted
+  workspace does not run it at all: it moves to a newer runtime with `sidekicks core update`.
 - Editing a skill here is allowed, but it makes that skill diverge. The next sync reports it as a
   **conflict** and refuses to overwrite it without an explicit `--force` (which backs the local
   copy up first). A local improvement worth keeping belongs upstream in the source repo.
@@ -142,7 +158,7 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
 - **Cross-platform:** every script must run on both macOS and Windows — one unified
   implementation, never an OS fork. Watch path joining, line endings (tolerate `\r\n`), and
   executable suffixes (`.venv/bin` vs `.venv/Scripts`).
-- **Python:** the single repo-root `.venv` only — this runtime carries none yet, because no inherited skill needs one. If one becomes necessary, create it at the repo root as `.venv` and install everything there.
+- **Python:** the single repo-root `.venv` only — this runtime carries none yet, because no inherited skill needs one. If one becomes necessary, create it at the WORKSPACE root as `.venv` and install everything there — mounted, that is the directory holding `.sidekicks-core/`, not this read-only tree; standalone, the two are the same place.
 - **Timezone:** `Asia/Bangkok` (UTC+07:00) for ALL timestamps and dates.
 - **Protected branches — never implement on them (hard rule):** no implementation work may be
   edited, committed, or amended directly on `main`, `sit`, `uat`, `staging`, `prod`, or

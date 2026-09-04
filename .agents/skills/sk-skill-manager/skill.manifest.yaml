@@ -40,8 +40,8 @@ requires:
     defaults: config.defaults.yaml
   framework_files:
     - path: lib/framework-settings/floor.mjs
-      degraded: 'TODO: state what breaks without this file'
-      # seen at SKILL.md:119
+      degraded: 'ARCHITECT loses the one list that says which ids are frozen, so the settings-split gate cannot tell a safety floor entry from an ordinary policy statement. Every finding it raises then reads the same, and the advice it gives for a hard stop (Rule 4, prod access, a credential) becomes "declare a criterion for it" - which is the exact opposite of correct, because a floor id written into any settings layer is a validation error. The skill still validates, heals, exports and imports; it is the ADVISE half that stops being trustworthy, and a wrong answer there is worse than no answer.'
+      # seen at SKILL.md:154
 
 # AUTHORED rejections — findings a human looked at and decided are not dependencies.
 not_required:
@@ -141,4 +141,4 @@ bundle:
   scripts/skill-repo-readmes-private.mjs: sha256:2c32ac9860640dec9be2218dee7a3ed94dba0c1748d462f847889ed60d6f9271
   scripts/skill-repo-readmes-public.mjs: sha256:913942b4f25eab31890ba728553838349477629823afcdce8360e22b623d6862
   scripts/skill-search.mjs: sha256:63daac8ee2709c8d2fd00faae31d942e7b526c58cce2e9d1fb8a0138f3f01aeb
-  skill.yaml: sha256:54e6ae0288bab42e1a3f7309fea10170f342d74e960c2dc6e9bf9bd7eb422cba
+  skill.yaml: sha256:2bda30ad9a34a9cc4b5d55737733f11a49ba0dacd40337dc9220293cf1923468

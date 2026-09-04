@@ -11,7 +11,7 @@
 //   3. THE GATE LIVES IN THE SCRIPT, not in the per-CLI wiring. That is what keeps Rule 6
 //      cheap: .claude/settings.json, .codex/config.toml, .gemini/settings.json and
 //      .agent/settings.json stay byte-identical to before, all four inherit the gate at once,
-//      and tests/multi-cli-parity.test.mjs keeps passing unchanged.
+//      and lib/framework-lifecycle/tests/multi-cli-parity.test.mjs keeps passing unchanged.
 //
 // Zero npm dependencies — node:* + the framework-settings resolver only.
 
