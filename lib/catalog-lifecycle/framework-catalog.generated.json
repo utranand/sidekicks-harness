@@ -1520,9 +1520,9 @@
     ]
   },
   "framework": {
-    "entry_count": 60,
+    "entry_count": 61,
     "rule_count": 28,
-    "criterion_count": 17,
+    "criterion_count": 18,
     "hook_count": 15,
     "floor_count": 17,
     "entries": [
@@ -1724,6 +1724,19 @@
           "sk-skill-auditor"
         ],
         "body_at": ".agents/skills/sk-skill-auditor/rules/criterion.skill-auditing.md",
+        "body_marker": null,
+        "script": null,
+        "floor": false,
+        "source": "skill"
+      },
+      {
+        "id": "criterion.snyk-kics-leg",
+        "kind": "criterion",
+        "title": "Run the KICS IaC leg as part of the security gate",
+        "owners": [
+          "sk-shp-snyk-test"
+        ],
+        "body_at": ".agents/skills/sk-shp-snyk-test/rules/criterion.snyk-kics-leg.md",
         "body_marker": null,
         "script": null,
         "floor": false,

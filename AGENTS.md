@@ -1,7 +1,7 @@
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `dcf15e16` on 2026-09-04T11:08:14+07:00 (Asia/Bangkok). It is regenerated on every
+> `af54175b` on 2026-09-04T18:16:01+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Where your own
 > instructions go depends on how this runtime is being used:
 >

@@ -4,8 +4,8 @@
   "direction": "one-way: sidekicks source -> this runtime",
   "source": {
     "repo": "sidekicks",
-    "commit": "dcf15e16",
-    "inherited_at": "2026-09-04T11:08:10+07:00",
+    "commit": "af54175b",
+    "inherited_at": "2026-09-04T18:15:57+07:00",
     "tool": "sk-inherit"
   },
   "options": {
@@ -17,8 +17,8 @@
       "origin": "active",
       "version": "1.7.0",
       "source_path": ".agents/skills/sk-hello",
-      "source_commit": "dcf15e16",
-      "inherited_at": "2026-09-04T11:08:10+07:00",
+      "source_commit": "af54175b",
+      "inherited_at": "2026-09-04T18:15:57+07:00",
       "files": {
         "SKILL.md": "30d274fe0bf6e5a759e97f2306086a9d7b396305ba2610430f314471ada89629",
         "VERSION.json": "9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af",
@@ -34,8 +34,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-cli",
-      "source_commit": "dcf15e16",
-      "inherited_at": "2026-09-04T11:08:10+07:00",
+      "source_commit": "af54175b",
+      "inherited_at": "2026-09-04T18:15:57+07:00",
       "files": {
         "SKILL.md": "339bbc3ed4999dc91550811ea86f99d994dba6d5d1bf71f04c06b8092d7f95d8",
         "VERSION.json": "23ae847800c72cb55557e9a52d3d9e1f5f5650f218db63c1b8ab7ade771c1646",
@@ -48,8 +48,8 @@
       "origin": "active",
       "version": "1.4.1",
       "source_path": ".agents/skills/sk-commander",
-      "source_commit": "dcf15e16",
-      "inherited_at": "2026-09-04T11:08:10+07:00",
+      "source_commit": "af54175b",
+      "inherited_at": "2026-09-04T18:15:57+07:00",
       "files": {
         "SKILL.md": "66397e830f26d1fa4f69c2b7ef2695e03135325552b2366aa9915b3dce929339",
         "VERSION.json": "1916895f28fd3fd5d28af2efd7e9f1b27d541964256734b8cd89e86ba94734b9",
@@ -95,8 +95,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-scope-switch",
-      "source_commit": "dcf15e16",
-      "inherited_at": "2026-09-04T11:08:10+07:00",
+      "source_commit": "af54175b",
+      "inherited_at": "2026-09-04T18:15:57+07:00",
       "files": {
         "SKILL.md": "0c429429f6d535e538680bd0d701a954c4737260a85b72d18d5dbbd7a1a60d17",
         "VERSION.json": "2f8fffddaf0f59c6711434d2b4477beb3d19f847fdb02f09826ce348b3a4e405"
@@ -107,8 +107,8 @@
       "origin": "active",
       "version": "1.0.0",
       "source_path": ".agents/skills/sk-config-doctor",
-      "source_commit": "dcf15e16",
-      "inherited_at": "2026-09-04T11:08:10+07:00",
+      "source_commit": "af54175b",
+      "inherited_at": "2026-09-04T18:15:57+07:00",
       "files": {
         "SKILL.md": "198908336a007135039fa971f60708ebebc5dd30e779afd01b4e822b964ece46",
         "VERSION.json": "86a579f1dc8a18d070e0e6a1f68488a04c94d19384c9f2c25888ce11f82fdf72",
@@ -120,8 +120,8 @@
       "origin": "active",
       "version": "1.6.0",
       "source_path": ".agents/skills/sk-skill-manager",
-      "source_commit": "dcf15e16",
-      "inherited_at": "2026-09-04T11:08:10+07:00",
+      "source_commit": "af54175b",
+      "inherited_at": "2026-09-04T18:15:57+07:00",
       "files": {
         "SKILL.md": "475911883d18beca8efbcd7ec8a0c4f05061e8fa049f2618e6b30172f1757a9e",
         "VERSION.json": "206f32a6bb6d3831419e5bd2c515c43ac61081e04987da07d8d028fdaf2e13e2",
@@ -364,7 +364,7 @@
       "classification": "settings",
       "initializer_origin": "framework setting",
       "mode": "copy",
-      "hash": "6522e3504532c43eff346eb2ce26432631a92c20e3030bddbfea05fbe09d6ff0"
+      "hash": "3b8341799ce9d9fea189b3517d19c1e70b12e01d3a2aac6cbfd6da566634cf80"
     },
     {
       "source": ".sidekicks/config/settings/hooks.yaml",

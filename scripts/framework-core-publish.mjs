@@ -23,9 +23,9 @@
 //      passed back as --core-version. `status` shows the next version before you commit.
 //
 //      THE SOURCE package.json IS NOT THE CORE VERSION AND IS NOT STALE. It has now
-//      been reported as a defect by two consecutive audits (INC-2026-09-04-01 F-5,
-//      INC-2026-09-04-02 N-9), so it is written down here rather than re-litigated a
-//      third time. The forge STAMPS the forged package.json with --core-version
+//      been reported as a defect by three consecutive audits (INC-2026-09-04-01 F-5,
+//      INC-2026-09-04-02 N-9, INC-2026-09-04-03 U-4), so it is written down here
+//      rather than re-litigated a fourth time. It is DECIDED, not open. The forge STAMPS the forged package.json with --core-version
 //      (inherit.mjs writeCoreDistribution), so a mounted CLI's `--version` is correct
 //      today; the source file versions the source repo, which is a different artifact
 //      with a different release cadence and no consumer. Syncing them would create a
@@ -160,6 +160,11 @@ const DRY = has("dry-run");
 const JSON_OUT = has("json");
 const NO_TESTS = has("no-tests");
 const NO_MOUNT_CHECK = has("no-mount-check");
+// The upgrade gate mounts the previous SERVED release and runs its `core update` onto the
+// candidate. Costly (a second workspace and a second doctor), and skippable for the same reasons
+// the mount check is — but never by default: a release whose fix lives in the update tail is
+// exactly the release that cannot verify itself any other way (INC-2026-09-04-03, R-4).
+const NO_UPGRADE_CHECK = has("no-upgrade-check");
 const NO_COMMIT = has("no-commit");
 const ALLOW_PROTECTED = has("allow-protected");
 const RELAND = has("reland");
@@ -1045,6 +1050,12 @@ async function doStatus() {
     head: head.sha,
     branch: head.branch,
     working_tree_dirty: head.dirty,
+    // Split from working_tree_dirty on purpose (INC-2026-09-04-03, U-4). head.dirty is
+    // `git status --porcelain` over the WHOLE repo, so four unrelated project gitlinks made a
+    // release whose every core-bound surface was committed report "working tree DIRTY" — a warning
+    // that named nothing the release could act on, next to a refusal (below) that correctly gates on
+    // core-bound files only. The honest number was already being computed; it just was not reported.
+    core_bound_dirty: uncommitted.length,
     core_bound_path_count: paths.length,
     surface_source: source,
     pending_commits: pending.commits.length,
@@ -1085,7 +1096,10 @@ async function doStatus() {
           `the forged core is OLDER than the log claims; reconcile before bumping`
       );
     }
-    out.push(`  HEAD:        ${head.sha}${head.branch ? ` (${head.branch})` : ""}${head.dirty ? " — working tree DIRTY" : ""}`);
+    out.push(`  HEAD:        ${head.sha}${head.branch ? ` (${head.branch})` : ""}`
+      + (head.dirty
+        ? ` — working tree DIRTY (${uncommitted.length} core-bound)`
+        : ""));
     out.push(`  surfaces:    ${paths.length} core-bound path(s) — from ${source}`);
     out.push("");
     if (pending.unknownBase) {
@@ -1374,9 +1388,12 @@ function upsertLogEntry(logPath, version, entry) {
 //   3. its test suite   — the code it ships actually passes its own gates
 //   4. drift            — what was forged matches what the source says it should be
 //   5. mount            — a consumer mounting it gets a working workspace
+//   6. upgrade          — a consumer UPGRADING to it from the last served release gets one too
 //
 // Gate 5 is the one that answers the question the others cannot: everything above tests
-// the core as a directory, and only this tests it as a thing someone installs.
+// the core as a directory, and only this tests it as a thing someone installs. Gate 6 exists
+// because gate 5 installs it FRESH, and a fresh install never runs the update tail — which is
+// where a whole class of defect lives, invisible to every gate above it.
 
 /** Run one subprocess and keep only enough output to diagnose a failure. */
 function step(cmd, args, cwd) {
@@ -1538,6 +1555,133 @@ function mountCheck() {
 }
 
 /**
+ * Install the PREVIOUS served release the way a consumer did, then upgrade it to the candidate.
+ *
+ * WHY A SECOND MOUNT GATE. `mountCheck` above installs the candidate FRESH, and a fresh install was
+ * clean for every release this gate would have caught. `core update` is a verb of the core being
+ * REPLACED: the workspace shim forwards into the mount, so after `git checkout` swaps the files it
+ * was still the outgoing release's already-imported modules that re-derived the workspace from them.
+ * Every fix living in that tail therefore skipped the update that installed it — v1.4.3 shipped with
+ * a green mount check while upgrading a v1.4.2 workspace to it reproduced both defects it fixed
+ * (INC-2026-09-04-03). A gate that only ever installs the new core cannot see that, by construction.
+ *
+ * The assertion is step 5: the NEW core's own `core doctor --all` in a workspace that arrived there
+ * by upgrading, not by installing. v1.4.3 would have failed it.
+ *
+ * @returns {{ok: true, skipped?: boolean, note?: string} | {ok: false, note: string, tail?: string}}
+ */
+function upgradeCheck() {
+  if (!targetIsOwnRepo()) {
+    return { ok: true, skipped: true, note: "the target is not its own git repository, so there is nothing to upgrade" };
+  }
+  // The previous release must be one the REMOTE actually served: an upgrade path only exists from a
+  // version a consumer could have installed. state.json's remote_verified is the only field that
+  // means that (last_local_release is explicitly not evidence anyone can fetch it).
+  const stateNow = readJson(STATE_REL) || {};
+  const prev = stateNow.remote_verified && stateNow.remote_verified.version
+    ? String(stateNow.remote_verified.version)
+    : null;
+  if (!prev) {
+    return { ok: true, skipped: true, note: "no verified remote release to upgrade FROM — nothing to check yet" };
+  }
+  const prevTag = `v${prev}`;
+  const prevSha = git(["rev-parse", "--verify", `${prevTag}^{commit}`], SRC_ABS);
+  if (!prevSha.ok || !prevSha.out) {
+    return { ok: true, skipped: true, note: `${prevTag} was served but does not resolve in this checkout — cannot mount it` };
+  }
+  const candidate = candidateCommit();
+  if (!candidate.ok) return { ok: false, note: candidate.note };
+
+  let ws = null;
+  try {
+    ws = mkdtempSync(join(tmpdir(), "sk-core-upgrade-"));
+    const g = (args, cwd = ws) => spawnSync("git", ["-c", "protocol.file.allow=always", ...args], { cwd, encoding: "utf8" });
+    g(["init", "-q", "."]);
+    g(["config", "user.email", "publish@sidekicks.local"]);
+    g(["config", "user.name", "framework-core-publish"]);
+    const added = g(["submodule", "add", "-q", SRC_ABS, ".sidekicks-core"]);
+    if (added.status !== 0) {
+      return { ok: false, note: `could not mount the previous release: ${(added.stderr || "").trim().split("\n").slice(-3).join(" ")}` };
+    }
+    const mount = join(ws, ".sidekicks-core");
+
+    // 1. Put the mount on the previous SERVED release, and record it as the tracked ref the way both
+    //    installers do — the pin is what makes this an upgrade rather than a re-install.
+    const onPrev = g(["checkout", "-q", "--detach", prevSha.out], mount);
+    if (onPrev.status !== 0) {
+      return { ok: false, note: `could not check out ${prevTag} in the mount: ${(onPrev.stderr || "").trim().split("\n").slice(-3).join(" ")}` };
+    }
+    g(["config", "-f", ".gitmodules", "submodule..sidekicks-core.branch", prevTag]);
+    g(["add", ".gitmodules"]);
+
+    // 2. The OLD core seeds the workspace. Through its own bin, because the workspace has no shim yet.
+    const init = nodeStep([join(mount, "bin", "sidekicks"), "core", "init"], ws);
+    if (!init.ok) {
+      return { ok: false, note: `${prevTag} could not seed a workspace — the upgrade path starts from a broken install`, tail: init.tail };
+    }
+    // Asked explicitly: a `core init` that exits 0 without writing the shim leaves every step below
+    // failing as MODULE_NOT_FOUND, which names the symptom and not the cause.
+    if (!existsSync(join(ws, "bin", "sidekicks"))) {
+      return {
+        ok: false,
+        note: `${prevTag} seeded a workspace with no bin/sidekicks shim, so there is nothing to upgrade THROUGH`,
+        tail: init.tail,
+      };
+    }
+
+    // 3. The candidate is an unreferenced throwaway commit, so `core update`'s own
+    //    `fetch origin --tags` cannot reach it — and that fetch failing is non-fatal by design.
+    //    Put the object in the mount first, so the ref ladder resolves it locally.
+    const fetched = spawnSync("git", ["-c", "protocol.file.allow=always", "fetch", "-q", SRC_ABS, candidate.sha],
+      { cwd: mount, encoding: "utf8" });
+    if (fetched.status !== 0) {
+      return { ok: false, note: `could not fetch the candidate into the mount: ${(fetched.stderr || "").trim().split("\n").slice(-3).join(" ")}` };
+    }
+
+    // 4. THE UPGRADE, through the WORKSPACE shim — i.e. run by the OLD core, which is the point.
+    const upd = nodeStep([join(ws, "bin", "sidekicks"), "core", "update", "--ref", candidate.sha], ws);
+    if (!upd.ok) {
+      return { ok: false, note: `core update from ${prevTag} to the candidate failed`, tail: upd.tail };
+    }
+
+    // 5. THE ASSERTION. The new core's own doctor, in a workspace that got here by upgrading.
+    const doctor = nodeStep([join(ws, "bin", "sidekicks"), "core", "doctor", "--all"], ws);
+    if (!doctor.ok) {
+      return {
+        ok: false,
+        note: `core doctor --all failed after upgrading a ${prevTag} workspace to this candidate — `
+          + "the tail of the update did not run the new core's rules",
+        tail: doctor.tail,
+      };
+    }
+
+    // 6. U-2 directly: the branch key reached the INDEX, not just the worktree. Left unstaged, a
+    //    commit records a pin with no tracked ref and a fresh clone falls back to main.
+    const inIndex = spawnSync("git", ["show", ":.gitmodules"], { cwd: ws, encoding: "utf8" });
+    const onDisk = readFileSync(join(ws, ".gitmodules"), "utf8");
+    if (inIndex.status !== 0 || inIndex.stdout.trim() !== onDisk.trim()) {
+      return {
+        ok: false,
+        note: "after the upgrade .gitmodules disagrees with itself — the tracked ref was written to "
+          + "the worktree and never staged, so a commit would record a pin with no ref",
+        tail: `index:\n${inIndex.stdout}\nworktree:\n${onDisk}`,
+      };
+    }
+    return { ok: true, note: `upgraded a ${prevTag} workspace to the candidate` };
+  } catch (err) {
+    return { ok: false, note: `upgrade check could not run: ${err && err.message ? err.message : String(err)}` };
+  } finally {
+    if (ws) {
+      try {
+        rmSync(ws, { recursive: true, force: true });
+      } catch {
+        /* a leftover temp dir is not worth failing a release over */
+      }
+    }
+  }
+}
+
+/**
  * Every gate, in order. Returns the rows for the log entry plus the first failure, if any.
  * Stops at the first failure: gate 3 has nothing useful to say about a core whose CLI does
  * not even start, and a wall of downstream noise buries the one line that matters.
@@ -1610,6 +1754,23 @@ function runGates(inheritAbs) {
     const m = mountCheck();
     if (!m.ok) return record("mount check", "FAIL", m.note, m.tail);
     gates.push({ name: "mount check", result: m.skipped ? "skipped" : "pass", note: m.note });
+  }
+
+  // 6 — a consumer's UPGRADE actually works. Gate 5 installs the candidate fresh, which stays green
+  // for every defect that lives in the update tail, because a fresh install never runs it.
+  //
+  // --no-mount-check waives this one too, and deliberately: both gates ask "does this behave as a
+  // thing someone installs", and that flag is what a caller passes when the target is not a real
+  // mountable core (the publish suite's synthetic fixtures). Honouring only the fresh half would
+  // turn every existing --no-mount-check caller red on a question it had already waived.
+  // --no-upgrade-check waives the upgrade half alone.
+  if (NO_UPGRADE_CHECK || NO_MOUNT_CHECK) {
+    gates.push({ name: "upgrade check", result: "SKIPPED",
+      note: NO_UPGRADE_CHECK ? "--no-upgrade-check" : "--no-mount-check" });
+  } else {
+    const u = upgradeCheck();
+    if (!u.ok) return record("upgrade check", "FAIL", u.note, u.tail);
+    gates.push({ name: "upgrade check", result: u.skipped ? "skipped" : "pass", note: u.note });
   }
 
   return { gates, failed: null };
@@ -2372,7 +2533,7 @@ async function doShip() {
     : "  to cut:       nothing — no core-bound change since the last release");
   for (const m of moves) plan.push(`  branch move:  ${m.what}: '${m.from}' is protected → switch -C ${branchName}`);
   plan.push("");
-  plan.push("  then: publish (forge, 5 gates, log, commit + tag locally)");
+  plan.push("  then: publish (forge, 6 gates, log, commit + tag locally)");
   plan.push("        release (push the TAG first, then the branch, then verify the remote serves it)");
 
   if (!owed && servedAlready) {
