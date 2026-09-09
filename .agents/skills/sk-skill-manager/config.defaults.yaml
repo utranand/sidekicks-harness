@@ -6,14 +6,14 @@
 # `sidekicks framework config sk-skill-manager`.
 #
 # SECRETS ARE FORBIDDEN HERE (committed file; enforced by .githooks/pre-commit and
-# tests/skill-config.test.mjs). Nothing below is a credential: a public git URL is not one, and
-# reaching a PRIVATE repo uses the operator's own already-configured git credentials, never a token
-# recorded here.
+# tests/skill-config.test.mjs). The carried default is deliberately public-only: a forged framework
+# must never reveal a source checkout's private destination or machine-local checkout path.
 
 skill_manager:
   # The skills repositories this skill exports to and imports from — a MAP, one named destination
-  # per repository. There is more than one on purpose: some skills are publishable and some are
-  # client-specific, and a single `skill_repo:` could not express that, so nothing could check it.
+  # per repository. The portable default exposes only the public catalog. A source checkout may add
+  # private destinations and local checkout paths in its root `config/skills.yaml`; those values are
+  # configuration, not distributable skill defaults.
   # A destination name is what `skill export --destination <name>` and `skill destinations
   # --destination <name>` take; a skill pins itself to one with `skill_repo: <name>` in its own
   # skill.yaml (or withholds itself everywhere with `skill_repo: none`).
@@ -47,11 +47,7 @@ skill_manager:
     # differently. Empty or absent falls through to the block-level value.
     public:
       remote: 'https://github.com/utranand/sidekicks-skills.git'
-      checkout: 'projects/global/services/sidekicks-skills/src'
-      source_repo: 'https://github.com/utranand/sidekicks-harness.git'
-    private:
-      remote: 'https://github.com/utranand/sidekicks-skills-private.git'
-      checkout: 'projects/global/services/sidekicks-skills-private/src'
+      checkout: ''
       source_repo: 'https://github.com/utranand/sidekicks-harness.git'
 
   # PUBLISHED PROVENANCE, so it must name a repo a reader of the DESTINATION can reach — the framework
@@ -85,11 +81,20 @@ skill_manager:
     source_repo: 'https://github.com/utranand/sidekicks-harness.git'
 
   import:
-    # Back the local skill up before replacing it. Cheap, and the one thing that makes a wrong
-    # import recoverable.
+    # INERT — DECLARED, NOT READ. Both keys below are the same case as `require_clean_bundle` above:
+    # `grep -rn 'allow_force\|import\.backup' lib/` finds nothing. They are kept rather than deleted
+    # only so a scope that has already set one does not fail `config doctor` on an undeclared key.
+    #
+    # Back the local skill up before replacing it. lib/skill-lifecycle/import.mjs `applyOne` calls
+    # `backupSkillDir` UNCONDITIONALLY, reading no config: the backup is the one thing that makes a
+    # wrong import recoverable, and a switch that can turn it off is a switch that will one day be
+    # off during the import that needed it. Setting this `false` does NOT skip the backup.
     backup: true
-    # --force overwrites a locally-modified skill. Off by default: the whole point of the
-    # three-way reconcile is that a conflict stops and asks.
+    # --force overwrites a locally-modified skill, and is gated by the FLAG alone. Setting this
+    # `true` does not pre-authorise anything and setting it `false` does not disable `--force`.
+    # Making it conditional would turn a hardcoded guard into a switchable one — a separately
+    # reviewed change to import.mjs's gate logic, decided by a human. It is not planned, not
+    # half-built, and not a config toggle waiting to be flipped.
     allow_force: false
 
   bmad:

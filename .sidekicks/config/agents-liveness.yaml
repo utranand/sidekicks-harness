@@ -1,15 +1,16 @@
 # agents-liveness.example.yaml — committed schema documentation for the artifact-liveness
 # watcher (scripts/artifact-liveness-hook.mjs) and the `sidekicks artifacts scan` threshold.
 #
-# HOW TO USE: copy this file to `agents-liveness.yaml` in the same directory (.sidekicks/) and
-# adjust. The file is OPTIONAL — absent or unparseable, everything falls back to the built-in
+# HOW TO USE: `sidekicks core init` renders this example as the live `agents-liveness.yaml`
+# beside it, under .sidekicks/config/. Adjust that copy, never this one. The file is OPTIONAL — absent or unparseable, everything falls back to the built-in
 # defaults shown below, so a fresh clone needs no config. This example carries only defaults
 # and is safe to commit.
 #
 # ROOT-ONLY (not per-project). The liveness inventory is a SINGLE repo-wide artifact
 # (.sidekicks/artifacts-inventory.{json,md}) — one scan folds every project + service scope
 # into one file — so there is nothing per-project to tune. Unlike run_notify:/slack: (which
-# live in the per-scope config.yaml), this config lives ONLY at .sidekicks/agents-liveness.yaml.
+# live in the per-scope config/ family files), this config lives ONLY at the ROOT scope:
+# .sidekicks/config/agents-liveness.yaml.
 
 artifact_liveness:
   # Master switch for the AUTOMATIC watcher (the SessionStart/Stop/SubagentStop hook).

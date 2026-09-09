@@ -1,0 +1,24 @@
+schema: agent-charter/v1
+name: fiona
+specialty: "Frontend/UI/UX specialist — React and React Native components, design systems, mobile builds"
+categories:
+  - frontend
+  - ui
+  - design
+  - design-system
+  - ux
+  - mobile-app
+role: worker
+model: mid
+persona: ""
+mission: ""
+goals: []
+expertise: []
+principles: []
+routines: []
+output_contract: ""
+status: active
+created_at: 2026-07-25T15:50:50+07:00
+default_work_dir: ""
+improvement:
+  enabled: false

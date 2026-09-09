@@ -69,7 +69,7 @@
 // Flags:
 //   --target DIR               the core to forge into (default: the configured service src/)
 //   --name NAME                runtime name passed to the inherit engine (default: derived)
-//   --preset NAME              inherit preset to forge (default: core — the required floor only)
+//   --preset NAME              inherit preset to forge (default: framework)
 //   --remote URL               git remote stamped into the generated installers
 //   --bump patch|minor|major   override the derived class
 //   --version X.Y.Z            set the version explicitly (overrides --bump)
@@ -130,6 +130,9 @@ import { join, dirname, resolve, relative, isAbsolute, basename, sep } from "nod
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { configurationInventory } from "../lib/core-lifecycle/config-templates.mjs";
+// The reader of `check run --json` lives with the runner that writes it — see readCheckRun
+// for the two ways this script used to misread that result (INC-2026-09-09).
+import { readCheckRun } from "../lib/check-lifecycle/_shared.mjs";
 
 // ── Repo root ───────────────────────────────────────────────────────────────
 // Walk up for .sidekicks/ rather than `git rev-parse`: this script sits next to
@@ -349,14 +352,30 @@ const SRC_REL = flag("target")
 const SRC_ABS = resolve(ROOT, SRC_REL);
 const RUNTIME_NAME = flag("name") || (flag("target") ? deriveName(SRC_REL) : CFG.runtime_name || "sidekicks-harness");
 const REMOTE = flag("remote") || CFG.remote || "https://github.com/utranand/sidekicks-harness.git";
-// The published core carries the REQUIRED FLOOR and nothing else. `core` is the preset that names
-// exactly that floor (presets.yaml keeps it identical to the `required:` block, test-enforced), so a
-// mounted core can orient itself, drive every CLI verb, align scope and validate its config — and the
-// consumer chooses every other skill instead of inheriting our whole bench. The rest of the framework
-// family did not stop being framework skills: they stay in the `framework` preset and are published
-// as the `framework` category of the sidekicks-skills repository, installed on demand.
-// `--preset framework` still forges the old fat core for anyone who wants it.
-const PRESET = flag("preset") || CFG.preset || "core";
+// The published core carries the dynamically resolved framework runtime. The `framework` preset
+// starts with skills declared for that runtime and lets the inherit engine add the immutable required
+// floor and hard dependency closure. `--preset` remains an explicit escape hatch for operators who
+// need another supported composition, including the legacy floor-only `core` preset.
+const PRESET = flag("preset") || CFG.preset || "framework";
+
+// How much of the shipped AGENT PACKS' declared skill graph the core carries. A pack names the
+// skills its agents need and NEVER bundles one — both shipped pack.yaml files say so in their own
+// header — so the core ships pack METADATA and the consumer imports the skills. That is not a hole:
+// `agent pack install` refuses before writing anything when a required skill is absent and prints
+// the exact clone/import/sync commands (lib/agent-lifecycle/pack.mjs), which is the authored
+// contract this default finally stops overriding.
+//
+// This defaulted to `closure` for one release. The reasoning was "a published core must be
+// dependency-closed", but closing a PACK's graph is a different question from closing the core's:
+// it dragged 25 sibling skills — every sk-bmad-*, jira, database and confluence skill — into a core
+// that neither declares nor depends on them, turning the framework runtime into a copy of the
+// development workspace. Under `none` nothing is half-declared, because nothing pack-derived is
+// present at all. `declared` and `closure` remain explicit operator overrides for a deliberately
+// larger distribution, and both are recorded in status and the release log.
+//
+// Passed to BOTH the plan and the forge, because corePaths() reads the plan to decide what changed
+// — a plan that derived a different set than the forge would misreport the release.
+const PACK_SKILLS = flag("pack-skills") || CFG.pack_skills || "none";
 
 /**
  * Run state lives under the SERVICE root when the target IS a service's src/ (artifacts base
@@ -428,6 +447,23 @@ function targetIsOwnRepo() {
 function lastRelease(state) {
   if (!state) return null;
   return state.last_local_release || state.last_publish || null;
+}
+
+/**
+ * Does a version-stamped state block still describe `version`?
+ *
+ * Every remote-facing block in state.json (`remote_verified`, `remote_check`, `remote_release`)
+ * carries the version it is about, precisely so a block from an older release is never read as a
+ * statement about the current one. The comparison is stringified on both sides: the same version
+ * reaches this file as `"1.4.4"` from JSON and can arrive as a number-shaped value from a hand edit,
+ * and `1.4 !== "1.4"` would silently discard a block that was perfectly valid.
+ *
+ * @param {{version?: unknown}|null|undefined} block
+ * @param {string} version
+ * @returns {boolean}
+ */
+function sameVersion(block, version) {
+  return Boolean(block) && String(block.version) === String(version);
 }
 
 function publishedVersion() {
@@ -541,9 +577,9 @@ function referenceContent(version, state, ver) {
 // ── Core-bound surfaces ─────────────────────────────────────────────────────
 // Which source paths actually end up inside the core. Asking the inherit engine is
 // the only answer that cannot drift: `plan` prints the substrate list and the resolved
-// skill set from the SAME code that copies them. The literal list below is a fallback
-// for the case where plan cannot run (or its output shape changes) — it is reported as
-// a fallback so a wrong answer is never mistaken for an authoritative one.
+// skill set from the SAME code that copies them. A present inherit engine that cannot plan is a
+// hard error: release composition may never fall back after a malformed/forbidden dynamic closure.
+// The literal list below remains only for reduced fixtures/checkouts where inherit is absent.
 const SUBSTRATE_FALLBACK = [
   "bin",
   "lib",
@@ -565,63 +601,85 @@ const SUBSTRATE_FALLBACK = [
   "AGENTS.md",
 ];
 
+/**
+ * The core's composition, asked of the engine that forges it.
+ *
+ * READ AS JSON, NOT AS PROSE. This used to regex `inherit plan`'s human output — the skills header,
+ * the two-space row indent, the bracketed reason tokens. That coupling was invisible from both
+ * sides, and it broke exactly the way an invisible coupling does: the day the header gained an
+ * "including N required" suffix the parser matched nothing, and the release silently lost its entire
+ * skill list along with every skill path in the pending-file scan. `--json` is the engine stating
+ * its answer; anything it cannot state is a failure here rather than an empty section.
+ */
 function corePaths() {
   const inherit = join(ROOT, INHERIT_REL);
   if (existsSync(inherit)) {
     const r = spawnSync(
       process.execPath,
-      [inherit, "plan", "--name", RUNTIME_NAME, "--preset", PRESET],
+      // --as-core matches what publish actually forges. Without it the plan derives no agent-pack
+      // skills, so the path set below would omit skills the core really ships and the bump
+      // classifier would not see one arriving.
+      [inherit, "plan", "--name", RUNTIME_NAME, "--preset", PRESET, "--as-core",
+        "--pack-skills", PACK_SKILLS, "--json"],
       { cwd: ROOT, encoding: "utf8" }
     );
-    const text = r.stdout || "";
-    const skills = [];
-    const substrate = [];
-    let mode = null;
-    for (const raw of text.split("\n")) {
-      // The count may carry a qualifier — "skills (17, including 4 required):" — so match the
-      // opening paren loosely. Pinning it to `\(\d+\)` silently dropped the whole skill list
-      // (and with it every skill path in the pending-file scan) the day the required floor
-      // added its suffix.
-      if (/^skills \(\d+[^)]*\)/.test(raw)) {
-        mode = "skills";
-        continue;
-      }
-      if (/^core substrate/.test(raw)) {
-        mode = "substrate";
-        continue;
-      }
-      if (/^\S/.test(raw)) {
-        mode = null; // any unindented line ends the current section
-        continue;
-      }
-      if (!mode) continue;
-      const line = raw.trim();
-      if (!line) continue;
-      if (mode === "skills") {
-        // "  <name>  active  v1.0.0" — nested advisory lines are deeper-indented
-        // and carry a ':' or start with a keyword, so require the 2-space form.
-        if (!/^ {2}\S/.test(raw)) continue;
-        const name = line.split(/\s+/)[0];
-        if (name && !name.includes(":")) skills.push(`.agents/skills/${name}`);
-      } else if (/^ {2}\S+$/.test(raw)) {
-        substrate.push(line);
-      }
+    const fail = (why) => {
+      const detail = (r.stderr || r.stdout || why).trim().split('\n').slice(0, 12).join('\n');
+      process.stderr.write(
+        `cannot resolve framework-core composition from inherit plan (exit ${r.status ?? 'unknown'}):\n`
+        + `${detail}\n`
+      );
+      process.exit(4);
+    };
+    if (r.status !== 0) fail('inherit plan failed without diagnostic output');
+
+    let plan = null;
+    try {
+      plan = JSON.parse(r.stdout || "null");
+    } catch {
+      fail('inherit plan --json produced no parseable payload');
     }
-    if (skills.length && substrate.length) {
+    const names = Array.isArray(plan?.skill_names) ? plan.skill_names : null;
+    const substrate = Array.isArray(plan?.substrate) ? plan.substrate : null;
+    if (!names?.length || !substrate?.length) {
+      fail('inherit plan --json carried no skill or substrate surface');
+    }
+
+    const reasons = {};
+    for (const row of plan.skills || []) {
+      // A skill with no reason is a skill the artifact cannot explain. The engine now records one
+      // for every path INCLUDING agent-pack contribution, so an empty list here means a real gap
+      // rather than "the publisher could not tell" — say so instead of inventing a label.
+      reasons[row.skill] = row.reasons?.length ? [...row.reasons].sort() : ['unattributed'];
+    }
+    return {
       // CLAUDE.md is imported by the generated core CLAUDE.md's rules and is not in
       // the substrate list, but a change to it does change the core.
-      return {
-        paths: [...substrate, "AGENTS.md", ...skills].sort(),
-        skills: skills.map((p) => p.split("/").pop()).sort(),
-        source: "inherit plan",
-      };
-    }
+      paths: [...substrate, "AGENTS.md", ...names.map((n) => `.agents/skills/${n}`)].sort(),
+      skills: [...names].sort(),
+      reasons,
+      packSkills: plan.pack_skills ?? null,
+      payload: plan.payload ?? null,
+      runtimeExcludedDirs: Array.isArray(plan.runtime_excluded_dirs) ? plan.runtime_excluded_dirs : [],
+      problems: plan.problems ?? [],
+      source: "inherit plan --json",
+    };
   }
   return {
     paths: [...SUBSTRATE_FALLBACK].sort(),
     skills: null, // unknown, not empty — an empty set would read as "every skill was removed"
+    reasons: null,
+    packSkills: null,
+    payload: null,
+    runtimeExcludedDirs: [],
+    problems: [],
     source: "fallback list (inherit plan unavailable)",
   };
+}
+
+function renderSkillReasons(reasons) {
+  if (!reasons) return ['  unavailable — inherit engine is absent'];
+  return Object.keys(reasons).sort().map((name) => `  ${name}  [${reasons[name].join(', ')}]`);
 }
 
 // ── Inventory: what the core carries, on each side ──────────────────────────
@@ -1001,7 +1059,10 @@ function headInfo() {
 // ── status ──────────────────────────────────────────────────────────────────
 async function doStatus() {
   const ver = publishedVersion();
-  const { paths, skills, source } = corePaths();
+  const {
+    paths, skills, reasons: skillReasons, source,
+    packSkills: planPackSkills, payload, problems: planProblems,
+  } = corePaths();
   const head = headInfo();
   const base = ver.markerCommit || ver.stateCommit;
   const pending = pendingSince(base, paths);
@@ -1030,6 +1091,21 @@ async function doStatus() {
     ? stateNow.remote_check
     : null;
   const remoteState = verified ? "served" : negative ? "not_served" : "unverified";
+  // Three states here too, and for the same reason as remoteState: a release nobody has verified has
+  // not been found "behind", it has not been looked at. Only a recorded boolean is an answer.
+  const advertisedRecord = verified || negative;
+  const advertised = advertisedRecord && typeof advertisedRecord.advertised === "boolean"
+    ? advertisedRecord.advertised
+    : null;
+  // What `release` recorded as owed and `verify-remote` has not yet been able to cross off. Read
+  // from state only — status never reaches the network, so it reports the last answer and says when.
+  const outstandingMerges = sameVersion(stateNow.remote_release, lastLocal?.version)
+    && Array.isArray(stateNow.remote_release.merges_outstanding)
+    ? stateNow.remote_release.merges_outstanding
+    : [];
+  const mergesCheckedAt = sameVersion(stateNow.remote_release, lastLocal?.version)
+    ? stateNow.remote_release.merges_checked_at || null
+    : null;
   // Only classified against the remote when there ARE orphans, so an ordinary status stays offline.
   const orphanTags = unloggedTags();
   const phantomHistory = historyWithoutLog(stateNow);
@@ -1058,6 +1134,15 @@ async function doStatus() {
     core_bound_dirty: uncommitted.length,
     core_bound_path_count: paths.length,
     surface_source: source,
+    skill_selection_reasons: skillReasons,
+    // The composition POLICY, reported next to the composition itself. `preset` alone never said
+    // how much of the shipped agent packs' skill graph came with it, so two releases with the same
+    // preset and wildly different skill sets were indistinguishable in the record.
+    pack_skills: planPackSkills ?? PACK_SKILLS,
+    // What the runtime projection carried and what it left behind, by class. A release that ships
+    // a skill's improvement funnel and one that does not are otherwise the same release here.
+    payload,
+    policy_violations: planProblems,
     pending_commits: pending.commits.length,
     pending_files: pending.files.length,
     uncommitted_core_files: uncommitted.length,
@@ -1074,6 +1159,11 @@ async function doStatus() {
       || (negative && negative.checked_at)
       || null,
     unpushed_release: remoteState === "served" || !lastLocal ? null : String(lastLocal.version),
+    // Whether the core's main carries this release — the fact that decides which version the
+    // README one-liner actually installs. null means nobody has checked, not "no".
+    advertised,
+    merges_outstanding: outstandingMerges,
+    merges_checked_at: mergesCheckedAt,
     unlogged_tags: orphanTags,
     // The mirror image of unlogged_tags: history claiming a release the log has no section for.
     history_without_log: phantomHistory,
@@ -1085,6 +1175,15 @@ async function doStatus() {
     const out = [];
     out.push(`Framework core: ${portable(SRC_REL)}`);
     out.push(`  published:   v${ver.marker || "?"} (source ${ver.markerCommit || "?"})`);
+    // Four consecutive audits have filed the repo-root package.json version as stale (INC-2026-09-04
+    // -01 F-5, -02 N-9, -03 U-4, INC-2026-09-05-04 V-4). It is not: the core's version is stamped
+    // into the FORGED package.json by --core-version, and the source file versions the source repo,
+    // which is a different artifact on a different cadence. Decided by the operator 2026-09-04 and
+    // written up at the top of this file — but an auditor reads `status`, not the source header,
+    // which is exactly why it kept getting re-reported. So the pointer lives where they look.
+    out.push(`  note:        this is the CORE's version. The repo-root package.json versions the`);
+    out.push(`               source repo and is deliberately unrelated — see the VERSIONING note at`);
+    out.push(`               the top of scripts/framework-core-publish.mjs (decided 2026-09-04).`);
     if (resumed) {
       out.push(
         `  RESUMING:    marker says v${ver.marker}, log's last release is v${ver.state} — a publish ` +
@@ -1101,6 +1200,8 @@ async function doStatus() {
         ? ` — working tree DIRTY (${uncommitted.length} core-bound)`
         : ""));
     out.push(`  surfaces:    ${paths.length} core-bound path(s) — from ${source}`);
+    out.push(`  resolved skills:`);
+    out.push(...renderSkillReasons(skillReasons));
     out.push("");
     if (pending.unknownBase) {
       out.push("  Cannot diff: the published source commit is unknown or not in this repo's history.");
@@ -1147,12 +1248,38 @@ async function doStatus() {
     if (remoteState === "served") {
       out.push(`  remote:      SERVED — v${result.remote_verified_version} verified at ${result.remote_checked_at}`);
     } else if (remoteState === "not_served") {
-      const first = (negative.checks || []).find((c) => c && c.ok === false);
+      // Scored checks only. The refs/heads/main check is deliberately unscored, so an outstanding
+      // merge can sit at ok:false in the record — naming it as the reason a release is NOT SERVED
+      // would point the operator at `release --yes` for something a merge fixes.
+      const first = (negative.checks || []).find((c) => c && c.ok === false && c.scored !== false);
       out.push(`  remote:      NOT SERVED — v${lastLocal.version}: ${first ? first.detail : "the remote does not serve this release"}`);
       out.push("               finish it: node scripts/framework-core-publish.mjs release --yes");
     } else if (lastLocal) {
       out.push(`  remote:      NOT VERIFIED — v${lastLocal.version} is a LOCAL release; nothing has asked the remote.`);
       out.push("               run: node scripts/framework-core-publish.mjs verify-remote");
+    }
+
+    // ── advertised: a second sentence, because SERVED does not imply it ───────
+    // INC-2026-09-05-04 V-1. SERVED means the tag and the release branch are on the remote.
+    // ADVERTISED means the core's main carries them, which is what the README one-liner actually
+    // fetches — so between `release` and the operator's merge, a first-time reader installs the
+    // PREVIOUS release while every local signal says the release is done. Rendered from the record
+    // `verify-remote` left, never by reaching the network: status stays offline.
+    if (lastLocal && advertised === true) {
+      out.push(`               ADVERTISED — the core's main carries v${lastLocal.version}`
+        + `${mergesCheckedAt ? ` (checked ${mergesCheckedAt})` : ""}`);
+    } else if (lastLocal && advertised === false) {
+      out.push("               NOT ADVERTISED — the core's main is behind, so the README one-liner");
+      out.push("               still installs the previous release.");
+      if (outstandingMerges.length) {
+        out.push("               outstanding, and yours alone — this script never merges:");
+        for (const m of outstandingMerges) {
+          out.push(`                 ${m.repo}: merge ${m.from} -> ${m.into}`
+            + `${m.unresolved ? "   (could not be checked from here)" : ""}`);
+        }
+      }
+      out.push(`               re-check: node scripts/framework-core-publish.mjs verify-remote`
+        + `${mergesCheckedAt ? `   (last checked ${mergesCheckedAt})` : ""}`);
     }
 
     if (orphanTags.length) {
@@ -1395,12 +1522,18 @@ function upsertLogEntry(logPath, version, entry) {
 // because gate 5 installs it FRESH, and a fresh install never runs the update tail — which is
 // where a whole class of defect lives, invisible to every gate above it.
 
-/** Run one subprocess and keep only enough output to diagnose a failure. */
+/**
+ * Run one subprocess and keep only enough output to diagnose a failure.
+ *
+ * `text` is the WHOLE output and `tail` the last 25 lines. Both, because a blind tail is the right
+ * default for a step that streams progress and the wrong one for a step whose output is a single
+ * structured document — see checkRunFailureTail below.
+ */
 function step(cmd, args, cwd) {
   const r = spawnSync(cmd, args, { cwd, encoding: "utf8" });
   const text = `${r.stdout || ""}${r.stderr || ""}`.trimEnd();
   const tail = text.split("\n").slice(-25).join("\n");
-  return { ok: r.status === 0, status: r.status ?? -1, tail };
+  return { ok: r.status === 0, status: r.status ?? -1, tail, text };
 }
 
 const nodeStep = (args, cwd) => step(process.execPath, args, cwd);
@@ -1477,6 +1610,8 @@ function mountCheck() {
   const candidate = candidateCommit();
   if (!candidate.ok) return { ok: false, note: candidate.note };
   let ws = null;
+  let keep = false;
+  let mountNote = undefined;
   try {
     ws = mkdtempSync(join(tmpdir(), "sk-core-mount-"));
     const g = (args) => spawnSync("git", ["-c", "protocol.file.allow=always", ...args], { cwd: ws, encoding: "utf8" });
@@ -1499,8 +1634,17 @@ function mountCheck() {
     if (checkedOut.status !== 0) {
       return { ok: false, note: `could not check the candidate out in the mount: ${(checkedOut.stderr || "").trim().split("\n").slice(-3).join(" ")}` };
     }
+    // From here on the failures are about the WORKSPACE's behaviour, and that workspace is the only
+    // reproduction of them there is — so these keep it and name the path (see the `finally` below).
+    // The git-plumbing failures above are not routed through this: a bare `git init` with a failed
+    // submodule add holds nothing to inspect.
+    const failInMount = (note, tail) => {
+      keep = true;
+      return { ok: false, note: `${note} — mount KEPT for inspection: ${ws}`, tail };
+    };
+
     const init = nodeStep([join(ws, ".sidekicks-core", "bin", "sidekicks"), "core", "init"], ws);
-    if (!init.ok) return { ok: false, note: `core init failed in a fresh workspace`, tail: init.tail };
+    if (!init.ok) return failInMount("core init failed in a fresh workspace", init.tail);
     // `--all`, not a bare `core doctor` (F-06/F-09). A bare run judges the MOUNT, and the mount was
     // sound in the release this gate passed: the workspace it produced failed framework doctor,
     // config doctor and skill verify, and this gate never asked any of them. --all composes all
@@ -1508,7 +1652,7 @@ function mountCheck() {
     // "did the submodule land".
     const doctor = nodeStep([join(ws, "bin", "sidekicks"), "core", "doctor", "--all"], ws);
     if (!doctor.ok) {
-      return { ok: false, note: "core doctor --all failed in the mounted workspace", tail: doctor.tail };
+      return failInMount("core doctor --all failed in the mounted workspace", doctor.tail);
     }
     // The doctors answer "is this workspace healthy". They do not answer "does this workspace pass
     // its own gates", and the two came apart: `check run quick` was red in EVERY mounted workspace
@@ -1523,8 +1667,23 @@ function mountCheck() {
     // suite and skill.doctor --strict inside the mount. Not `release`: its `core.mounted` gate would
     // build a core from this core, and `package.clean` is covered directly below instead.
     const check = nodeStep([join(ws, "bin", "sidekicks"), "check", "run", "full", "--json"], ws);
-    if (!check.ok) {
-      return { ok: false, note: "check run full failed in the mounted workspace", tail: check.tail };
+    // The PROFILE's verdict decides, not the exit code, and the failing ROWS are what gets reported.
+    // Both are readCheckRun's whole subject — see it for why either alone is wrong.
+    const run = readCheckRun(check.text);
+    if (!run) {
+      // An unreadable --json result is only a problem when the run also failed; a green run whose
+      // json this cannot parse would be a silent pass, so it is not treated as one either.
+      return failInMount("check run full produced a --json result that could not be read in the "
+        + "mounted workspace", check.tail);
+    }
+    if (run.status !== "passed" || run.failed.length) {
+      return failInMount("check run full failed in the mounted workspace", run.tail || check.tail);
+    }
+    // A non-blocking skip does not fail a release, and it does not vanish either: it rides out on
+    // the passing gate's note, which is what `verify` and `ship` print.
+    if (run.skipped.length) {
+      mountNote = `check run full passed in the mount; not run there: `
+        + run.skipped.map((g) => g.id).join(", ");
     }
     // `package.clean` is release-profile only, so `full` does not reach it — and it is the gate that
     // died in a mount with "validateSource: lib/sk-cli not found", taking two more down with it as
@@ -1534,17 +1693,20 @@ function mountCheck() {
       ws
     );
     if (!pkg.ok) {
-      return {
-        ok: false,
-        note: "package create could not resolve the framework from the mounted workspace",
-        tail: pkg.tail,
-      };
+      return failInMount("package create could not resolve the framework from the mounted workspace",
+        pkg.tail);
     }
-    return { ok: true };
+    return { ok: true, note: mountNote };
   } catch (err) {
     return { ok: false, note: `mount check could not run: ${err && err.message ? err.message : String(err)}` };
   } finally {
-    if (ws) {
+    // KEPT ON FAILURE. This mount is the only reproduction of a mount-only defect that exists: the
+    // candidate commit is a throwaway that no ref holds, so once this directory is gone the failing
+    // workspace cannot be rebuilt except by re-running the whole forge. INC-2026-09-09's recovery
+    // plan asked for "the first failing test and stack trace" from a mount that had already been
+    // deleted by this block. A temp directory the operator can re-run `check run full` inside is
+    // worth more than a tidy /tmp; a green run still cleans up.
+    if (ws && !keep) {
       try {
         rmSync(ws, { recursive: true, force: true });
       } catch {
@@ -1773,7 +1935,121 @@ function runGates(inheritAbs) {
     gates.push({ name: "upgrade check", result: u.skipped ? "skipped" : "pass", note: u.note });
   }
 
+  // 7 — the forged tree IS the composition the plan resolved.
+  //
+  // Every gate above asks whether the artifact works. None asks whether it is the RIGHT artifact.
+  // Those are different questions, and the second one is how a core ends up shipping a developer
+  // workspace while passing everything: 43 skills forged from a policy nobody re-read, with every
+  // skill's improvement funnel inside, and all six gates green.
+  const composition = compositionCheck();
+  if (!composition.ok) return record("composition", "FAIL", composition.note, composition.tail);
+  gates.push({ name: "composition", result: "pass", note: composition.note });
+
   return { gates, failed: null };
+}
+
+/**
+ * Does the forged tree carry exactly what the resolved plan says, and nothing a lean core forbids?
+ *
+ * Read-only over the forged target. Five refusals, each one a way the artifact and its own plan can
+ * disagree without any other gate noticing.
+ */
+function compositionCheck() {
+  const plan = corePaths();
+  if (!plan.skills) {
+    return { ok: false, note: "the inherit engine is absent, so the forged composition cannot be checked against a plan" };
+  }
+  const failures = [];
+
+  // (a) selection equality. The plan is what status reported and what the bump classifier read; a
+  // forge that produced a different set makes both of those a description of something else.
+  const skillsDir = join(SRC_ABS, ".agents", "skills");
+  const forged = subdirs(skillsDir).sort();
+  const planned = [...plan.skills].sort();
+  const extra = forged.filter((s) => !planned.includes(s));
+  const missing = planned.filter((s) => !forged.includes(s));
+  if (extra.length) failures.push(`forged but not planned: ${extra.join(", ")}`);
+  if (missing.length) failures.push(`planned but not forged: ${missing.join(", ")}`);
+
+  // (b) every skill can say why it is there. An unexplained skill in a published core is a skill
+  // nobody can decide to remove later.
+  for (const skill of forged) {
+    const why = plan.reasons?.[skill];
+    if (!why?.length || why.includes("unattributed")) {
+      failures.push(`'${skill}' carries no inclusion reason`);
+    }
+  }
+
+  // (c) a default build ships no pack-derived skill. An explicit broader mode records the additions
+  // as intentional rather than failing — the point is that the choice is visible, not that it is
+  // forbidden.
+  if (PACK_SKILLS === "none") {
+    for (const skill of forged) {
+      const why = plan.reasons?.[skill] || [];
+      if (why.some((r) => r.startsWith("agent-pack:"))) {
+        failures.push(`'${skill}' is pack-derived but --pack-skills is none`);
+      }
+    }
+  }
+
+  // (d) no development surface reached the runtime. Checked on the ARTIFACT, not on the projection
+  // that produced it: a gate that re-asks the projector the question it already answered proves
+  // only that the projector is self-consistent.
+  // The excluded set is named by the ENGINE in its plan, not imported here. Importing the
+  // projection module would bind this script to the whole skill-manifest chain, and a second local
+  // copy of the list is precisely the divergence the projection exists to prevent.
+  const excludedDirs = plan.runtimeExcludedDirs?.length ? plan.runtimeExcludedDirs : [];
+  const forbidden = [];
+  for (const skill of forged) {
+    for (const dir of excludedDirs) {
+      if (existsSync(join(skillsDir, skill, dir))) forbidden.push(`${skill}/${dir}/`);
+    }
+  }
+  if (!excludedDirs.length) {
+    failures.push("the plan named no runtime-excluded directories — this core was forged by an "
+      + "engine that predates runtime projection, so its payload cannot be graded");
+  }
+  if (forbidden.length) {
+    failures.push(`development surfaces shipped: ${forbidden.sort().join(", ")}`);
+  }
+
+  // (e) no family adapter outlived its family. A command or agent port for a skill set the core no
+  // longer carries is a menu entry that fails when someone picks it.
+  for (const orphan of orphanFamilyAdapters(forged)) failures.push(`orphan adapter: ${orphan}`);
+
+  if (failures.length) {
+    return {
+      ok: false,
+      note: `the forged core is not the composition its plan resolved (${failures.length} problem(s))`,
+      tail: failures.join("\n"),
+    };
+  }
+  return {
+    ok: true,
+    note: `${forged.length} skill(s), preset ${PRESET}, --pack-skills ${PACK_SKILLS}, `
+      + `no development surface, every skill attributed`,
+  };
+}
+
+/**
+ * Per-CLI command/agent directories whose owning skill family left the core.
+ *
+ * BMAD is the family this exists for: its command tree and its bmm-* agent ports are wired by name,
+ * so a core that stops carrying `sk-bmad-*` skills but keeps their adapters offers a consumer a
+ * whole menu of commands with nothing behind them.
+ */
+function orphanFamilyAdapters(forged) {
+  const families = [
+    { prefix: "sk-bmad-", paths: [".claude/commands/bmad", ".gemini/commands/bmad"] },
+  ];
+  const orphans = [];
+  for (const family of families) {
+    if (forged.some((s) => s.startsWith(family.prefix))) continue;
+    for (const rel of family.paths) {
+      if (existsSync(join(SRC_ABS, ...rel.split("/")))) orphans.push(rel);
+    }
+  }
+  return orphans.sort();
 }
 
 // ── The local half of a release ─────────────────────────────────────────────
@@ -1922,7 +2198,7 @@ function previousReleaseServed() {
 
 async function doPublish() {
   const ver = publishedVersion();
-  const { paths, skills, source } = corePaths();
+  const { paths, skills, reasons: skillReasons, source } = corePaths();
   const head = headInfo();
   const base = ver.markerCommit || ver.stateCommit;
   const pending = pendingSince(base, paths);
@@ -2059,6 +2335,8 @@ async function doPublish() {
     // README) would have silently stopped travelling. What is published is a mountable core whatever
     // skill set it carries, so the flag says so rather than riding on the preset name.
     "--as-core",
+    "--pack-skills",
+    PACK_SKILLS,
     "--force",
     "--prune-skills",
     "--core-version",
@@ -2088,6 +2366,9 @@ async function doPublish() {
         `publish forged and stamped, then a gate failed. Deriving from the LOG, so that number is reused.`
     );
   }
+  out.push("");
+  out.push(`  resolved skills (from ${source}):`);
+  out.push(...renderSkillReasons(skillReasons));
   out.push("");
   out.push(`  units added, removed, or version-bumped (inventory from ${cls.inventory_source}):`);
   out.push(...renderDelta(rows));
@@ -2266,7 +2547,7 @@ async function doPublish() {
     join(ROOT, STATE_REL),
     JSON.stringify(
       {
-        schema: 2,
+        schema: 3,
         comment:
           "Framework-core release state. Written by scripts/framework-core-publish.mjs; paths are "
           + "repo-relative. `last_local_release` is what `publish` cut — it forges, gates, commits "
@@ -2274,7 +2555,12 @@ async function doPublish() {
           + "evidence that any remote serves this version. That evidence is `remote_verified`, "
           + "written by `verify-remote`, and by `release`/`ship` once they have pushed and "
           + "re-checked. schema 2 carries no `remote_release`; schema 3 adds it, recording which "
-          + "refs a release actually pushed and which merges it deliberately left to the operator.",
+          + "refs a release actually pushed and which merges it deliberately left to the operator. "
+          + "`remote_release.merges_outstanding` is READ BACK by verify-remote, which resolves each "
+          + "entry against the remote and prunes the ones that have landed, and by `status`, which "
+          + "renders what is left. SERVED and ADVERTISED are different facts: SERVED means the tag "
+          + "and the release branch are on the remote; ADVERTISED means the core's `main` carries "
+          + "them too, which is what the README one-liner actually fetches.",
         runtime: RUNTIME_NAME,
         target_rel: portable(SRC_REL),
         // Renamed from `last_publish` (F-13): local state called v2.0.0 "published" while the
@@ -2318,9 +2604,17 @@ async function doPublish() {
         // `verify-remote` after a hand push. Absence means "not verified", never "verified false"
         // — the distinction matters, because the failure this records was reporting an unpushed
         // release as published.
-        remote_verified: prevState.remote_verified && prevState.remote_verified.version === version
+        remote_verified: sameVersion(prevState.remote_verified, version)
           ? prevState.remote_verified
           : null,
+        // Carried forward on the SAME terms, and for the same reason. This object is written whole,
+        // so anything not named here is dropped — and `remote_check` and `remote_release` used to be
+        // exactly that: a `publish` after a `release` silently erased both, taking the outstanding
+        // merge record with them. A re-publish of the SAME version leaves them true (the refs it
+        // pushed and the merges it owed have not changed); a new version genuinely invalidates both,
+        // and they go back to null rather than describing the wrong release.
+        remote_check: sameVersion(prevState.remote_check, version) ? prevState.remote_check : null,
+        remote_release: sameVersion(prevState.remote_release, version) ? prevState.remote_release : null,
         history,
       },
       null,
@@ -2703,16 +2997,63 @@ function historyWithoutLog(state) {
 }
 
 /**
+ * One line per verification check, in the one place both callers read from.
+ *
+ * `verify-remote` and `release` each printed this line with their own copy of the ternary, so the
+ * unscored `note` spelling would have had to be added twice and would have drifted the first time
+ * only one was touched.
+ *
+ * @param {{ref: string, ok: boolean, scored?: boolean, detail: string}} c
+ * @returns {string}
+ */
+function checkLine(c) {
+  const verdict = c.scored === false ? "note" : c.ok ? "ok  " : "FAIL";
+  return `  ${verdict}  ${c.ref}  ${c.detail}\n`;
+}
+
+/**
+ * The version this release supersedes, read from `history` rather than guessed.
+ *
+ * Used to say WHAT a stale `main` is still advertising. `history` is appended in release order, so
+ * the newest entry that is not the current version is the one a consumer following the README's
+ * one-liner would install while the merge is outstanding.
+ *
+ * @param {object|null} state - parsed state.json
+ * @param {string} version - the current release
+ * @returns {string|null}
+ */
+function previousVersion(state, version) {
+  const history = Array.isArray(state?.history) ? state.history : [];
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const h = history[i];
+    if (h && h.version && String(h.version) !== String(version)) return String(h.version);
+  }
+  return null;
+}
+
+/**
  * Compare the local release against what the core's remote actually serves.
  *
- * @returns {{ok: boolean, version: string|null, checks: Array<{ref: string, expected: string|null, remote: string|null, ok: boolean, detail: string}>}}
+ * TWO DIFFERENT FACTS, and conflating them is INC-2026-09-05-04 V-1. **Served** is the tag and the
+ * release branch: the release exists on the remote and `--ref v<version>` resolves. **Advertised**
+ * is the core's `main` carrying it too — which is what actually matters to a first-time reader,
+ * because the README one-liner fetches `install.sh` and `README.md` from `main`, and between
+ * `release` and the operator's merge those still describe the PREVIOUS release. Nothing breaks in
+ * that window; the new release is simply not the one a newcomer installs.
+ *
+ * So `main` is checked but NOT scored. `ok` — and therefore SERVED, and therefore `release`'s exit
+ * code — keeps meaning exactly what it meant: tag plus release branch. The merge onto `main` is
+ * operator-only by design (see the release banner below), so failing a verification on it would fail
+ * every release for doing the right thing. `advertised` is returned alongside instead.
+ *
+ * @returns {{ok: boolean, advertised: boolean|null, version: string|null, checks: Array<{ref: string, expected: string|null, remote: string|null, ok: boolean, scored?: boolean, detail: string}>}}
  */
 function verifyRemote() {
   const state = readJson(STATE_REL);
   const last = lastRelease(state);
   const checks = [];
   if (!last) {
-    return { ok: false, version: null, checks: [{ ref: "(state)", expected: null, remote: null, ok: false,
+    return { ok: false, advertised: null, version: null, checks: [{ ref: "(state)", expected: null, remote: null, ok: false,
       detail: `no local release recorded in ${portable(STATE_REL)} — run publish first` }] };
   }
   const version = String(last.version);
@@ -2732,7 +3073,9 @@ function verifyRemote() {
   if (!remote.ok) {
     checks.push({ ref: remote.url || "origin", expected: expectedSha, remote: null, ok: false,
       detail: remote.detail });
-    return { ok: false, version, checks };
+    // `advertised` is null, not false: the remote could not be asked, and "unreachable" is not
+    // "behind". The same distinction state.json's own comment makes about remote_verified.
+    return { ok: false, advertised: null, version, checks };
   }
   const refs = remote.refs;
 
@@ -2773,11 +3116,164 @@ function verifyRemote() {
       expected: null,
       remote: null,
       ok: true,
+      // Was opted out of scoring by simply setting ok:true, which reads as "this passed". It did not
+      // pass; it was not run. `scored:false` says that out loud, and the renderer prints it as
+      // `note` rather than `ok` — so an unscored row can never be mistaken for a green one.
+      scored: false,
       detail: "this release recorded no core branch — the tag above is what identifies it",
     });
   }
 
-  return { ok: checks.every((c) => c.ok), version, checks };
+  // ── refs/heads/main — checked, never scored (see the doc comment above) ────
+  const remoteMain = refs.get("refs/heads/main") || null;
+  // Caught up two ways: `main` IS the release commit (the ordinary fast-forward), or `main` has
+  // moved on and still CONTAINS it. The second test needs the remote's commit in the local object
+  // store; when it is absent the honest answer is "cannot tell from here", not "behind".
+  const mainHasRelease = Boolean(remoteMain) && Boolean(expectedSha)
+    && (remoteMain === expectedSha
+      || git(["merge-base", "--is-ancestor", expectedSha, remoteMain], SRC_ABS).ok);
+  const mainKnown = Boolean(remoteMain)
+    && (remoteMain === expectedSha || git(["cat-file", "-e", `${remoteMain}^{commit}`], SRC_ABS).ok);
+  const prev = previousVersion(state, version);
+  const stillAdvertises = prev ? `still advertises v${prev}` : "still advertises the previous release";
+  checks.push({
+    ref: "refs/heads/main",
+    expected: expectedSha,
+    remote: remoteMain,
+    ok: mainHasRelease,
+    scored: false,
+    detail: !remoteMain
+      ? "the remote has no main — nothing to advertise this release from"
+      : mainHasRelease
+        ? `caught up — the README one-liner advertises ${tag}`
+        : mainKnown
+          ? `BEHIND — merge outstanding; the README one-liner ${stillAdvertises}`
+          : `BEHIND or diverged — main is at ${remoteMain.slice(0, 12)}, which is not in this clone; `
+            + `the README one-liner ${stillAdvertises}`,
+  });
+
+  // Scored checks decide `ok`; unscored ones are reported and nothing else.
+  const scored = checks.filter((c) => c.scored !== false);
+  // `release_sha` and `refs` ride out so the merge resolver below can answer "has this landed?"
+  // without a second `ls-remote` — one network call per run stays the rule.
+  return { ok: scored.every((c) => c.ok), advertised: mainHasRelease, version, checks,
+    release_sha: expectedSha, remote_refs: refs };
+}
+
+/**
+ * Stamp a verification outcome onto state, in the ONE shape both callers write.
+ *
+ * `release` and `verify-remote` each built these two blocks inline and had already drifted: one set
+ * `schema`, the other did not; one used a single stamp, the other called `nowBangkok()` twice so
+ * `verified_at` and `checked_at` could land a second apart for the same check. Mutates `state`.
+ *
+ * `remote_verified` stays null on failure — absence means "not verified", never "verified false",
+ * and `remote_check` is where a recorded negative lives.
+ *
+ * @param {object} state - parsed state.json, mutated in place
+ * @param {{ok: boolean, advertised: boolean|null, version: string|null, checks: Array<object>}} res
+ * @param {string} stamp - one Asia/Bangkok stamp for both blocks
+ */
+function recordRemoteVerification(state, res, stamp) {
+  state.schema = 3;
+  state.remote_verified = res.ok
+    ? {
+      version: res.version,
+      verified_at: stamp,
+      // Whether the core's main carries the release: SERVED without ADVERTISED is the window in
+      // which the README one-liner still installs the previous version. Recorded so `status` can
+      // report it offline instead of reaching the network itself.
+      advertised: res.advertised,
+      refs: res.checks.map((c) => ({ ref: c.ref, sha: c.remote })),
+    }
+    : null;
+  state.remote_check = {
+    version: res.version,
+    checked_at: stamp,
+    ok: res.ok,
+    advertised: res.advertised,
+    checks: res.checks.map((c) => ({ ref: c.ref, ok: c.ok, scored: c.scored !== false, detail: c.detail })),
+  };
+}
+
+/**
+ * Write state.json only when it would actually differ.
+ *
+ * INC-2026-09-05-04 V-4: `verify-remote` rewrote `verified_at` on every invocation, so a read-only
+ * check left the source tree dirty and the audit had to restore the prior bytes by hand. The
+ * timestamps are the only fields that move on an unchanged outcome, so they are blanked on both
+ * sides before comparing: same answer, same bytes, no write.
+ *
+ * @param {object} state
+ * @returns {boolean} whether anything was written
+ */
+function writeStateIfChanged(state) {
+  const abs = join(ROOT, STATE_REL);
+  const next = `${JSON.stringify(state, null, 2)}\n`;
+  const withoutStamps = (text) => text
+    .replace(/"verified_at": "[^"]*"/g, '"verified_at": ""')
+    .replace(/"checked_at": "[^"]*"/g, '"checked_at": ""')
+    .replace(/"merges_checked_at": "[^"]*"/g, '"merges_checked_at": ""');
+  let current = null;
+  try { current = readFileSync(abs, "utf8"); } catch { /* absent — write it */ }
+  if (current !== null && withoutStamps(current) === withoutStamps(next)) return false;
+  writeFileSync(abs, next);
+  return true;
+}
+
+/**
+ * Resolve the merges a release deliberately left to the operator, and drop the ones that landed.
+ *
+ * `merges_outstanding` was written once by `release` and read by nothing (INC-2026-09-05-04 V-1):
+ * the record existed, so `status` could have said the README was behind, and instead said SERVED.
+ * This is the read-back half.
+ *
+ * Two repos, two ways of asking, both honest about what they cannot know:
+ *   core   — the merge target is a branch on the CORE's remote, and its SHA is already in the
+ *            `ls-remote` map `verifyRemote` fetched. Landed when that branch carries the release
+ *            commit.
+ *   source — this repo. There is no network call here on purpose: `origin/<into>` is a local
+ *            remote-tracking ref, so the answer is only as fresh as the last fetch. An entry that
+ *            cannot be resolved is KEPT and flagged, never quietly dropped — the failure mode this
+ *            whole change exists to remove is a record that says a thing is done when nobody asked.
+ *
+ * @param {object|null} state - parsed state.json
+ * @param {{version: string|null, release_sha: string|null, remote_refs: Map<string,string>|undefined}} res
+ * @returns {{remaining: Array<object>, landed: Array<object>, unresolved: number}|null} null when there is nothing recorded
+ */
+function resolveOutstandingMerges(state, res) {
+  const rel = state?.remote_release;
+  if (!sameVersion(rel, res.version) || !Array.isArray(rel.merges_outstanding)) return null;
+
+  const remaining = [];
+  const landed = [];
+  let unresolved = 0;
+
+  for (const m of rel.merges_outstanding) {
+    if (!m || !m.repo || !m.into) { remaining.push(m); unresolved += 1; continue; }
+    let done = null;                                   // null = could not tell
+    if (m.repo === "core") {
+      const head = res.remote_refs?.get(`refs/heads/${m.into}`) || null;
+      if (head && res.release_sha) {
+        done = head === res.release_sha
+          || git(["merge-base", "--is-ancestor", res.release_sha, head], SRC_ABS).ok;
+        // A branch head this clone has never seen cannot be tested for containment, and a false
+        // from `merge-base` on a missing object would read as "not merged".
+        if (!done && head !== res.release_sha
+          && !git(["cat-file", "-e", `${head}^{commit}`], SRC_ABS).ok) done = null;
+      }
+    } else if (m.repo === "source" && m.from) {
+      const target = git(["rev-parse", "--verify", `origin/${m.into}`], ROOT);
+      const from = git(["rev-parse", "--verify", `${m.from}^{commit}`], ROOT);
+      if (target.ok && from.ok) done = git(["merge-base", "--is-ancestor", from.out, target.out], ROOT).ok;
+    }
+    if (done === true) landed.push(m);
+    else {
+      remaining.push(done === null ? { ...m, unresolved: true } : m);
+      if (done === null) unresolved += 1;
+    }
+  }
+  return { remaining, landed, unresolved };
 }
 
 // ── release ─────────────────────────────────────────────────────────────────
@@ -2963,16 +3459,11 @@ function doRelease() {
   // ── 5. Prove it. A push that reported success is a claim, not evidence ─────
   process.stdout.write("\n── verifying ───────────────────────────────────────\n");
   const res = verifyRemote();
-  for (const c of res.checks) process.stdout.write(`  ${c.ok ? "ok  " : "FAIL"}  ${c.ref}  ${c.detail}\n`);
+  for (const c of res.checks) process.stdout.write(checkLine(c));
 
   const stamp = nowBangkok().stamp;
   const fresh = readJson(STATE_REL) || {};
-  fresh.schema = 3;
-  fresh.remote_verified = res.ok
-    ? { version: res.version, verified_at: stamp, refs: res.checks.map((c) => ({ ref: c.ref, sha: c.remote })) }
-    : null;
-  fresh.remote_check = { version: res.version, checked_at: stamp, ok: res.ok,
-    checks: res.checks.map((c) => ({ ref: c.ref, ok: c.ok, detail: c.detail })) };
+  recordRemoteVerification(fresh, res, stamp);
 
   if (!res.ok) {
     writeFileSync(join(ROOT, STATE_REL), `${JSON.stringify(fresh, null, 2)}\n`);
@@ -3022,6 +3513,14 @@ function doRelease() {
 
   const out = [""];
   out.push(`v${version} is SERVED by ${remote.url}.`);
+  // SERVED is not ADVERTISED, and this is the exact moment the two diverge: the tag and the release
+  // branch are up, the merge onto main has not happened, so `--ref v<version>` resolves while the
+  // README one-liner a newcomer copies still installs the previous release. Saying it here is what
+  // makes the outstanding-merge list below read as a consequence rather than as bookkeeping.
+  if (res.advertised === false) {
+    out.push("It is NOT yet ADVERTISED: the core's main does not carry it, so the README one-liner");
+    out.push("still installs the previous release until the merge below lands.");
+  }
   out.push("");
   if (sourceProtected) {
     out.push(`  NOTE: this repo is on '${rootBranch}', which is protected — the source branch was`);
@@ -3065,26 +3564,45 @@ function appendPublishedBlock(version, { stamp, refs, sourcePushed, merges }) {
 
 function doVerifyRemote() {
   const res = verifyRemote();
-  if (JSON_OUT) process.stdout.write(`${JSON.stringify(res, null, 2)}\n`);
-  else {
+  const state = readJson(STATE_REL);
+  const merges = resolveOutstandingMerges(state, res);
+
+  if (JSON_OUT) {
+    // `remote_refs` is a Map — it exists so the merge resolver can avoid a second ls-remote, and it
+    // would serialise as `{}`. Drop it rather than emit a field that is always empty.
+    const { remote_refs: _refs, ...payload } = res;
+    process.stdout.write(`${JSON.stringify({ ...payload, merges_outstanding: merges?.remaining ?? null }, null, 2)}\n`);
+  } else {
     process.stdout.write(`verify-remote: local release v${res.version || "?"}\n`);
-    for (const c of res.checks) {
-      process.stdout.write(`  ${c.ok ? "ok  " : "FAIL"}  ${c.ref}  ${c.detail}\n`);
-    }
+    for (const c of res.checks) process.stdout.write(checkLine(c));
     process.stdout.write(res.ok
       ? "\nthe remote serves this release.\n"
       : "\nthe remote does NOT serve this release — it is a LOCAL release only.\n");
+    // Served and advertised are separate sentences because they are separate facts.
+    if (res.ok && res.advertised === true) {
+      process.stdout.write("it is also ADVERTISED — the core's main carries it, so the README one-liner installs it.\n");
+    } else if (res.ok && res.advertised === false) {
+      process.stdout.write("it is NOT yet ADVERTISED — the core's main is behind, so the README one-liner\n"
+        + "still installs the previous release. The merge is yours; nothing here performs it.\n");
+    }
+    if (merges) {
+      for (const m of merges.landed) process.stdout.write(`  landed:      ${m.repo}: ${m.from} -> ${m.into}\n`);
+      for (const m of merges.remaining) {
+        process.stdout.write(`  outstanding: ${m.repo}: merge ${m.from} -> ${m.into}`
+          + `${m.unresolved ? "   (could not be checked from here)" : ""}\n`);
+      }
+    }
   }
 
   // Record the answer either way. "Checked and it is not there" is the fact worth keeping.
-  const state = readJson(STATE_REL);
   if (state) {
-    state.remote_verified = res.ok
-      ? { version: res.version, verified_at: nowBangkok().stamp, refs: res.checks.map((c) => ({ ref: c.ref, sha: c.remote })) }
-      : null;
-    state.remote_check = { version: res.version, checked_at: nowBangkok().stamp, ok: res.ok,
-      checks: res.checks.map((c) => ({ ref: c.ref, ok: c.ok, detail: c.detail })) };
-    writeFileSync(join(ROOT, STATE_REL), `${JSON.stringify(state, null, 2)}\n`);
+    const stamp = nowBangkok().stamp;
+    recordRemoteVerification(state, res, stamp);
+    if (merges) {
+      state.remote_release.merges_outstanding = merges.remaining;
+      state.remote_release.merges_checked_at = stamp;
+    }
+    writeStateIfChanged(state);
   }
   process.exit(res.ok ? 0 : 1);
 }

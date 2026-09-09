@@ -1,0 +1,8 @@
+{
+  "name": "fable-mind",
+  "version": "1.1.2",
+  "description": "Turns this repo's ten standing session defaults into explicit checkpoints a fixed-thinking (non-Fable-class) model actually runs.",
+  "files": [
+    "SKILL.md"
+  ]
+}

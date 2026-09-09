@@ -1,5 +1,5 @@
 {
   "name": "sidekicks-agents",
-  "description": "Imported Claude agents from .claude/agents",
+  "description": "Sidekicks subagent ports generated from .agents/subagents",
   "version": "1.0.0"
 }

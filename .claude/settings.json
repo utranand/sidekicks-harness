@@ -35,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/.sidekicks/hooks/rtk-hook.sh\""
+            "command": "node \"$CLAUDE_PROJECT_DIR/.sidekicks/hooks/rtk-hook.mjs\""
           },
           {
             "type": "command",
@@ -82,28 +82,20 @@
     ]
   },
   "enabledPlugins": {
-    "ralph-loop@claude-plugins-official": true,
-    "claude-hud@claude-hud": true,
-    "slack@claude-plugins-official": true,
-    "caveman@caveman": true
+    "caveman@caveman": true,
+    "ponytail@ponytail": true
   },
   "extraKnownMarketplaces": {
-    "claude-plugins-official": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/claude-plugins-official"
-      }
-    },
-    "claude-hud": {
-      "source": {
-        "source": "github",
-        "repo": "jarrodwatts/claude-hud"
-      }
-    },
     "caveman": {
       "source": {
         "source": "github",
         "repo": "JuliusBrussee/caveman"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
       }
     }
   }

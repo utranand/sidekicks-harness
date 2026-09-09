@@ -27,7 +27,7 @@ A skill's destination is decided by **two tests, applied in order** — the firs
    > stale by one against both `audit-groups.yaml` and `docs/skill-modular-category.md`.
 
 2. **Otherwise it is first-party** → it goes to a repository:
-   - **`sidekicks-skills-private`** when it is **offloaded** (archived) **or** **client-specific**
+   - the configured **private destination** when it is **offloaded** (archived) **or** **client-specific**
      (the `sk-shp-*` family — a named provincial health system).
    - **`sidekicks-skills`** (public) in every other case — but **only after client identifiers are
      removed from its content** (see *Sanitization* below).
@@ -135,7 +135,7 @@ citing them as current.
 | PUBLIC `sidekicks-skills` — the `framework` family | 18 |
 | PUBLIC `sidekicks-skills` — everything else first-party and clean | 82 |
 | PUBLIC total | **100** |
-| PRIVATE `sidekicks-skills-private` — offloaded or client-specific | 24 |
+| PRIVATE destination — offloaded or client-specific | 24 |
 | EXCLUDED — vendored third-party (`skill_repo: none`) | 16 |
 
 100 + 24 + 16 = 140 = every skill both trees hold.

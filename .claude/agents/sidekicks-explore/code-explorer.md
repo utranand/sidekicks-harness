@@ -16,7 +16,7 @@ When invoked:
 
 Sidekicks repo landmarks:
 - `bin/sidekicks` → thin shim → `lib/sk-cli/cli.mjs`; 18 zero-dependency Node ESM modules under `lib/` (only `node:*` built-ins; YAML handled by `lib/yaml-subset`, not js-yaml).
-- Skills are canonical at `.agents/skills/<name>/SKILL.md` (host `.claude/skills/` is a symlink); Python helpers under each skill's `scripts/` run from the repo-root `.venv`.
+- Skills are canonical at `.agents/skills/<name>/SKILL.md` (host-specific skill exposure folders link to it); Python helpers under each skill's `scripts/` run from the repo-root `.venv`.
 - Tests: `node --test tests/**/*.test.mjs`, fixtures in `tests/fixtures/`.
 - Service code lives in `projects/<p>/services/<svc>/src/` (some projects are submodules and may not be checked out).
 

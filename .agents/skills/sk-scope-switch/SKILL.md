@@ -1,6 +1,8 @@
 ---
 name: sk-scope-switch
 description: Switch the active Sidekicks project/service scope so edits, new files, and downstream skills land in the correct working folder. Use when the user names a project/service target or provides a path under `projects/<project>/services/<service>/...` that implies scope.
+sidekicks:
+  runtime-class: framework
 ---
 
 # Sidekicks Scope Switch

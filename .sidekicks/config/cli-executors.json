@@ -2,22 +2,16 @@
   "//": "EXAMPLE — the external-CLI registry read by sk-cli-executor / sk-cli-orchestrator.",
   "//1": "DO NOT hand-edit the live file. Manage it only with the CLI verbs (Rule 1 — .sidekicks/ is the",
   "//2": "CLI write surface): `sidekicks cli-executor register|list|remove`. This example documents the shape.",
-  "//3": "Live file is scope-resolved: root -> .sidekicks/cli-executors.json ; project -> projects/<active>/cli-executors.json.",
-  "//4": "A MISSING file is not an error — the three built-ins apply by default (fresh-clone behavior unchanged).",
+  "//3": "Live file is scope-resolved: root -> .sidekicks/config/cli-executors.json ; project -> projects/<active>/config/cli-executors.json.",
+  "//4": "A MISSING file is not an error — built-in adapters remain available and runtime selection stays provider-neutral.",
+  "//5": "No routing.prefer chain is shipped. Auto-routing prefers the current host when eligible, then uses capability, containment, availability, and a stable neutral tie-break. Operators may configure a local chain explicitly.",
   "schema_version": 2,
   "executors": {
     "claude": {
-      "//": "kind=generic — Claude Code's own CLI registered as an executor (claude -p headless). Commonly the MAIN/default pick: put it first in routing.prefer so `executor: auto` items resolve to a fresh headless Claude, with the other CLIs picked by specialty/availability.",
-      "//permissions": "claude -p runs under Claude's own permission system, NOT an external sandbox. For tasks that must EDIT files headlessly you may add a permission mode to the invoke template (e.g. add '--permission-mode' + 'acceptEdits'). A permission-BYPASS flag is deliberately NOT set here (safety — never auto-approve beyond the documented headless setting).",
-      "kind": "generic",
+      "//": "kind=builtin selects the native Claude adapter as one peer. It may be preferred when Claude Code hosts the current session, but is not a persisted project default.",
+      "kind": "builtin",
       "enabled": true,
-      "binary": "claude",
-      "invoke": ["-p", "{brief}", "--model={model}"],
-      "probe": ["--version"],
-      "brief_stdin": false,
-      "transport": "print-mode",
-      "sandbox": "constraint-block-only",
-      "//models-top": "`top` = the tier ABOVE high (Fable/Mythos-class; CLAUDE.md → 'Fable fallback'). Map it only where the CLI truly offers one — set with `register <name> --model-top <id>`; executors without one leave it unmapped and the orchestrator routes top-shaped work to an executor that maps it, or requests high explicitly.",
+      "//models-top": "`top` = the tier ABOVE high. Map it only where the CLI truly offers one — set with `register <name> --model-top <id>`; executors without one leave it unmapped.",
       "models": { "top": "fable", "high": "opus", "mid": "sonnet", "low": "haiku" },
       "specialties": ["orchestration & planning", "multi-step reasoning", "general-purpose implementation", "verification & review"],
       "//model_specialties": "OPTIONAL per-tier job pairing — for each configured model tier, the jobs THAT model is best at, so the orchestrator picks an item's model_tier by fit ('right job on the right model'), not just generic complexity. Set with `register <name> --model-specialties-high 'a,b' --model-specialties-mid '...' --model-specialties-low '...'` (empty value clears a tier). Advisory metadata — drives no flag.",
@@ -27,7 +21,7 @@
         "mid": ["general-purpose implementation", "docs & story drafting"],
         "low": ["mechanical bulk edits", "simple extraction & classification"]
       },
-      "description": "Claude Code CLI (claude -p) — main/default executor"
+      "description": "Claude Code CLI (claude -p)"
     },
     "codex": {
       "//": "kind=builtin only toggles a native adapter (codex/gemini/antigravity). Omit to keep the default; set enabled:false to silence it.",
@@ -42,6 +36,22 @@
       },
       "//specialties": "OPTIONAL capability hints the orchestrator routes tasks against (via `list --json`) — short phrases, no closed vocabulary, drive no flag. Set with `register codex --specialties 'a,b,c'`.",
       "specialties": ["code implementation", "refactoring", "debugging", "test generation"]
+    },
+    "gemini": {
+      "kind": "builtin",
+      "enabled": true,
+      "models": { "high": "pro", "mid": "flash", "low": "flash-lite" },
+      "specialties": ["planning", "review", "long-context analysis", "multimodal"]
+    },
+    "antigravity": {
+      "kind": "builtin",
+      "enabled": true,
+      "models": {
+        "high": "gemini-3.1-pro-high",
+        "mid": "gemini-3.8-flash-medium",
+        "low": "gemini-3.8-flash-low"
+      },
+      "specialties": ["frontend & UI work", "browser/agentic tasks", "multimodal"]
     },
     "my-cli": {
       "//": "kind=generic is a NEW CLI driven entirely by this spec via adapter_generic.py — no bespoke adapter.",
@@ -62,25 +72,6 @@
       "models": { "high": "big-model", "low": "small-model" },
       "specialties": ["example task kind"],
       "description": "example generic CLI"
-    }
-  },
-  "routing": {
-    "//": "OPTIONAL auto-routing policy. `prefer` is an ordered fallback chain — `--executor auto`",
-    "//1": "(or an orchestrator item executor:auto) probes these in order and takes the first AVAILABLE.",
-    "//2": "Manage with `sidekicks cli-executor route set claude codex` / `route` / `route clear`.",
-    "//3": "Unset → auto falls back to every enabled executor in natural order (built-ins first).",
-    "//4": "prefer[0] is the MAIN pick for `executor: auto` — put claude first to make it the default, others the fallback.",
-    "prefer": ["claude", "codex", "antigravity"],
-    "//skills": "OPTIONAL per-task-kind RECOMMENDATIONS — 'for THIS kind of job these executors work best, in order' — consulted BEFORE the global prefer chain when the task kind is known. `prefer` is the ordered best-fit chain; `avoid` names executors that must NOT take this kind of job; `note` says why. Manage with `sidekicks cli-executor route skill set <task-kind> <name>... [--avoid '<a,b>'] [--note '<why>']` / `route skill remove <task-kind>` / `route skill`.",
-    "skills": {
-      "image-generation": {
-        "prefer": ["antigravity", "codex"],
-        "avoid": ["claude"],
-        "note": "Claude CLI has no native image generation — route visual/image jobs to Gemini-backed Antigravity first, Codex second"
-      },
-      "code-implementation": {
-        "prefer": ["codex", "claude"]
-      }
     }
   }
 }

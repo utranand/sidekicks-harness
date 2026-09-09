@@ -1,0 +1,11 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning) and
+# docs/guide/framework-settings.md.
+#
+# Owns the shared `jira:` connector block: this is the skill every other jira-* skill reuses for
+# auth and I/O, so its defaults file is the one the resolver reads for that block.
+skill: sk-jira-connector
+
+config:
+  block: jira
+  family: jira
+  defaults: config.defaults.yaml

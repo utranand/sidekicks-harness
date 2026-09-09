@@ -31,15 +31,16 @@
 # Membership is listed explicitly because it cannot be derived. These sit in four different audit
 # groups, and no rule over `audit-groups.yaml` produces this set.
 #
-# Two deliberate differences from `sk-inherit`'s `framework` PRESET, which is a runtime
-# question rather than a publication one:
+# Two deliberate differences from the runtime-class roots used by `sk-inherit`'s dynamic
+# `framework` preset, which is a runtime question rather than a publication one:
 #
-#   - `skill-creator` is in the preset but NOT here. It is vendor-authored (see
+#   - `skill-creator` is catalog-only but enters the resolved runtime as a bundled dependency; it
+#     is NOT published here. It is vendor-authored (see
 #     docs/skill-modular-category.md's classification rule, which lists it as external alongside
-#     `caveman`), and republishing someone else's skill under our name is the objection that removed
-#     `caveman` from the preset. It still TRAVELS into a runtime; it is just not ours to publish.
+#     `caveman`), and republishing someone else's skill under our name is the objection that keeps
+#     it out of the publication family. It still TRAVELS into a runtime; it is just not ours to publish.
 #     The refusal is enforced, not just written down: its skill.yaml declares `skill_repo: none`.
-#   - `sk-framework-core` is here but NOT in the preset. It drives the publish pipeline by
+#   - `sk-framework-core` is source-only, so it is here but NOT in the runtime. It drives the publish pipeline by
 #     forging a runtime with sk-inherit, and inherit hard-refuses to run from inside one — so
 #     a core carrying it could never use it. It is still framework machinery, and a reader looking
 #     for "how does a framework release get cut" should find it in this family.

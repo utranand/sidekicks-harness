@@ -1,0 +1,12 @@
+# config.defaults.yaml — this skill's OWN defaults for its `jira:` config block.
+#
+# Resolution order (lib/skill-config/resolve.mjs; inspect with
+# `sidekicks framework config sk-jira-connector`):
+#   projects/<active>/config.yaml → .sidekicks/config.yaml (blocks that inherit root) →
+#   THIS FILE → the skill's documented built-in.
+#
+# SECRETS ARE FORBIDDEN HERE — this file is committed. Enforced by .githooks/pre-commit and
+# tests/skill-config.test.mjs. Credentials belong in the scope's git-ignored config.yaml.
+#
+# EMPTY BY DESIGN: every setting in this block lives under a per-site ALIAS (`jira: { my-board: { jira_url, api_token, ... } }`). A default one level up would be read as an alias name, and a guessed jira_url or default_project would point work at the wrong Jira site. "Not configured" is the only safe answer.
+jira: {}

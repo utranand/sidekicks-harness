@@ -12,6 +12,8 @@ description: >-
   setup/resume it AUTO-APPLIES every idempotent fix (hooks, mirrors, skill links, submodules, config
   documentation, plugins, RTK, jq), then audits connector capabilities and documents the missing
   config blocks — via `sidekicks config sync`, from each installed skill's own config.defaults.yaml.
+sidekicks:
+  runtime-class: framework
 ---
 
 # Sidekicks Hello
@@ -29,7 +31,8 @@ runs the **readiness step** (Step 0) so the things git does not carry across a c
 before you start work, not discovered halfway through it. And when a scope is being used for the
 **first time** — or the user wants connectors set up — the **capability audit** (Step 0.5) maps
 which Sidekicks skill capabilities are configured versus still locked, and guides initializing the
-essential config blocks.
+essential config blocks. Setup/resume may then offer the report-only role recommendations in Step
+0.75; installing anything remains an explicit user choice.
 
 ## Before you start
 
@@ -144,11 +147,25 @@ which `--apply` runs for the user. Nothing extra to explain — but when a works
 bootstrapped from a mounted core, say so out loud, because the missing plugin is the reason a
 declared comms mode or command is not responding yet.
 
-The live case is **`caveman`** (`JuliusBrussee/caveman`, MIT). AGENTS.md loads it at session start as
-the default comms mode, yet a freshly mounted workspace has the *declaration* and not the *package*.
-If that row is `[FIX]`, tell the user plainly: caveman is third-party, install it with the printed
-command (or `--apply`), and until then responses come back in normal prose. Do **not** offer to copy
-the skill folder in from somewhere — that is the redistribution this split exists to avoid.
+The live cases are the two **token-discipline** plugins AGENTS.md pairs under *Token discipline —
+two layers*. They govern different layers and never overlap, so a workspace can be missing one and
+not the other:
+
+| Plugin | Upstream | Layer | What a `[FIX]` row costs until installed |
+|---|---|---|---|
+| `caveman` | `JuliusBrussee/caveman`, MIT | Layer 1 — prose | responses come back in normal prose |
+| `ponytail` | `DietrichGebert/ponytail`, MIT | Layer 2 — code | code generation runs without the YAGNI / stdlib-first constraint |
+
+A freshly mounted workspace has the *declaration* and not the *package* for both. If either row is
+`[FIX]`, tell the user plainly which layer is not yet active and install it with the printed command
+(or `--apply`). Do **not** offer to copy the skill folder in from somewhere — that is the
+redistribution this split exists to avoid. The vendored caveman skill folder predates this split and
+exists only to hold the `criterion.caveman` body — not as a bundling precedent.
+
+Ponytail is the reason the split matters most: it activates through its own SessionStart /
+SubagentStart / UserPromptSubmit hooks, so the *package* — not a skills-folder copy — is what makes
+it fire at all. AGENTS.md carries a compressed Layer 2 directive so the rule still governs before
+the package lands; the plugin adds enforcement on top rather than being the only source.
 
 ### BMAD Method — a required dependency, not a plugin
 
@@ -305,6 +322,32 @@ an undeclared block to a git-ignored `pending-removal.<family>.yaml` rather than
 
 Carry the result into the summary's **Capabilities** field: `N configured, M open (essential:
 <names>)` — or `all essential connectors covered`.
+
+## Step 0.75 — Optional role-based skill recommendations
+
+On a setup/resume run, after readiness and capability reporting, offer one **multi-select** that can
+combine roles, publication categories, and exact skill names. Skip this step for a plain orientation
+request. The available roles are PM, BA, SA, and Developer; do not infer one from the repository or
+select it for the user.
+
+Drive the report-only helper owned by `sk-skill-manager`:
+
+```sh
+node .agents/skills/sk-skill-manager/scripts/role-recommendations.mjs \
+  --role PM,Developer --category database --skill sk-git-ship
+```
+
+It prints recommendations and the exact manual commands for the public skill catalog. It works
+without network access or a local clone: role and exact-skill choices still resolve, while category
+choices stay explicitly unresolved until `--catalog <checkout-or-catalog.yaml>` is supplied.
+
+This step is advisory only:
+
+- never clone a repository, import a skill, or add `--apply` on the user's behalf;
+- never mention, probe, or expose a private skills destination;
+- show the public clone command, then `skill import --all --list`, `skill advise`, the dry-run
+  import, and the separate `--apply` form;
+- let the user narrow or change the multi-select before any install is attempted.
 
 ## Step 1 — Read the root index (primary orientation call)
 

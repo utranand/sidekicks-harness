@@ -1,4 +1,4 @@
-# .sidekicks/config/memory.example.yaml — Local memory — external sources
+# memory.example.yaml — Local memory — external sources
 #
 # The SAFE initializer for config/memory.yaml. A forged core and a fresh workspace start from this
 # file, never from another checkout's real registry (see lib/core-lifecycle/config-templates.mjs).

@@ -1,0 +1,28 @@
+# config.defaults.yaml — this skill's OWN defaults for its `knowledge:` config block.
+#
+# Resolution order (lib/config-store/read.mjs; inspect with `sidekicks config get knowledge`):
+#   projects/<active>/config/skills.secret.yaml → projects/<active>/config/skills.yaml →
+#   the retired monolith → the same three at root (this block inherits root) → THIS FILE →
+#   the BUILTIN_CONFIG literals in scripts/knowledge.mjs.
+#
+# SECRETS ARE FORBIDDEN HERE — this file is committed. Enforced by .githooks/pre-commit and
+# tests/skill-config.test.mjs. This block has no credentials at all.
+
+knowledge:
+  # Write reports/<slug>.html on every register / reindex / render / check. Set false to make the
+  # report an on-request artifact only: the `report <slug>` verb and `--report` still produce one,
+  # and turning it off DELETES any report already on disk rather than leaving a stale page whose
+  # face gives no hint that it no longer matches the entry.
+  always_generate: true
+
+  # Ask the user before writing the report. AGENT-LEVEL: a Node script cannot ask anyone, so
+  # SKILL.md gates on this key and scripts/knowledge.mjs deliberately ignores it. Honouring it in
+  # the engine would mean silently skipping the report instead of asking — not the same thing.
+  confirm_before_generate: false
+
+  # The language the report's PROSE is written in. This selects, never translates: the engine picks
+  # the entry's `## Report (<lang>)` section and the matching chrome labels. The entry markdown is
+  # never translated, and technical terms, code, column names, SQL identifiers, CLI commands, file
+  # paths and exact error strings stay verbatim inside that prose whatever this is set to.
+  # Supported today: Thai (th) and English (en); anything else falls back to English labels.
+  result_language: Thai

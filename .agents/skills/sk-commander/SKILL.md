@@ -8,6 +8,8 @@ description: >-
   unattended/overnight (ralph persistence). NOT a queue of headless delegations to external executor
   CLIs (sk-cli-orchestrator owns that loop) or the single-item executor invocation it drives
   (sk-cli-executor).
+sidekicks:
+  runtime-class: framework
 ---
 
 ## Trigger guidance

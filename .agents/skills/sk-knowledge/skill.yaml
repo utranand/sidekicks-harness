@@ -1,0 +1,14 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning) and
+# docs/guide/v1.5/settings-vs-configuration.md.
+
+skill: sk-knowledge
+
+config:
+  block: knowledge
+  family: skills
+  defaults: config.defaults.yaml
+  # inherits_root because the report policy is a HOUSE STYLE, not a per-project fact: the language
+  # a report is written in, and whether one is produced at all, are the same answer for every store
+  # in the checkout. Without this, setting result_language once at root would silently do nothing
+  # the moment a project is active — and every store worth reporting on lives under a project.
+  inherits_root: true

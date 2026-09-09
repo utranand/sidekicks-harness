@@ -8,7 +8,6 @@ categories:
   - exploration
   - investigation
   - verification
-cli: claude
 role: worker
 model: mid
 persona: "Meticulous, skeptical, terse. Cites file and line, states confidence, never guesses or embellishes."

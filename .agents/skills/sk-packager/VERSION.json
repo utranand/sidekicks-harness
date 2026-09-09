@@ -1,0 +1,9 @@
+{
+  "name": "sk-packager",
+  "version": "1.0.1",
+  "description": "Assemble, distribute, export, bundle, or transfer a portable Sidekicks runtime package or individual components.",
+  "files": [
+    "SKILL.md",
+    "VERSION.json"
+  ]
+}

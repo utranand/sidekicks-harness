@@ -14,16 +14,16 @@
 #
 # Safety-floor ids cannot appear here (lib/framework-settings/floor.mjs) — writing one is a
 # validation error, not a silent no-op.
-artifact-autotrigger: true
-artifact-liveness: true
-enforce-branch-safety: false
+artifact-autotrigger: false
+artifact-liveness: false
+enforce-branch-safety: true
 enhance-prompt: true
-fable-escalation: true
-gtd-orphan-watch: true
+fable-escalation: false
+gtd-orphan-watch: false
 load-local-memory: true
-office-viz: true
-recompile-validation-checklist: true
+office-viz: false
+recompile-validation-checklist: false
 rtk: true
-run-notify: true
+run-notify: false
 skill-advisor: true
 memory-trigger: true

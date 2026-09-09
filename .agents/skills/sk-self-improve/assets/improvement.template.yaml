@@ -1,0 +1,28 @@
+# ▶ IMPROVEMENT ARTIFACT for the sk-self-improve skill ◀
+# Lives under the TARGET skill: .agents/skills/<target>/improvements/<NNN>-<slug>.yaml
+# Inert until applied; every change to the target skill itself is executed via skill-creator.
+
+id: <NNN>-<slug>                  # sequential NNN per target, e.g. 003-tighten-verify-brief
+target_skill: <name>
+created: <YYYY-MM-DDTHH:mm:ss+07:00>   # Asia/Bangkok
+source: <queue artifact path | mission path | user feedback | eval report — where the lesson came from>
+kind: instructions                # instructions | description | scripts | assets | evals
+observation: >-
+  <What actually happened, with evidence — the failing pattern, the repeated manual fix, the
+  trigger miss, the template-worthy shape. Concrete and citable.>
+proposal: >-
+  <The precise change: which file/section, what it should say or contain instead, or the
+  template/asset to add. Written so skill-creator can act without re-deriving intent.>
+expected_effect: <why the skill is better after — one or two lines>
+risk: medium                      # low = additive, no behavior change | medium | high = core flow
+status: proposed                  # proposed → approved → applied | rejected
+# jira_subtask: SDHPT-1234        # OPTIONAL — set by EXPORT when filed as a Jira subtask (backlog); presence = already exported
+# jira_exported_at: <YYYY-MM-DDTHH:mm:ss+07:00>   # OPTIONAL — Asia/Bangkok, stamped at EXPORT
+approved_by: null                 # human name, or "auto" (auto-apply lane: low + assets + additive)
+applied_at: null                  # Asia/Bangkok timestamp, stamped the moment the apply lands
+applied_notes: null               # at apply: what skill-creator did, checks run (description ≤1024 etc.)
+changes:                          # filled at apply — the change-tracking record
+  files: []                       #   paths touched inside the target skill, relative to its dir
+  version_from: null              #   target skill's frontmatter version before the apply
+  version_to: null                #   …and after (skill-creator bumps it as part of the apply)
+  commit: null                    #   git commit SHA once the change is committed (null until then)

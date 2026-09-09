@@ -1,0 +1,17 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning).
+
+skill: sk-inherit
+
+rules:
+  - id: rule.repo-root-scripts-lifecycle
+    title: Repo-root scripts/ — add, move and remove by ownership
+    body: rules/rule.repo-root-scripts-lifecycle.md
+
+# Each `why` is one quoted line on purpose — lib/yaml-subset does not fold a `>-` block scalar
+# inside a list item, and the reader rejects one rather than let it silently swallow the next entry.
+settings_split:
+  tunable_exempt:
+    - name: DEFAULT_DIR
+      why: "a template variable, not this skill's knob: it becomes the default workspace directory the GENERATED installer offers ITS user, who overrides it with `--dir` / `-Dir` (assets/install.sh.tmpl, install.ps1.tmpl, core-readme.md.tmpl). It is already configurable, one layer further out, by the person it actually affects."
+    - name: REGISTRY_LOCK_RETRIES
+      why: "a correctness constant of the registry lock, not a preference: with the critical section a few milliseconds long, 100 x 20ms is a ~2s ceiling chosen so the budget effectively never expires, and the exhaustion path proceeds unlocked with a stderr NOTICE. Lowering it would trade a wait nobody experiences for the lost-entry race the lock exists to prevent; raising it would turn 'never blocks a run' into a hang. Neither is an operator decision."

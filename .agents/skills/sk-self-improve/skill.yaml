@@ -1,0 +1,14 @@
+# Skill descriptor — what this skill owns in the framework registry.
+#
+# Read by lib/framework-settings/registry.mjs (discovered by scanning, never listed in a
+# catalog). Lets `sidekicks framework list|show` name this skill as a rule's owner and point at
+# the rule body, and lets the skill carry its own rules when it is lifted into another repo.
+#
+# Values must avoid `*word` and `&word` — the YAML subset parser rejects them as glob/anchor.
+
+skill: sk-self-improve
+
+rules:
+  - id: criterion.self-improvement
+    title: Skill self-improvement — opt-in, externally triggered
+    body: rules/criterion.self-improvement.md

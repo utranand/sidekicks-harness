@@ -19,6 +19,7 @@ branch-naming: true
 cross-platform: true
 incident-reports: false
 local-memory-register: true
+repo-root-scripts-lifecycle: true
 scope-anchors: true
 single-venv: true
 timezone-bangkok: true

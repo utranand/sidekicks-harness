@@ -15,7 +15,10 @@
 # Safety-floor ids cannot appear here (lib/framework-settings/floor.mjs) — writing one is a
 # validation error, not a silent no-op.
 command-sequences: true
+fable-mind: true
 model-tier-substitution: true
-new-skill-checklist: false
-session-practices: false
+new-skill-checklist: true
+self-improvement: true
+session-practices: true
+skill-auditing: true
 memory-lazy-load: true

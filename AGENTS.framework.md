@@ -6,11 +6,32 @@
 > pinned to. Workspace-specific instructions belong in that `AGENTS.md`, below the block —
 > `sidekicks core update` never touches them.
 
+## Reading this in a mounted workspace
+
+Everything below the rule is the framework's own instruction file, written from the point of
+view of a standalone runtime. Five things read differently where you are:
+
+- **You have a `projects/` tree.** `core init` creates it, and the root project is the
+  workspace itself, so the active scope is the root scope until you run `project create`.
+  Rules 1–2 still hold exactly as stated — `projects/` is CLI-mediated, never `mkdir`.
+- **Your skills are links.** The entries under `.agents/skills/` point into `.sidekicks-core/`, so
+  they are read-only and travel with the pinned version. A REAL directory of the same name
+  beside them shadows the core's copy — that is how you override or extend one.
+- **The CLI, the hook scripts and `lib/` are inside `.sidekicks-core/`.** Your workspace has no
+  root `scripts/`; `bin/sidekicks` is a shim, and every wired hook path routes through the mount.
+- **Subagents and an agent pack shipped with the core.** `.agents/subagents/` is canonical,
+  with generated `.claude/agents/`, `.codex/agents/`, `.gemini/agents/`, and `.agents/plugins/sidekicks-agents/` ports;
+  `sidekicks agent pack list` shows the packs, which are shipped but not installed.
+- **Third-party plugins are DECLARED, never redistributed.** `.claude/settings.json` names them
+  and their marketplaces; nothing is installed until you run `sk-hello --apply`.
+
+Full reference for the mount itself: `.sidekicks-core/README.md`.
+
 ---
 # sidekicks-harness — Agent Bootstrap (Inherited Runtime)
 
 > **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
-> `af54175b` on 2026-09-04T18:16:01+07:00 (Asia/Bangkok). It is regenerated on every
+> `53ee1adb` on 2026-09-09T23:17:45+07:00 (Asia/Bangkok). It is regenerated on every
 > `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Where your own
 > instructions go depends on how this runtime is being used:
 >
@@ -27,7 +48,7 @@
 
 ## What this runtime is
 
-A self-contained Sidekicks runtime carrying **6 skill(s)** and the core substrate
+A self-contained Sidekicks runtime carrying **18 skill(s)** and the core substrate
 needed to run them — the `sidekicks` CLI (`bin/` + `lib/`), the boundary contract, and the hook
 scripts. It is a **complete copy**: nothing here links back to the repo it was inherited from, so it
 needs no other repo present. Whether it also carries a Python venv depends on its skills; the answer
@@ -41,6 +62,18 @@ It runs two ways, and the difference decides where your files go:
   version is pinned.
 - **Standalone** — `git clone` + `node bin/sidekicks --help` is all it takes, and the runtime root
   is also the workspace root.
+
+## Explicit per-action waiver — applies to every hard rule
+
+Every repository instruction described as a **hard rule**, **mandatory**, a **safety floor**, or
+with absolute `MUST` / `NEVER` language is binding by default, but the user may waive one for one
+precisely stated action. Before acting, the agent MUST name the exact rule, action and target,
+protection being skipped, concrete risk or consequence, and rollback/recovery/containment plan when
+one exists, then wait for an explicit yes. Approval covers only that action and target in the current
+request; it does not carry to changed scope, later actions, autonomous/YOLO runs, subagents, retries
+with different risk, or future sessions. The agent never infers or self-grants a waiver. Higher-priority
+host, platform, system, legal, or security policy still wins. Safety-floor entries remain enabled and
+cannot be persistently disabled; consent is a conversation-bound exception, not configuration.
 
 ## Inheritance is one-way
 
@@ -64,6 +97,18 @@ never out of it:
 | `sk-scope-switch` | Switch the active Sidekicks project/service scope so edits, new files, and downstream skills land in the correct working folder. |
 | `sk-config-doctor` | VALIDATE, LINT, and SCAFFOLD the per-scope Sidekicks project config — the git-ignored config.yaml (root .sidekicks/config.yaml, user project projects/name/config.yaml)… |
 | `sk-skill-manager` | Front door for a skill's whole life in Sidekicks: CREATE one (via skill-creator), ARCHITECT its work_dir=/docs_dir= anchors, VALIDATE one (skill doctor/verify/manifest… |
+| `fable-mind` | Turns this repo's ten standing session defaults into explicit checkpoints a fixed-thinking model actually runs — depth-by-stakes triage, re-grounding the plan after ev… |
+| `sk-auto-improve` | Autonomous, additive-only skill improver — runs unattended across a LIST of target skills, sequentially, applying ONLY changes that cannot break anything: an improveme… |
+| `sk-inherit` | Forge and maintain a standalone lightweight Sidekicks RUNTIME: a self-contained folder and git repo, placed anywhere via --target, carrying a hand-picked subset of ski… |
+| `sk-jira-connector` | Connect to a Jira Cloud project over the REST API to query or update it: JQL/board search, list your assigned tickets, render an epic timeline, drill into an issue (de… |
+| `sk-knowledge` | Investigate, distill, and RECORD durable knowledge about the active project/service — code behavior, architecture, data characteristics, an answered question — into a … |
+| `sk-packager` | Assemble, distribute, export, bundle, or transfer a portable Sidekicks runtime package or individual components. |
+| `sk-self-improve` | Central skill-improvement funnel for the Sidekicks ecosystem — every improvement to a skill parses through here. |
+| `sk-skill-auditor` | Skill auditor — the DISCOVERER half of skill self-improvement. |
+| `sk-skill-description-trimmer` | Keep Sidekicks skill frontmatter descriptions within the host limits by moving excess trigger/routing detail into each SKILL.md body — Claude's per-description 1024-ch… |
+| `sk-skill-offload` | Safely offload (archive/deactivate) a Sidekicks skill — first verify no OTHER active skill references it, then move it from .agents/skills/<name>/ into .sidekicks/skil… |
+| `skill-creator` | Guide for creating effective skills. |
+| `skill-nickname` | Resolve a short nickname/alias to its full Sidekicks skill name and invoke that skill with any trailing arguments. |
 
 Skills are canonical at `.agents/skills/`. The per-CLI exposure directories
 (`.claude/skills/`, `.agent/skills/`, `.agents/skills/`, `.gemini/skills/`) are git-ignored
@@ -109,10 +154,10 @@ queries, targeted reads). Never assume limits or requirements based on intuition
 headers; always ground suggestions in concrete evidence found within the active scope.
 
 **Rule 6 — Multi-CLI Parity (instructions canonical at AGENTS.md)**
-This runtime **MUST** work identically across every supported agent CLI — Claude Code (primary),
-Codex CLI, Gemini CLI, Antigravity. Instructions are canonical at `AGENTS.md` and Claude Code stays
-the canonical authoring surface for hooks, subagents and skill wiring; every CLI **inherits** shared
-surfaces rather than carrying a divergent copy: instructions via the
+This runtime **MUST** work identically across every supported agent CLI — Claude Code, Codex CLI,
+Gemini CLI, Antigravity. The project persists capabilities and model tiers, never a project-wide
+provider or model default; only individual agent charters or explicit invocations may pin a CLI.
+Instructions, hooks, and subagents have CLI-neutral canonical sources, and every CLI **inherits** shared surfaces rather than carrying a divergent copy: instructions via the
 `CLAUDE.md`/`GEMINI.md` mirrors of `AGENTS.md`, skills via the Rule 3 exposure links, hooks and
 subagents via the per-CLI ports under `.codex/`, `.gemini/`, `.agent/`, `.agents/`. Any change to
 a shared surface **MUST** propagate to all supported CLIs in the same change, and every script
@@ -158,9 +203,9 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
 - **Cross-platform:** every script must run on both macOS and Windows — one unified
   implementation, never an OS fork. Watch path joining, line endings (tolerate `\r\n`), and
   executable suffixes (`.venv/bin` vs `.venv/Scripts`).
-- **Python:** the single repo-root `.venv` only — this runtime carries none yet, because no inherited skill needs one. If one becomes necessary, create it at the WORKSPACE root as `.venv` and install everything there — mounted, that is the directory holding `.sidekicks-core/`, not this read-only tree; standalone, the two are the same place.
+- **Python:** the single repo-root `.venv` only — this runtime's own, never another repo's venv, never system Python. All pip installs go there. The package set is pinned in `requirements.txt`.
 - **Timezone:** `Asia/Bangkok` (UTC+07:00) for ALL timestamps and dates.
-- **Protected branches — never implement on them (hard rule):** no implementation work may be
+- **Protected branches — explicit waiver required (hard rule):** by default, no implementation work may be
   edited, committed, or amended directly on `main`, `sit`, `uat`, `staging`, `prod`, or
   `release/*`. Before the first write, align a supplied target path to its scope (otherwise read the
   active project/service configuration), resolve every intended write path to its nearest owning
@@ -169,7 +214,8 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
   not itself an intentional write. If parent-owned metadata or artifacts are also written, that
   parent repo must be checked too. Get every protected owner onto a work branch `<type>/<slug>`
   first (`feature|fix|chore|docs`) — never commit on the protected branch to "move it later".
-  Protected branches only ever receive work through a merge or PR the user approves.
+  Protected branches normally receive work through a merge or PR the user approves. Direct work
+  requires a separate, scoped approval under the *Explicit per-action waiver* contract above.
 - **Never hijack a shared working tree (hard rule):** the checkout may have another agent session,
   a dev server, a build, or the user's editor live in it. Getting onto the work branch is
   worktree-first — `git worktree add ../worktrees/<slug> -b <type>/<slug> <base>`, then work
@@ -231,6 +277,45 @@ artifact. Use paths relative to the working folder, or repo-relative forms.
   rejected alternatives with `sidekicks memory add` — the bar is "a future agent on a fresh clone
   would be wrong without this." The store is committed and **LOCAL-ONLY**: never write project
   memory to a per-CLI global store (`~/.claude`).
+
+### Session working practices — ten standing defaults
+
+1. **Orient once, then act** — inspect the index once and align scope before artifact work.
+2. **Depth by stakes** — reserve high-tier reasoning for planning, architecture, review, and verification.
+3. **Parallelize independent work** — batch independent reads and sequence only true dependencies.
+4. **Evidence before claims** — keep observed facts separate from assumptions.
+5. **Verify independently of the executor** — treat self-reports as claims until checked.
+6. **Adversarially check high-stakes findings** — try to refute them before reporting.
+7. **Lead with the outcome** — answer what happened before narrating the work.
+8. **Report faithfully** — include failures and skips; never claim unverified success.
+9. **Persist decisions** — register durable, non-obvious choices in project memory.
+10. **Big work = plan → execute → verify loops** — stop only at the hard safety gates.
+
+## Skills
+
+**New skill checklist:** record both independent decisions when creating a Sidekicks skill:
+`sidekicks.runtime-class` (`catalog-only` by default, or deliberate `framework` / `source-only`) and
+publication intent (`public` / `private` / `none`). Register first-party skills in one audit group,
+keep publication category separate from runtime disposition, wire scope/artifact anchors from day
+one, keep every helper and asset inside the skill, validate the bundle, and regenerate its manifest.
+
+## Token discipline — two declared plugins
+
+Two third-party plugins are **declared** in this runtime's per-CLI wiring (`.claude/settings.json`
+`enabledPlugins` + `extraKnownMarketplaces`) and **not redistributed** — their code is fetched from
+their own marketplaces, and nothing is installed until you run `sk-hello --apply`, which names each
+one first. They cut token spend on independent axes and do not conflict by construction: caveman
+compresses the prose *around* code and leaves code verbatim; ponytail shrinks the code *itself* and
+disclaims prose.
+
+| | **caveman** (`caveman@caveman`) | **ponytail** (`ponytail@ponytail`) |
+|---|---|---|
+| Governs | prose / communication | code architecture + implementation |
+| Never touches | code blocks, variable names, file paths, terminal commands, exact error strings, and **all** persisted text (commits, docs, PRs, memory) | validation at trust boundaries, error handling that prevents data loss, security, accessibility, anything explicitly requested |
+| Turn off for a session | "stop caveman" / "normal mode"; `/caveman off` | "stop ponytail" / "normal mode" |
+| Turn off for the repo | remove `caveman@caveman` from `.claude/settings.json` | remove `ponytail@ponytail` from the same file |
+
+Neither is required. A runtime that declares neither behaves identically, only more verbosely.
 
 ## Local memory — register decisions that matter
 

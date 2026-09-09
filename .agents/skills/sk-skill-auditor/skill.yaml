@@ -1,0 +1,13 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning).
+#
+# NOTE: this skill also co-owns the LOCKED rule `rule.auditor-autonomous-safety-floor`. Locked
+# rules are declared in lib/framework-settings/core-registry.mjs with their bodies kept in the
+# always-loaded AGENTS.md, so they are deliberately NOT declared here — a descriptor may not
+# redeclare a framework-core entry.
+
+skill: sk-skill-auditor
+
+rules:
+  - id: criterion.skill-auditing
+    title: Skill auditing — coverage, groups, autonomous mode
+    body: rules/criterion.skill-auditing.md

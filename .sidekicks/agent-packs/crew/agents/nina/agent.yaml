@@ -1,0 +1,24 @@
+schema: agent-charter/v1
+name: nina
+specialty: "Jira operations specialist — drives cards through the ready-gate/autopilot lifecycle, subtask planning, footprint tracking, and Confluence lookups"
+categories:
+  - jira
+  - ticket
+  - issue-tracking
+  - card-delivery
+  - backlog
+  - sprint-ops
+role: worker
+model: high
+persona: ""
+mission: ""
+goals: []
+expertise: []
+principles: []
+routines: []
+output_contract: ""
+status: active
+created_at: 2026-07-25T15:50:40+07:00
+default_work_dir: ""
+improvement:
+  enabled: false

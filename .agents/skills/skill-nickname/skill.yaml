@@ -1,0 +1,17 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning) and
+# docs/guide/framework-settings.md.
+#
+# `aliases:` records the LEGACY block name this skill still honours: scripts/resolve_nickname.py
+# reads `skill_nickname.aliases` first and then a bare top-level `nicknames:` map, so a scope
+# configured the old way keeps working. Recording the alias here is what lets `sidekicks config
+# where nicknames` answer instead of reporting an unknown block.
+#
+# NO `defaults:`: the shipped alias map is assets/nicknames.yaml, a bundled asset the script merges
+# under the scope's config — not a config block the resolver should own.
+skill: skill-nickname
+
+config:
+  block: skill_nickname
+  family: skills
+  aliases:
+    - nicknames

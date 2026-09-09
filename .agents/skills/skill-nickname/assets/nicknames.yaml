@@ -1,0 +1,58 @@
+# Bundled default skill nicknames for the skill-nickname resolver.
+#
+# Format: an `aliases` map of  <short-alias>: <full-sidekicks-skill-name>.
+# Aliases are matched case-insensitively and a leading "/" is ignored, so
+# `gtd`, `GTD`, and `/gtd` all resolve the same.
+#
+# These are DEFAULTS. The active project's Sidekicks config can add new aliases
+# or override any of these — see SKILL.md > "Adding or overriding aliases".
+# Project overrides always win over the defaults below.
+aliases:
+  # --- orchestration / delivery ---
+  gtd: sk-get-things-done
+  gpd: sk-get-plan-done
+  itd: sk-is-things-done
+  cmd: sk-commander
+  seq: sk-sequence-planner
+
+  # --- planning / rules ---
+  plan: sk-implementation-planner
+  ip: sk-implementation-planner
+  irules: sk-implementation-rules
+  arules: sk-architect-rules
+
+  # --- architecture ---
+  arch: sk-project-architect
+  sysarch: sk-project-architect
+
+  # --- BMaD pipeline ---
+  pm: sk-bmad-pm
+  dev: sk-bmad-developer
+  story: sk-bmad-create-story
+  cr: sk-bmad-code-review
+  review: sk-bmad-code-review
+  tech: sk-bmad-epic-tech-context
+  vprd: sk-bmad-validate-prd
+  varch: sk-bmad-validate-architect
+  carch: sk-bmad-create-architecture
+
+  # --- database ---
+  dba: sk-database-analyst
+  dbc: sk-database-connector
+  dbi: sk-database-data-importer
+  dbt: sk-database-transfer
+
+  # --- SHP province ---
+  backup: sk-shp-backup-table
+  runnum: sk-shp-fix-running-number
+
+  # --- platform / ops ---
+  hello: sk-hello
+  cli: sk-cli
+  scope: sk-scope-switch
+  pkg: sk-packager
+  conf: sk-confluence-connector
+  sec: sk-security-remediation
+  cluster: sk-cluster-ops
+  si: sk-self-improve
+  trim: sk-skill-description-trimmer

@@ -1,0 +1,19 @@
+# Report-only onboarding recommendations. Keep this map intentionally small: roles are a starting
+# point, not a second catalog. Categories and exact skill picks are additive selections resolved by
+# scripts/role-recommendations.mjs.
+
+roles:
+  PM:
+    - sk-bmad-pm
+    - sk-bmad-create-story
+  BA:
+    - sk-feasibility-probe
+    - sk-bmad-validate-prd
+  SA:
+    - sk-project-architect
+    - sk-bmad-create-architecture
+    - sk-bmad-validate-architect
+  Developer:
+    - sk-bmad-developer
+    - sk-bmad-code-review
+    - sk-test-gate

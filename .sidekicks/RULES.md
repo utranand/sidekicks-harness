@@ -2,6 +2,20 @@
 
 This file is the **canonical source** of the Sidekicks boundary contract. `AGENTS.md` and all agent-facing skills **MUST mirror** the boundary rules verbatim from this file.
 
+## Explicit per-action waiver
+
+Every repository instruction described as a hard rule, mandatory, a safety floor, or with absolute
+`MUST` / `NEVER` language is binding by default but may be waived by the user for one precisely stated
+action. Before acting, the agent MUST name the exact rule, action and target, protection being skipped,
+concrete risk or consequence, and rollback/recovery/containment plan when one exists, then wait for an
+explicit yes. Approval covers only that action and target in the current request; it does not carry to
+changed scope, later actions, autonomous/YOLO runs, subagents, retries with different risk, or future
+sessions. The agent never infers or self-grants a waiver. Higher-priority host, platform, system,
+legal, or security policy still wins.
+
+Safety-floor entries remain enabled and cannot be persistently disabled in settings. The waiver is a
+conversation-bound exception, not a durable configuration value.
+
 ## The Six Boundary Rules
 
 **Rule 1 — CLI Write Surface**
@@ -31,7 +45,7 @@ Before executing any command that modifies a database (including `INSERT`, `UPDA
 Before proposing schema changes, reporting on data characteristics, or making technical claims about file contents, the agent **MUST** perform empirical verification (e.g., `grep` scans, SQL queries, targeted `read_file`). Never assume limits or requirements based on intuition or partial headers; always ground suggestions in concrete evidence found within the active project.
 
 **Rule 6 — Multi-CLI Parity (instructions canonical at AGENTS.md)**
-The repo **MUST** work identically across every supported agent CLI — Claude Code (primary), Codex CLI, Gemini CLI, Antigravity, and any CLI added later — switching CLIs must never lose instructions, skills, hooks, subagents, or memory. Instructions are canonical at `AGENTS.md` — the CLI-neutral standard filename — and Claude Code stays the canonical authoring surface for hooks, subagents and skill wiring; every CLI **inherits** shared surfaces, never carries a divergent copy: instructions via the `CLAUDE.md`/`GEMINI.md` symlinks to `AGENTS.md`, skills via the Rule 3 exposure links to `.agents/skills/`, hooks and subagents via committed per-CLI ports of the Claude wiring (`.codex/config.toml`, `.gemini/settings.json`, `.agent/settings.json`, `.codex/agents/`, `.agents/plugins/`). Any change to a shared surface **MUST** propagate to all supported CLIs in the same change, and every script involved **MUST** run on both macOS and Windows. Parity is enforced by `lib/framework-lifecycle/tests/multi-cli-parity.test.mjs` and `lib/framework-lifecycle/tests/agent-context-mirror.test.mjs` — colocated under `lib/` so they travel into a forged core and a consumer can check its OWN wiring; the maintenance contract (parity matrix, per-surface checklists, how to add a new CLI) is `docs/guide/multi-cli-compatibility.md`.
+The repo **MUST** work identically across every supported agent CLI — Claude Code, Codex CLI, Gemini CLI, Antigravity, and any CLI added later — switching CLIs must never lose instructions, skills, hooks, subagents, or memory. The project is a **generic CLI host**: it persists model tiers and required capabilities, never a project-wide provider or model default. Runtime selection prefers the current host CLI when it is eligible, then uses capability, tier, containment and availability checks with a stable provider-neutral fallback. Only an individual agent charter or an explicit one-off invocation may pin a CLI executor. Instructions are canonical at `AGENTS.md`; shared hooks and subagents likewise have CLI-neutral canonical sources, while each supported CLI receives a committed adapter in its native format. Every CLI **inherits** shared surfaces, never carries a divergent copy: instructions via the `CLAUDE.md`/`GEMINI.md` symlinks to `AGENTS.md`, skills via the Rule 3 exposure links to `.agents/skills/`, and hooks/subagents via their per-CLI ports. Claude Code remains fully supported as a peer adapter, not the project default. Any change to a shared surface **MUST** propagate to all supported CLIs in the same change, and every script involved **MUST** run on both macOS and Windows. Parity is enforced by `lib/framework-lifecycle/tests/multi-cli-parity.test.mjs` and `lib/framework-lifecycle/tests/agent-context-mirror.test.mjs` — colocated under `lib/` so they travel into a forged core and a consumer can check its OWN wiring; the maintenance contract (parity matrix, per-surface checklists, how to add a new CLI) is `docs/guide/pending-update/multi-cli-compatibility.md`.
 
 ## Active Scope & Working-Folder Resolution
 
@@ -187,7 +201,7 @@ Implemented in `lib/framework-settings/resolve.mjs`; full contract in
 
 | Level | Source | Priority |
 |---|---|---|
-| Safety floor | `lib/framework-settings/floor.mjs` (`LOCKED_IDS`) — **code, not a setting** | Absolute (cannot be disabled) |
+| Consent-gated safety floor | `lib/framework-settings/floor.mjs` (`LOCKED_IDS`) — **code, not a setting** | Always enabled; one-action waiver only |
 | Project | `projects/<active>/manifest.yaml` → `overrides.framework.{rules,criteria,hooks}.<slug>` | High (Wins) |
 | Machine | `.sidekicks/settings.json` → `framework.{rules,criteria,hooks}.<slug>` (git-ignored) | Medium |
 | Framework | `.sidekicks/framework.yaml` → `{rules,criteria,hooks}.<slug>` (committed) | Low |

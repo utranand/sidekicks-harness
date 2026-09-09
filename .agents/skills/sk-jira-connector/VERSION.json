@@ -1,0 +1,6 @@
+{
+  "name": "sk-jira-connector",
+  "version": "0.5.1",
+  "description": "Sidekicks skill for querying and updating a Jira Cloud project over the REST API: browse/JQL search, my-assigned-tasks, epic timeline, issue drill-down, and autonomous writes (comment add/list/edit, transition, edit, create, link).",
+  "author": "Arms"
+}

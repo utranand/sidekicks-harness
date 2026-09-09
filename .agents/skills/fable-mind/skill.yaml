@@ -1,0 +1,8 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning).
+
+skill: fable-mind
+
+rules:
+  - id: criterion.fable-mind
+    title: Fable-mind — load the checkpoint layer on a non-Fable-class model
+    body: rules/criterion.fable-mind.md

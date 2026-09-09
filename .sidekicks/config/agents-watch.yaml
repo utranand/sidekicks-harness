@@ -1,8 +1,8 @@
 # agents-watch.example.yaml — committed schema documentation for the running-agents
 # monitor's WATCH FOLDERS (lib/artifacts-lifecycle/watch-config.mjs).
 #
-# HOW TO USE: copy this file to `agents-watch.yaml` in the same directory (.sidekicks/) and
-# list the artifact folders to watch. The file is OPTIONAL — absent or unparseable, only the
+# HOW TO USE: `sidekicks core init` renders this example as the live `agents-watch.yaml` beside
+# it, under .sidekicks/config/. List the artifact folders to watch in that copy, never in this one. The file is OPTIONAL — absent or unparseable, only the
 # standard bases are scanned (repo root + every project + service `src/` `artifacts/runs`),
 # so a fresh clone needs no config. This example is safe to commit.
 #

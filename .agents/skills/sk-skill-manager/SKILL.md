@@ -13,11 +13,10 @@ description: >-
   (sk-skill-offload); runtimes (sk-inherit); packaging (sk-packager); audits (sk-skill-auditor);
   improvements (sk-self-improve); CLI parity (sk-parity-keeper).
 user-invocable: true
-version: 0.5.2
+version: 1.7.0
 sidekicks:
+  runtime-class: framework
   logical-id: skill:sk-skill-manager
-  depends-on:
-    - skill:skill-creator
   provides:
     - skill-lifecycle
 ---
@@ -86,6 +85,7 @@ the verb's report instead of predicting it.
 | "what's published where", "is the skills repo up to date", "did we ever export X" | **DESTINATIONS** |
 | "what needs re-exporting", "what changed since I last published", "let me pick which skills to publish", "give me a list to choose from" | **REVIEW** |
 | "what else do I need for X", "what depends on X", "I want the bmad skills" | **ADVISE** |
+| "which skills should a PM/BA/SA/developer install", "recommend skills for my role" | **ADVISE → ROLE ONBOARDING** |
 | "regenerate the modular category doc" | **CATALOG** |
 
 Ambiguous between EXPORT and packaging? Ask once: *"Do you want these skills published to the
@@ -100,10 +100,19 @@ skills repository, or a portable runtime package?"* — the second is `sk-packag
    for and name the sibling that owns that instead. Read the neighbours first —
    `sidekicks skill list` and `docs/skill-modular-category.md` §2 for the families.
 2. **Author it through `skill-creator`.** Invoke that skill; do not hand-write the folder file
-   by file. `scripts/init_skill.py <name> --path .agents/skills [--resources …]` scaffolds
-   it. Then **delete `agents/`** — that is a Codex-UI artifact, and only 4 of this repo's 120
-   skills carry one, so it is not a convention here.
-3. **Wire it, in the same change.** This is the part a scaffold cannot do, and skipping any leg
+   by file. Run `scripts/init_skill.py <name> --path .agents/skills --runtime-class <class>` with
+   `--publication <public|private|none> [--resources …]`; it scaffolds the skill. Then **delete
+   `agents/`** — that is a Codex-UI artifact, and only 4 of this repo's 120
+   skills carry one, so it is not a convention here. `skill-creator` is an optional sibling
+   (`skill.manifest.yaml`), not a hard dependency: when it is absent from this runtime, CREATE
+   cannot proceed — there is no fallback to hand-writing the folder as a substitute.
+3. **Record its runtime disposition in frontmatter.** Every newly-created first-party skill gets
+   exactly one `sidekicks.runtime-class`: `catalog-only` is the default, `framework` is a deliberate
+   opt-in for framework-owned runtime machinery, and `source-only` means it must never be carried
+   into a forged runtime. A missing field on a legacy skill resolves as `catalog-only`; do not use
+   that compatibility fallback for new work. Classification is the authority — never add a new
+   skill to the dynamic `framework` selection by editing a roster.
+4. **Wire it, in the same change.** This is the part a scaffold cannot do, and skipping any leg
    trips a repo-wide test:
 
    | Leg | Where | Trips if skipped |
@@ -114,11 +123,11 @@ skills repository, or a portable runtime package?"* — the second is `sk-packag
    | every **tunable value**, declared in `skill.yaml` `config:` + `config.defaults.yaml` | the skill's own folder | `skill doctor` → `hardcoded-default`; `config doctor` → `defaults-undeclared` |
    | `sidekicks framework sync` | `.sidekicks/config/settings/` | `tests/framework-cli.test.mjs` |
    | `sidekicks config sync` | the scope's `config/<family>.yaml` | `tests/config-sync.test.mjs` |
-   | a Category-1 skill also joins §1 **and** the `framework` preset | `docs/skill-modular-category.md`, `sk-inherit/assets/presets.yaml` | `tests/skills/inherit-framework-preset.test.mjs` |
+   | runtime disposition | `SKILL.md` → `sidekicks.runtime-class` | framework selection cannot classify the skill |
    | the anchors | see **ARCHITECT** | nothing today — which is why ARCHITECT exists |
-   | destination intent, **only when the skill must not go everywhere** | `skill_repo: <name>` \| `none` in the skill's own `skill.yaml` | nothing — but a private skill with no intent is publishable to a public tree by accident |
+   | destination intent, **for every new skill** | `skill_repo: public` \| `private` \| `none` in the skill's own `skill.yaml` | nothing — but a missing intent makes publication an implicit guess |
 
-4. **Gate it** with the VALIDATE sequence below before committing.
+5. **Gate it** with the VALIDATE sequence below before committing.
 
 A skill that owns a rule keeps the body **inside its own folder** (`rules/<id>.md`), because a
 lifted copy has to carry it — `tests/framework-export.test.mjs` asserts exactly that. A skill
@@ -210,7 +219,9 @@ for the preamble; do not paraphrase it here. Then check the four things that act
    defaults off `$ARTIFACTSDIR`. Do not "fix" a skill by promoting it to an anchor.
 
 Apply a repair through `sk-self-improve` → `skill-creator`. Never hand-edit the target
-skill; that rule is the funnel's, and it applies to this skill too.
+skill; that rule is the funnel's, and it applies to this skill too. Same optional-sibling
+absence as CREATE: with `skill-creator` not present, an ARCHITECT repair cannot be applied —
+there is no hand-edit fallback.
 
 ## VALIDATE
 
@@ -288,7 +299,8 @@ than create one. So `git init` + `skill export` produces a tree no generator wil
 in this order:
 
 ```sh
-node bin/sidekicks skill repo init <path> [--private] [--name <n>] [--remote <url>] [--json]
+node bin/sidekicks skill repo init <path> [--private] [--name <n>] [--remote <url>] \
+  [--peer <public-repository-name>] [--json]
 ```
 
 1. **Scaffold.** The verb above writes `.gitignore`, `LICENSE`, `LAYOUT.md`, `README.md`,
@@ -296,6 +308,8 @@ node bin/sidekicks skill repo init <path> [--private] [--name <n>] [--remote <ur
    family, and the variant-specific rollup file. Each file is written only when **absent** and the
    report says `created` or `kept` per path, so a re-run is legible and never re-templates prose
    somebody hand-edited. `<path>` is normally outside this repo.
+   For a private repository whose name does not end in `-private`, pass `--peer` explicitly so the
+   generated documentation cannot invent the wrong public counterpart.
 2. **Create and push the git repository — the user's, not yours.** `repo init` deliberately does not
    run `git init`: creating and pushing a repository is outward-facing
    (`rule.irreversible-outward-confirm`). The report states `git_initialised: false` rather than
@@ -590,18 +604,27 @@ node bin/sidekicks skill import <skill>… | --all --from <path> [--apply] [--fo
 `skill_manager.skill_repo:` (`sidekicks framework config sk-skill-manager`) rather than
 retyping a clone path from memory, which is how a skill gets imported from the wrong repository.
 
-**Read the statuses before reaching for `--force`.** Four of the seven mean *stop*, and one of those
+**Read the statuses before reaching for `--force`.** Five of the eight mean *stop*, and one of those
 is never importable at all:
 
 | Status | What it means | What to do |
 |---|---|---|
 | `new` | not here yet | import it |
-| `ff` | nothing recorded here would be lost | clean fast-forward, import it |
+| `ff` | nothing recorded here would be lost, and nothing says the incoming copy is older | clean fast-forward, import it |
 | `up-to-date` | identical baselines, or byte-identical content | nothing |
+| `behind` | the incoming copy declares an **older** version — importing would downgrade this skill | usually EXPORT instead; `--force` accepts the downgrade |
 | `conflict` | **both** sides moved | resolve the difference; `--force` discards the local side |
 | `local-only` | local has work the export predates | usually EXPORT instead |
 | `unversioned` | no baseline can attribute the difference, or the closure is undeclared | investigate |
 | `broken` | the incoming copy contradicts its own manifest | **`--force` does not open this** — re-export it at the source |
+
+**`ff` never meant "newer".** The reconcile compared baselines for equality, so a *differing*
+incoming baseline read as a clean fast-forward whichever side had moved — against this repo's own
+published skills that mislabelled 14 rows whose LOCAL copy was newer. Every row now carries a
+version delta (`local 1.4.1 <- incoming 1.1.0`) in the report and in `--json`, read from
+`VERSION.json` with the SKILL.md frontmatter breaking a tie, and a demonstrably older copy is
+`behind`. Where neither side carries a comparable version the row stays `ff` and says the direction
+is unknown — that is an honest gap, not a verdict.
 
 **A missing manifest is not automatically a problem.** `manifestRequired()` says a skill with no
 `scripts/`, no third-party import, no sibling edge, no binary and no `skill.yaml` needs none, and
@@ -651,6 +674,20 @@ third-party skill into this repo. Ambiguity between two layouts is an error nami
 with `--layout`. A name that already exists here is refused rather than merged — the two folders
 share a name and no history — so pass `--rename <upstream>=<local>`.
 
+**Pulling an update IS supported — re-run the same command.** When the local copy's receipt names
+this very upstream (`upstream.name`, `upstream.path`, `adapter.layout` and `source.kind` all still
+match), the same name IS the same skill and the collision refusal does not apply. The reconcile then
+uses the receipt's recorded hashes as the base: unchanged reads `up-to-date`, a moved upstream reads
+`ff`, local edits read `local-only`, and both moving reads `conflict`. A file you added here that
+the upstream never carried is never pruned by an update, and a `skill.manifest.yaml` the framework
+synthesized afterwards is not counted as a local edit — otherwise every correctly-followed import
+would report `local-only` on its next update. A local skill with **no** receipt, or one whose
+receipt names a different upstream, is still refused as a collision.
+
+Where neither side records a git remote, the match rests on name, path and layout alone; two
+unrelated repositories holding a same-named skill will match. That case still stops (the contents
+differ, so it is a `conflict`), and the row says the evidence was thin and offers `--rename`.
+
 **Conversion synthesizes nothing.** The folder is copied byte-exact, which is what lets a later
 re-import reconcile as `up-to-date` instead of as a conflict that can never be resolved. No
 `skill.yaml` is written (its `rules:`/`hooks:`/`config:` are claims about *this* repo that only a
@@ -663,6 +700,42 @@ single repo-root `.venv`, which it will not create for you), attribution (a lice
 ROOT does not travel — import never writes outside `.sidekicks/`), and whether a skill you did not
 write is yours to republish (`skill_repo: none`).
 
+### Adopting is cross-platform-checked — some sources are REFUSED
+
+A skill folder has to land as the same folder on macOS, Linux and Windows or it is not one skill.
+Three things break that, and the plan now says so **before** anything is written:
+
+| what | verdict |
+|---|---|
+| a symlink pointing **outside** the skill folder, or a dangling one | **refused** — the folder is not liftable |
+| a symlink pointing **inside** it | warned; copied as the target's **bytes**, never as a link |
+| a source checked out with `core.symlinks=false` (git's Windows default writes a link as a text file holding its target path) | **refused** — re-clone the source with symlinks enabled |
+| a name Windows cannot create: `CON PRN AUX NUL COM1-9 LPT1-9` (with or without an extension), `<>:"\|?*`, a trailing dot or space, or two paths differing only in case | **refused** |
+| a CRLF shebang (`bad interpreter` on POSIX), a `.ps1` entrypoint (needs `pwsh`), a path near Windows' 260-char `MAX_PATH` | warned |
+
+**`--force` does not open a refusal**, and there is no flag that does. `--force` means "I accept
+losing the local side"; it says nothing about a folder that cannot exist on Windows. The fix is at
+the source — say which upstream file, and what to change.
+
+The checks run against the **upstream's own names and bytes**, never against what this machine's
+filesystem happens to accept, so importing on macOS protects the Windows teammate and vice versa.
+Read the refusals out loud: each one names the file and what is wrong with it.
+
+The copy is **staged then swapped** (`artifacts/runs/skill-manager/staging/<stamp>/`) and rolled
+back on failure, so a half-written folder is no longer a way an import can end.
+
+**Executability is recorded, not inferred.** `skill manifest <name> --apply` writes a `modes:` block
+listing the executable paths, and `skill verify` reports `mode-drift` when a recorded executable is
+not one. Before this, the exec bit lived only in the source `stat` — which NTFS cannot report — so
+any skill that passed through a Windows checkout was published `0644` and every gate stayed green.
+An older manifest with no `modes:` block is valid and unchanged; re-record it when convenient.
+
+> **Windows support for `skill import` is UNVERIFIED.** Everything above is derived from code and
+> from a simulated `core.symlinks=false` clone on macOS. The `windows-latest` CI leg exists
+> (`.github/workflows/ci.yml`) but is `workflow_dispatch`-only with Actions disabled repo-wide, so
+> no Windows run has ever exercised this surface. Say so when it matters, and dispatch the leg
+> (`gh workflow run ci.yml --ref <branch>`) before relying on a Windows result.
+
 > **Where should a third-party skill land?** `skill doctor` is a CI gate over THIS repo, so adopting
 > a pile of foreign skills here turns it red with findings nobody intends to fix. Adopt into the
 > consumer repo that needs them, or park them on arrival with `--into skill-offloaded`.
@@ -674,6 +747,7 @@ sixth layout: [docs/guide/skill-import-adapters.md](../../../docs/guide/skill-im
 
 ```sh
 node bin/sidekicks skill registry [<skill>] [--check] [--json]
+node bin/sidekicks skill registry <skill>… | --all --apply        # re-record a drifted mirror
 node bin/sidekicks skill registry --backfill --assume-imported <skill> --apply
 ```
 
@@ -681,6 +755,18 @@ The receipt an import leaves. It records what is **not derivable afterwards** �
 and path, the layout adapter, whether it was converted, which framework ids the import enabled *in
 this repo*, the licence, and the as-installed file hashes. It deliberately records nothing already
 answerable from `bundle{}`, `catalog.yaml` or `origin.yaml`.
+
+**`--apply` re-records a drifted mirror**, which is what `--check`'s own "re-record it" advice
+means. Only the `mirror` block is rewritten — `files:` is the as-installed baseline that reports
+`local-only` and that `skill remove` reads to tell a file the import brought from one added since,
+so it is never refreshed. A bare `--apply` refuses: name the skills or pass `--all`. `--all` is
+accepted here and refused for `--backfill`, because a backfill *asserts* where a skill came from
+while a re-record only copies disk into the half of the file whose contract is already "the
+filesystem wins". `skill manifest --apply` refreshes the mirror by itself for any skill carrying a
+receipt, so the post-import plan no longer leaves this check red.
+
+Every import APPENDS to its receipt: the original `source`, `adapter` and `imported_at` survive a
+re-import from the same upstream, and each run adds a `history` entry.
 
 `--check` recomputes the mirrored half from disk; **where they disagree, the filesystem is right.**
 A skill with no profile reads `untracked` and never fails a check — most skills here were authored
@@ -772,6 +858,37 @@ Retracts the published copy: the skill's folder, its `meta/<skill>/` contents, a
 
 ## ADVISE
 
+### Role onboarding (report-only)
+
+For a setup/resume request that asks which skills fit the user's work, offer a **multi-select** over
+roles, publication categories, and exact skill names. Roles are small curated starting points;
+categories are resolved from a local public `catalog.yaml`; exact picks are always additive.
+
+```sh
+node .agents/skills/sk-skill-manager/scripts/role-recommendations.mjs \
+  --role PM,Developer --category database --skill sk-git-ship
+```
+
+The helper only reports. It never clones, imports, applies, or reads/prints a private destination.
+It works offline: role and exact-skill choices still resolve, while category choices remain named as
+unresolved until a local public catalog is supplied with `--catalog <checkout-or-catalog.yaml>`.
+When `--checkout` is omitted, that catalog path also becomes the checkout used in every printed
+manual command (a `catalog.yaml` path contributes its containing directory).
+Its output gives the explicit manual sequence: clone the public catalog, list it, run `skill advise`,
+preview `skill import`, and add `--apply` only after the user chooses to install.
+
+The maintained role defaults are deliberately narrow:
+
+- **PM:** `sk-bmad-pm`, `sk-bmad-create-story`
+- **BA:** `sk-feasibility-probe`, `sk-bmad-validate-prd`
+- **SA:** `sk-project-architect`, `sk-bmad-create-architecture`, `sk-bmad-validate-architect`
+- **Developer:** `sk-bmad-developer`, `sk-bmad-code-review`, `sk-test-gate`
+
+The canonical map is [assets/role-recommendations.yaml](assets/role-recommendations.yaml); do not
+duplicate or expand it in another onboarding script.
+
+### Dependency advice
+
 ```sh
 node bin/sidekicks skill advise <skill>… [--from <skills-repo-clone>]
 ```
@@ -828,17 +945,18 @@ current doc changes nothing. What it will **not** do, each for a stated reason:
   `tests/skills/skill-modular-category.test.mjs` instead, which is the useful half.
 - **§4's modularity audit.** Judgement. The doc's own header records a machine pass that got a
   family verdict *wrong* until a human noticed shared `sprint-status.yaml` state.
-- **Remove a §1 member the classification rule does not derive.** §1 is what
-  `sk-inherit`'s `framework` preset forges, so deleting a line changes what a runtime is
-  built from. The script reports it under "needing a human" and leaves it in place.
+- **Change a skill's runtime classification.** §1 documents the currently declared framework
+  roots, but the forge resolves those roots from each `SKILL.md` plus required dependencies. The
+  generator may report drift; it must not silently change a runtime contract.
 
 That last one is live: §1 lists 16 skills while the rule (`core` + `skill-improvement` + the
 auditor) yields 15, because `sk-packager` sits in the `ops` group yet appears in §1. Either
 the rule or the list is wrong — it is a taxonomy decision, so it is recorded rather than edited.
 Do not "tidy" it without deciding it.
 
-When you do edit §1, edit `sk-inherit/assets/presets.yaml`'s `framework` preset in the same
-change: the preset must stay a superset of §1, and a test enforces it.
+When you edit §1, make the matching `sidekicks.runtime-class` decision in the owning `SKILL.md`.
+The `framework` entry in `sk-inherit/assets/presets.yaml` is only a dynamic-preset sentinel; it is
+not a member list.
 
 ### Three taxonomies, and which question each answers
 
@@ -849,7 +967,7 @@ another to follow.
 |---|---|---|---|
 | **audit group** | `sk-skill-auditor/assets/audit-groups.yaml` | what the auditor sweeps together | audit coverage, and `first_party` in the catalog |
 | **publication category** | [assets/categories.yaml](assets/categories.yaml) | what a reader browses together | `catalog.yaml`'s `category`, the `categories/<family>/` pages, `--category` |
-| **runtime preset** | `sk-inherit/assets/presets.yaml` | what a forged runtime carries | what `inherit create` copies |
+| **runtime disposition** | each `SKILL.md` → `sidekicks.runtime-class` | whether a skill is a framework root, catalog-only, or source-only | the dynamic `framework` closure |
 
 A category defaults to the skill's audit group, so 12 of the 13 families list no members at all. The
 `framework` family is the one that must be explicit: its members audit under four different groups

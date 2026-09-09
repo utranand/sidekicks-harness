@@ -1,10 +1,12 @@
 {
   "name": "sk-skill-manager",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": ">-",
   "files": [
     "SKILL.md",
+    "assets/role-recommendations.yaml",
     "config.defaults.yaml",
+    "scripts/role-recommendations.mjs",
     "skill.yaml"
   ]
 }

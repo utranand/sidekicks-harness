@@ -49,12 +49,39 @@ requires:
     - path: scripts/framework-core-publish.mjs
       degraded: 'the "Framework core (release debt)" readiness row is SKIPPED entirely - readiness.mjs guards on existsSync for both this script and the core service before adding it, so nothing errors and no other row is affected. The row is the only consumer: it spawns `status --json` and renders the result. Absence is therefore a lost signal (the release log stops being surfaced automatically) rather than a broken check, which is why this is a requires entry and not a hard dependency.'
       # seen at SKILL.md:175
+  sibling_skills:
+    - skill: caveman
+      how: prose
+      optional: true
+      degraded: 'Nothing in sk-hello breaks. caveman is named only as documentation - it is one of the two token-discipline plugins the Host-plugins row installs, and the vendored .agents/skills/caveman/ copy exists solely to hold the criterion.caveman body. sk-hello never invokes it: the row is driven entirely by the enabledPlugins declaration in .claude/settings.json, so an absent caveman folder costs the criterion body and nothing else.'
+      # documented, seen at SKILL.md:159
+      #
+      # optional: true and how: prose, not a hard subprocess edge. This row was the reason EVERY
+      # forged core failed its own `core doctor --all` with
+      #   [declared-but-absent] sk-hello: declares sibling 'caveman', which is not present
+      # while the degraded sentence directly above said nothing breaks without it. Both halves were
+      # wrong in the same direction:
+      #   how: caveman is never invoked. SKILL.md's Host-plugins row is driven by the enabledPlugins
+      #     declaration in .claude/settings.json; `prose` is the value for a named-but-not-called
+      #     edge, `subprocess` claims a call site that does not exist.
+      #   optional: absence is the EXPECTED state, not a defect. caveman is third-party (MIT) and
+      #     declared-not-redistributed, so the `framework` preset deliberately excludes the skill
+      #     folder and SKILL.md:157 tells the agent NOT to copy it in. SKILL.md:155: "A freshly
+      #     mounted workspace has the declaration and not the package for both."
+      # Same shape as sk-commander -> sk-jira-footprint, which lib/skill-lifecycle/audit.mjs names
+      # as the precedent for why an optional sibling's absence is a notice and not an error.
+      # `ponytail` gets the identical treatment in the same SKILL.md table and has NO row here at
+      # all — there is no vendored ponytail folder for the scanner to find. That asymmetry is the
+      # evidence this row was an artifact of the vendored folder rather than a real dependency.
+    - skill: sk-skill-manager
+      how: subprocess
+      optional: true
+      degraded: 'Step 0.75 cannot produce role/category/exact-skill recommendations or its public-catalog command sequence. Environment readiness, capability audit, and scope orientation remain fully available.'
+      # documented, seen at SKILL.md:336
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:30d274fe0bf6e5a759e97f2306086a9d7b396305ba2610430f314471ada89629
-  VERSION.json: sha256:9dab88df651103479941de13d115c91da8c454b813b754bdfb3331e4376142af
-  improvements/001-trim-description-under-cap.yaml: sha256:d0e8cb0e9725311b40f2f0a139475ba431a4529a4701c20862c89f86b3fda599
-  improvements/INDEX.md: sha256:a161a50f85c2b8c97ad4e5d568b10b6f89e08d4546a03f3de9b221d3da2c6ac5
+  SKILL.md: sha256:e0d1b9818696cbcf6bebd8e1adbcff1f21cf06e13e379aa85b47165b0eefe140
+  VERSION.json: sha256:bf172896f357cc81db0fa7deab2ec72f60d5578195d7706b5f0d9512b30cf7d9
   scripts/capability.mjs: sha256:f6fac60be74dc39f0bd0cf95fd0ea75c4057d98b4e7b21a5527fde6060718ca3
   scripts/readiness.mjs: sha256:a706889383272f1e919673bf80a251ab4832bbe29a6bf9c6ee54a922eaddf2d7

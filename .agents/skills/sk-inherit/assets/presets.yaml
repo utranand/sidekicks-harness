@@ -1,0 +1,293 @@
+# Named skill bundles for `inherit create --preset <name>`, plus the one block that is not a bundle.
+#
+# A static preset is only a shorthand for a --skills list; presets compose (--preset core,git) and
+# mix freely with --skills. `framework` is the one dynamic exception: its empty entry below is a
+# sentinel whose membership resolves from per-skill runtime metadata and hard dependencies.
+#
+# THE `required:` BLOCK BELOW IS NOT A PRESET. It is the floor every runtime carries whatever the
+# operator selected, it cannot be named with --preset, and there is no flag that turns it off.
+#
+# FORMAT (parsed by scripts/inherit.mjs): preset name at column 0 ending in ':', each member an
+# indented '- <skill-name>' item. Comments and blank lines are ignored.
+#
+# A preset may also name DELEGATE AGENTS (.sidekicks/agents/<name>/) by splitting its members into
+# two labelled sections — the flat form above stays valid and means "all skills":
+#
+#   my-preset:
+#     skills:
+#       - sk-agent-creator
+#     delegates:
+#       - briony
+#
+# Keep every skill member a real directory under .agents/skills/ or .sidekicks/skill-offloaded/,
+# and every delegate member an agent directory carrying agent.yaml. `inherit plan` reports a member it
+# cannot resolve as NOT FOUND, and `create` refuses outright.
+
+# REQUIRED FLOOR — carried by EVERY runtime, unioned into whatever the operator selected. Not a
+# preset: it cannot be named with --preset, and no flag switches it off. A runtime without these
+# six cannot orient itself, drive a CLI verb, align scope, validate its config, execute a
+# command-sequence, or manage the skills it carries, so forging one is a defect and not a choice the
+# operator gets to make. Same stance as SCRIPT_SUBDIR_FLOOR one layer down, where scripts/lib always
+# travels because every hook imports hook-gate.mjs.
+#
+# `sk-skill-manager` is floor because a runtime's skill set is not frozen at forge time: it is the
+# front door for validating, healing, importing, removing and discovering skills, and a mounted core
+# whose consumer installs the rest of the bench needs that door from the first day. Its two siblings
+# are deliberately NOT dragged in — `skill-creator` (authoring) and `sk-skill-auditor` (group
+# membership) stay opt-in, and the manager's manifest states exactly what each absence costs: no
+# CREATE and no ARCHITECT repair without the former, no family/first-party half of CATALOG without
+# the latter. Validate, heal, export, import, remove and advise all work without either.
+#
+# Neither sibling is a frontmatter `depends-on` edge on sk-skill-manager — that field is reserved
+# for hard, forge-blocking dependencies (declaredDependencies() in scripts/inherit.mjs), and both
+# are genuinely optional. Declaring them only in the manifest is what keeps `core` (below)
+# dependency-closed with zero MISSING DEP despite carrying neither sibling.
+#
+# `sk-commander` is floor for the same reason: a command-sequence file is
+# EXECUTED, never read as a document (criterion.command-sequences, which commander owns and carries
+# in its own rules/ folder), so a runtime holding sequences without commander has no way to run them.
+# Authoring one is sk-sequence-planner, which is NOT floor — a runtime that only runs
+# sequences handed to it needs the executor, not the author.
+#
+# `verify` fails a runtime missing any member; `drift` reports it as MISSING REQUIRED and `patch`
+# restores it without needing --force. `--prune-skills` can never delete one.
+#
+# Keep this list identical to `core:` below. They are the same six skills seen from two angles —
+# this block is what a runtime may not go without, `core:` is how an operator asks for the floor
+# and nothing else — and `tests/skills/inherit-required-skills.test.mjs` fails if they diverge.
+required:
+  - sk-hello
+  - sk-cli
+  - sk-commander
+  - sk-scope-switch
+  - sk-config-doctor
+  - sk-skill-manager
+
+# BARE CORE — the six infrastructure skills that let a runtime manage itself, and nothing else.
+# Every member is substrate, not preference: orientation and first-run readiness, the live CLI verb
+# surface, command-sequence execution, scope alignment, config validation, and the skill lifecycle.
+# Needs no Python venv at all — sk-skill-manager ships no Python, and commander's one sibling
+# (sk-jira-footprint, a Python subprocess) is declared best-effort and degrades to no card notes
+# when absent. THE DERIVED PACK SKILLS BELOW CAN CHANGE THAT: the built-in `core` agent pack
+# declares sk-validation-gate, whose scripts/checklist.py imports yaml, so a core forged with the
+# default --pack-skills declared carries a venv with PyYAML. Forge --pack-skills none for a core
+# that is venv-free again — at the cost of the consumer's `agent pack install core` refusing until
+# they import those skills themselves.
+#
+# Identical to `required:` above, and kept as a preset on purpose: `--preset core` is how an
+# operator asks for the floor EXACTLY, with nothing else on top. Every other selection gets these
+# six anyway, so naming this preset alongside another one is harmless and redundant.
+#
+# THIS IS WHAT THE PUBLISHED FRAMEWORK CORE CARRIES. `scripts/framework-core-publish.mjs` forges
+# with this preset (`framework_core.preset`), so a mounted core is substrate plus the floor, and the
+# consumer installs the rest — including the other framework skills, published as the `framework`
+# category of the sidekicks-skills repository.
+#
+# PLUS ONE DERIVED SET, WHICH IS NOT LISTED HERE ON PURPOSE — AND IS OFF BY DEFAULT FOR A CORE.
+# A core also ships the agent packs in `.sidekicks/agent-packs/`, and a pack DECLARES the skills its
+# agents need. `resolvePackSkills` in scripts/inherit.mjs can read those declarations at forge time
+# and union them into a CORE's selection (never into `required:` — the floor is substrate, not crew).
+# `--pack-skills declared|closure|none` controls how much of that graph travels.
+#
+# A PUBLISHED core uses `none`. Both pack.yaml files state in their own headers that the skills they
+# declare are DECLARED, never bundled, and `agent pack install` already refuses before writing
+# anything when one is absent, printing the exact import commands. Forging them in anyway overrode
+# that authored contract and cost 25 extra skills — every sk-bmad-*, jira, database and confluence
+# skill — turning the framework runtime into a copy of the development workspace. `declared` and
+# `closure` remain available for a deliberately larger distribution, and both are recorded in the
+# release log. Whatever the mode, `plan` reports every contributed skill WITH the pack and the
+# sibling that pulled it in, so a skill is never in a core without saying why it is there.
+core:
+  - sk-hello
+  - sk-cli
+  - sk-commander
+  - sk-scope-switch
+  - sk-config-doctor
+  - sk-skill-manager
+
+# THE SIDEKICKS FRAMEWORK ITSELF — resolved dynamically by scripts/inherit.mjs. This empty entry is
+# only the named-preset sentinel. Its members are every active skill declaring
+# `sidekicks.runtime-class: framework`, the immutable `required:` floor, and their transitive hard
+# dependencies (frontmatter `depends-on` plus non-optional runtime manifest siblings).
+#
+# The resolver rejects missing, offloaded, private-only, or source-only closure members. A
+# dependency declaring `skill_repo: none` is allowed only when its folder carries license.txt, so a
+# vendor dependency such as skill-creator can travel with its licence without becoming a declared
+# framework root. Plan output and `.sidekicks/inherit.json` record why each member was selected.
+#
+# Do not add names here. Classify the owning SKILL.md, or fix the dependency declaration that makes
+# it part of the closure. Static presets below remain ordinary hand-maintained lists.
+framework:
+
+# Communication style. Deliberately NOT in `core` — a comms mode is an operator preference, and the
+# generated minimal AGENTS.md does not auto-load one (the source repo's AGENTS.md does). Inherit
+# this only if you also add the loading instruction to the runtime's AGENTS.local.md.
+#
+# NOTE: `caveman` here is THIRD-PARTY (MIT, github.com/JuliusBrussee/caveman). This preset is an
+# explicit local opt-in, so it still carries it — but do not use this preset to build a runtime you
+# publish. Redistribution obligations come with it, and the copy would go stale against upstream.
+comms:
+  - caveman
+  - fable-mind
+
+# Add this to let a runtime maintain its own skills. Note it does NOT let the runtime pull from the
+# source repo — inheritance is one-way and driven from the source side only.
+authoring:
+  - skill-creator
+  - sk-skill-description-trimmer
+
+# The skill improvement funnel — the one real subsystem inside the framework family: auditor and
+# auto-improve both file THROUGH self-improve, and skill-offload greps skill-nickname's
+# assets/nicknames.yaml. Inheriting any of them alone leaves the funnel with a missing stage.
+# Both of self-improve's declared depends-on ride along: skill-creator is the APPLY stage that
+# actually edits the skill, and sk-jira-connector is the only Jira client EXPORT mode shells
+# out to. Dropping either leaves a funnel stage dead — `plan` reports it as a MISSING DEP.
+improvement:
+  - sk-self-improve
+  - sk-auto-improve
+  - sk-skill-auditor
+  - sk-skill-offload
+  - skill-nickname
+  - skill-creator
+  - sk-jira-connector
+
+# Plan, execute, verify — the delivery engines, without the Jira/BMAD surface area.
+# sk-scope-switch is here because sk-get-things-done declares it in `depends-on`; it
+# is duplicated from `core` on purpose so `--preset delivery` alone is a complete runtime.
+delivery:
+  - sk-scope-switch
+  - sk-task-planner
+  - sk-get-things-done
+  - sk-is-things-done
+  - sk-commander
+  - sk-sequence-planner
+
+# THE GOAL ENGINE — `delivery` plus the autonomous conductor that drives it, and the multi-CLI
+# delegation pair. This is the preset for a runtime that is handed a GOAL and expected to carry it
+# to shippable on its own: sk-get-plan-done derives the acceptance criteria, takes one sign-off,
+# and runs plan -> execute -> review -> fix against a resumable mission ledger, through either of
+# its two engines (`engine: gtd`, the verified GTD queue below, or `engine: goal`, the
+# `sidekicks goal` CLI's envelope-approved per-node loop).
+#
+# sk-cli-orchestrator + sk-cli-executor are the multi-CLI half and are deliberately inseparable:
+# the orchestrator IS the loop and re-implements nothing, so every item is briefed and executed by
+# the executor's adapter, one call per iteration. Inheriting the orchestrator alone leaves a loop
+# with nothing to drive. They also carry the machine-local executor registry
+# (`.sidekicks/cli-executors.json`) the goal engine's per-node routing reads.
+#
+# BMAD-FREE ON PURPOSE. sk-get-plan-done and sk-implementation-planner treat BMaD as a DETECTED
+# CAPABILITY, not a dependency: each probes `sidekicks framework check rule.bmad-first` plus the
+# skill directory, prefers the `sk-bmad-pm -> sk-bmad-developer` chain where both hold, and
+# otherwise takes a named fallback route (`engine: goal`, `sk-framework-dev`,
+# `sk-service-implementer`, `sk-code-reviewer`) while recording which route it took. Neither names
+# a `sk-bmad-*` skill in its frontmatter `depends-on`, which is what lets this preset close with no
+# `MISSING DEP` and no BMaD member — asserted by tests/skills/inherit-goal-preset.test.mjs.
+# Want the lifecycle back? Compose `--preset goal,bmad`.
+#
+# sk-commander and sk-scope-switch are duplicated from `core`/`delivery` on purpose, the same
+# convention `delivery:` documents, so `--preset goal` ALONE is a complete runtime. Both Python
+# skills here (orchestrator, executor) need the repo-root .venv with PyYAML — do not pass --no-venv
+# for a runtime that will actually run them.
+goal:
+  - sk-scope-switch
+  - sk-task-planner
+  - sk-get-things-done
+  - sk-is-things-done
+  - sk-commander
+  - sk-sequence-planner
+  - sk-implementation-planner
+  - sk-get-plan-done
+  - sk-cli-orchestrator
+  - sk-cli-executor
+
+# git-ship is the hub both sweep and worktree-integrate hand off to; worktree-integrate also reads
+# the same `git worktree list` state sk-worktree manages. Shipping the hub without them
+# leaves the runtime unable to reach it from a dirty tree or from a finished worktree.
+git:
+  - sk-git-ship
+  - sk-git-sweep
+  - sk-worktree
+  - sk-worktree-integrate
+  - sk-release-notes
+
+# PostgreSQL work. Rule 4 (explicit permission + transaction scope for every write) travels with
+# these skills and is restated in the generated CLAUDE.md.
+# NONPROD ONLY — sk-database-connector hard-stops on a prod target and directs the agent to
+# sk-teleport-database-connector. Compose `--preset database,prod-access` for a runtime that
+# will ever touch prod, or the agent is pointed at a skill the runtime does not have.
+database:
+  - sk-database-rules
+  - sk-database-connector
+  - sk-database-analyst
+  - sk-database-data-importer
+  - sk-xlsx-to-csv
+
+# The Teleport (tsh zero-trust) skills — the ONLY sanctioned path to a production database or
+# Kubernetes cluster. Their nonprod counterparts (database-connector, cluster-ops) hard-stop on a
+# prod target and name these two as the route; a runtime that will see prod needs them present.
+prod-access:
+  - sk-teleport-database-connector
+  - sk-teleport-cluster-ops
+
+# The delegate-agent surface: the skills that create charters, stand agents by, coordinate them over
+# the mailbox, and inspect what they did. The `sidekicks agent` CLI verbs themselves ride in lib/, so
+# these skills are the documentation layer over them, not the mechanism.
+#
+# The `delegates:` section is EMPTY on purpose — which agents travel is per-runtime, so name them at
+# the call site (--delegates briony,debby) or add them to a local preset. Copy this preset and fill
+# the section in when a runtime should always carry the same crew.
+delegate-crew:
+  skills:
+    - sk-agent-creator
+    - sk-agent-standby
+    - sk-agent-master
+    - sk-agent-bridge
+    - sk-agent-journal
+    - sk-agent-dry-run
+  delegates:
+    # (none by default — name them at the call site: --delegates briony,debby)
+
+jira:
+  - sk-jira-connector
+  - sk-jira-my-work
+  - sk-jira-rules
+
+# Full BMAD implementation lifecycle: architecture -> PRD/epics/stories -> build -> review.
+# sk-bmad-epic-tech-context is NOT optional: sk-bmad-pm declares it in `depends-on`
+# and invokes it mid-pipeline, so a runtime without it stalls the PM run at the tech-context step.
+bmad:
+  - sk-bmad-create-architecture
+  - sk-bmad-pm
+  - sk-bmad-epic-tech-context
+  - sk-bmad-create-story
+  - sk-bmad-developer
+  - sk-bmad-code-review
+  - sk-implementation-rules
+  - sk-architect-rules
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────────
+# NOT A PRESET. The third-party host plugins a forged runtime may DECLARE in its per-CLI wiring,
+# spelled `<plugin>@<marketplace>` exactly as `.claude/settings.json` spells them. Anything not
+# listed here is stripped from `enabledPlugins` at forge time, and a marketplace no surviving plugin
+# names is stripped with it.
+#
+# THE RULE FOR ADDING ONE: a plugin belongs here only when the runtime's own generated instruction
+# surface STATES what it does and how to turn it off. Declaring a plugin the instructions never
+# mention hands the consumer a behaviour change with no documented opt-out — which is what v1.4.4
+# did with `ralph-loop`, `claude-hud` and `slack`, three tools of the source author's that no shipped
+# skill, rule or criterion refers to, installed non-interactively by `sk-hello --apply`
+# (INC-2026-09-06-06 B-5).
+#
+# DECLARED, NEVER REDISTRIBUTED — the distinction that makes this legal as well as lean. The plugin's
+# code is fetched from its own marketplace by the consumer; the framework ships only the name. That
+# is why `caveman` is here while the `caveman` SKILL is deliberately absent from the `framework`
+# preset above: vendoring someone else's MIT-licensed work into a core we publish is redistribution,
+# and naming it is not.
+#
+# The two members are the token-discipline layers, both stated in assets/AGENTS.min.md.tmpl:
+#   caveman  — compresses PROSE, never code, paths, commands, error strings or persisted text
+#   ponytail — governs CODE architecture, and explicitly disclaims prose
+# They do not conflict by construction, which is why both travel.
+host_plugins:
+  - caveman@caveman
+  - ponytail@ponytail

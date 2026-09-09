@@ -2,7 +2,7 @@
   "schema_version": 1,
   "cli": {
     "namespace_count": 20,
-    "command_count": 159,
+    "command_count": 160,
     "namespaces": [
       {
         "namespace": "agent",
@@ -26,7 +26,7 @@
       },
       {
         "namespace": "cli-executor",
-        "command_count": 8
+        "command_count": 9
       },
       {
         "namespace": "config",
@@ -144,8 +144,8 @@
         "id": "cli:agent/delegate",
         "namespace": "agent",
         "verb": "delegate",
-        "args": "<name> [--once] [--status] [--interval 2] [--max-runtime 3600] [--rotate-after 20] [--rotate-context 180000] [--settle 3] [--requeue-limit 3] [--permission-mode <m>] [--model <tier|id>] [--full-context] [--force]",
-        "summary": "Headless always-on runner: watches inbox/new and wakes a non-interactive agent-CLI session (cwd = repo root — skills, subagents, and CLI verbs intact) to drain it; primes each wake with the conversation-context block, resumes the wake session until its resident context passes --rotate-context, honors 'agent stop', keeps the comms daemons alive (adapters: claude, codex, antigravity — claude and codex resume their wake session, an antigravity wake is always fresh because agy has none); claude wakes run lean by default (--strict-mcp-config, --setting-sources project, --exclude-dynamic-system-prompt-sections) — --full-context restores the pre-lean context for debugging",
+        "args": "<name> [--once] [--status] [--host-cli <name>] [--interval 2] [--max-runtime 3600] [--rotate-after 20] [--rotate-context 180000] [--settle 3] [--requeue-limit 3] [--permission-mode <m>] [--model <tier|id>] [--full-context] [--force]",
+        "summary": "Headless always-on runner: unpinned agents prefer the available process-local host hint then resolve neutrally through the executor registry; watches inbox/new, wakes a contained non-interactive CLI session at repo root, primes conversation context, resumes supported sessions until rotation, honors agent stop, keeps comms alive, and preserves --full-context as the explicit debugging override",
         "status": "implemented",
         "module": "lib/agent-lifecycle/delegate.mjs"
       },
@@ -189,8 +189,8 @@
         "id": "cli:agent/pack",
         "namespace": "agent",
         "verb": "pack",
-        "args": "<list|show|install|status> [<pack-id>] [--dry-run] [--json]",
-        "summary": "OPTIONAL agent packs — versioned crews of portable charters that SHIP inside a framework core and are never installed for you automatically (`core init`/`core update` write no agent). `list`/`show` report each pack's version, per-agent presence and per-skill dependency state (available / missing-but-installable / unavailable); `install` validates the manifest and every charter, refuses BEFORE writing anything when a required skill is absent (printing the exact `skill import` commands), then creates only the agents that are missing — an agent you already have or have edited is never overwritten, and a repeat run writes nothing; `status` grades a pack ready | degraded | not-installed | invalid and exits 2 on anything but ready. Nothing here reaches the network or downloads a skill",
+        "args": "<list|show|install|status|harvest> [<pack-id>] [--agents a,b] [--version X.Y.Z] [--display-name <s>] [--summary <s>] [--skills-repo <url>] [--dry-run] [--json]",
+        "summary": "OPTIONAL agent packs — versioned crews of portable charters that SHIP inside a framework core and are never installed for you automatically (`core init`/`core update` write no agent). `list`/`show` report each pack's version, per-agent presence and per-skill dependency state (available / missing-but-installable / unavailable); `install` validates the manifest and every charter, refuses BEFORE writing anything when a required skill is absent (printing the exact `skill import` commands), then creates only the agents that are missing — an agent you already have or have edited is never overwritten, and a repeat run writes nothing; `status` grades a pack ready | degraded | not-installed | invalid and exits 2 on anything but ready. Nothing here reaches the network or downloads a skill. `harvest` runs the other way — it turns LIVE agents into a portable pack so a crew can ship inside a core: it drops the three per-install fields (the `pack:` provenance block, a pinned `default_work_dir`, `routines/` schedules), REFUSES any charter still naming the Telegram lane, the pacemaker, the LAN bridge or an absolute path (reported by field path, never rewritten — the prose is part of what the agent is), derives `requires_skills` from the skills the charters actually name plus those skills' declared siblings, and writes nothing at all unless every named agent passes",
         "status": "implemented",
         "module": "lib/agent-lifecycle/pack.mjs"
       },
@@ -261,8 +261,8 @@
         "id": "cli:agent/start",
         "namespace": "agent",
         "verb": "start",
-        "args": "<name> [--role orchestrator|worker] [--cli claude|codex|gemini|antigravity] [--model <tier|id>] [--print] [--spawn] [--headless] [--wait-online[=90]]",
-        "summary": "Launch a new terminal session for the agent using its charter CLI (or a one-off --cli override) + role-appropriate bootstrap prompt + resolved --model flag (--print never spawns; --spawn forces the window even from inside VS Code but is REFUSED with exit 2 when the session has no GUI to host one — use --headless there; auto otherwise; --headless starts the detached delegate runner instead of a window; --wait-online polls real presence and exits 2 if the agent never heartbeats — a window opening is never proof it came online)",
+        "args": "<name> [--role orchestrator|worker] [--cli claude|codex|gemini|antigravity] [--host-cli <name>] [--model <tier|id>] [--print] [--spawn] [--headless] [--wait-online[=90]]",
+        "summary": "Launch a new terminal session using an optional charter CLI pin or one-off --cli override; an unpinned agent prefers the available process-local --host-cli/SIDEKICKS_HOST_CLI and otherwise resolves neutrally through the executor registry. Adds the role bootstrap and registry-resolved model tier; --print never spawns, --spawn is refused without a GUI, --headless starts the delegate runner, and --wait-online verifies real presence",
         "status": "implemented",
         "module": "lib/agent-lifecycle/start.mjs"
       },
@@ -510,11 +510,20 @@
         "module": "lib/cli-executor-lifecycle/list.mjs"
       },
       {
+        "id": "cli:cli-executor/models",
+        "namespace": "cli-executor",
+        "verb": "models",
+        "args": "[<name>...] [--refresh] [--root] [--json]",
+        "summary": "Reconcile each executor's selected model tiers against its discovered catalog: per-tier valid/stale/unverified/unmapped, plus the catalog models no tier has claimed and the exact `register --model-<tier>` line to bind one. Run this when a vendor ships a new model. Advisory — it NEVER remaps a tier (a catalog row carries no tier hint, so the choice is the operator's); --refresh updates the capability snapshot only, through the same discover+sync path. Exits 2 on drift: a selected model absent from a complete catalog, or a CLI discovery reported unavailable",
+        "status": "implemented",
+        "module": "lib/cli-executor-lifecycle/models.mjs"
+      },
+      {
         "id": "cli:cli-executor/register",
         "namespace": "cli-executor",
         "verb": "register",
-        "args": "<name> [--root|--inherit] [--binary <exe>] [--invoke '<a,{brief}>'] [--probe '<a>'] [--capabilities-command '<a,b>'] [--auth-status-command '<a,b>'] [--auth-renew-command '<a,b>'] [--auth-interactive] [--effort-<tier> <value>]",
-        "summary": "Register/update an executor and its selected model/effort tiers; generic capability and auth commands are explicit side-effect-free metadata contracts",
+        "args": "<name> [--root|--inherit] [--binary <exe>] [--invoke '<a,{brief}>'] [--probe '<a>'] [--model-<tier> <id>] [--effort-<tier> <value>] [--specialties '<a,b>'] [--model-specialties-<tier> '<a,b>'] [--family <f>] [--description <d>] [--profile-file <path>] [--capabilities-command '<a,b>'] [--auth-status-command '<a,b>'] [--auth-renew-command '<a,b>'] [--auth-interactive]",
+        "summary": "Register/update an executor and its selected model/effort tiers (<tier> is top|high|mid|low; an EMPTY value clears just that tier, an absent flag carries the prior value forward) plus the specialty hints routing reads; generic capability and auth commands are explicit side-effect-free metadata contracts",
         "status": "implemented",
         "module": "lib/cli-executor-lifecycle/register.mjs"
       },
@@ -531,8 +540,8 @@
         "id": "cli:cli-executor/route",
         "namespace": "cli-executor",
         "verb": "route",
-        "args": "[set <name>... | clear | inherit | skill …] [--root]",
-        "summary": "Manage the layered global and per-task routing policy",
+        "args": "[set <name>... | clear | inherit | skill …] [--root] [--host-cli <name>]",
+        "summary": "Manage routing policy; a process-local host hint is preferred without becoming project configuration",
         "status": "implemented",
         "module": "lib/cli-executor-lifecycle/route.mjs"
       },
@@ -603,8 +612,8 @@
         "id": "cli:config/sync",
         "namespace": "config",
         "verb": "sync",
-        "args": "[--scope <name>] [--only a,b] [--dry-run] [--check] [--refresh] [--prune] [--json]",
-        "summary": "Rescan every installed skill and document its declared blocks in the scope's family files (written INERT, so they keep resolving to the skill's defaults); also materialises the settings half. --dry-run prints the plan (exit 0); --check is the CI gate (non-zero on a gap)",
+        "args": "[--scope <name>] [--only a,b] [--dry-run] [--check] [--refresh] [--prune] [--prune-only] [--json]",
+        "summary": "Rescan every installed skill and document its declared blocks in the scope's family files (written INERT, so they keep resolving to the skill's defaults); also materialises the settings half. --dry-run prints the plan (exit 0); --check is the CI gate (non-zero on a gap); --prune-only retires what nothing declares any more and seeds nothing",
         "status": "implemented",
         "module": "lib/config-lifecycle/sync.mjs"
       },
@@ -738,8 +747,8 @@
         "id": "cli:framework/list",
         "namespace": "framework",
         "verb": "list",
-        "args": "[--json] [--kind <rule|criterion|hook>] [--disabled]",
-        "summary": "List every framework rule, AGENTS.md criterion and hook with its effective state",
+        "args": "[--json] [--kind <rule|criterion|hook>] [--disabled] [--all]",
+        "summary": "List every framework rule, AGENTS.md criterion and hook with its effective state (owner-absent hooks — whose owning skill is not in this checkout, so they never fire — are hidden unless --all)",
         "status": "implemented",
         "module": "lib/framework-lifecycle/list.mjs"
       },
@@ -748,7 +757,7 @@
         "namespace": "framework",
         "verb": "show",
         "args": "<id> [--json]",
-        "summary": "Show one framework entry: state, deciding layer, owning skill(s), body location",
+        "summary": "Show one framework entry: state, deciding layer, owning skill(s), body location, and whether a hook's script is actually in this checkout",
         "status": "implemented",
         "module": "lib/framework-lifecycle/show.mjs"
       },
@@ -783,8 +792,8 @@
         "id": "cli:goal/plan",
         "namespace": "goal",
         "verb": "plan",
-        "args": "\"<goal>\" | <goal-file> [--executor <name>] [--tier top|high|mid|low] [--contest] [--planners <a,b,c>] [--json]",
-        "summary": "Turn a goal into a plan a CLI agent authored in enforced read-only mode, have a fresh independent critic check it (at most two correction passes, then it asks you), and print the approval-envelope digest. Writes goal.json, plan.json and a readable implementation-plan.md; dispatches nothing. --contest fans planning out to the highest eligible tier of every capable CLI family in parallel, cross-judges each candidate with a different family on a fixed rubric, and synthesizes the winner",
+        "args": "\"<goal>\" | <goal-file> [--executor <name>] [--host-cli <name>] [--tier top|high|mid|low] [--contest] [--planners <a,b,c>] [--json]",
+        "summary": "Turn a goal into a plan in enforced read-only mode, with explicit executor first, then an eligible process-local host hint, local policy, and stable provider-neutral fallback. A fresh independent critic gets at most two correction passes before asking the user; the command writes the goal, plan and approval envelope but dispatches no implementation. --contest fans out by capable CLI family, cross-judges and synthesizes",
         "status": "implemented",
         "module": "lib/goal-lifecycle/plan.mjs"
       },
@@ -801,8 +810,8 @@
         "id": "cli:goal/resume",
         "namespace": "goal",
         "verb": "resume",
-        "args": "<run-id> [--abandon-attempt <id>] [--json]",
-        "summary": "Reconcile and continue after an interruption, deriving the next action from run.json and the filesystem alone — never from chat context. An attempt with no proven terminal result is never re-dispatched: a live child is reported, a dead or unverifiable one waits for you to abandon it explicitly",
+        "args": "<run-id> [--host-cli <name>] [--abandon-attempt <id>] [--json]",
+        "summary": "Reconcile and continue after an interruption from run.json and filesystem evidence alone, using the same process-local neutral host-hint contract; live children are reported, and dead or unverifiable attempts require explicit abandonment before redispatch",
         "status": "implemented",
         "module": "lib/goal-lifecycle/resume.mjs"
       },
@@ -810,8 +819,8 @@
         "id": "cli:goal/run",
         "namespace": "goal",
         "verb": "run",
-        "args": "<run-id> [--max-nodes N] [--json]",
-        "summary": "Dispatch the approved plan one ready node at a time: implement at the routed tier in a bounded edit mode, then judge that attempt with a FRESH independent reviewer against the node's criteria, reopening the same node with an evidence-bearing correction on a fail. STOP, attempt limits, budget, breaker, branch drift and the action policy are all code-enforced",
+        "args": "<run-id> [--host-cli <name>] [--max-nodes N] [--json]",
+        "summary": "Dispatch the approved routing one ready node at a time, then judge it with a fresh independent reviewer; the process-local host hint affects only eligible review/verification seats, never approved node routing. Reopens failed nodes with evidence and enforces STOP, attempt/time budgets, breaker, branch drift and action policy",
         "status": "implemented",
         "module": "lib/goal-lifecycle/run.mjs"
       },
@@ -1432,7 +1441,7 @@
         "namespace": "skill",
         "verb": "import",
         "args": "<skill>... | --all --from <path> [--adopt] [--layout <id>] [--rename <up>=<local>] [--into <tree>] [--list] [--apply] [--force] [--json]",
-        "summary": "Bring skills in from any repository that holds them, reconciled against the local baseline (--adopt converts a non-sidekicks layout)",
+        "summary": "Bring skills in from any repository that holds them, reconciled against the local baseline (--adopt converts a non-sidekicks layout). A re-import from the same upstream reconciles against the import receipt; a copy declaring an older version is refused as 'behind'",
         "status": "implemented",
         "module": "lib/skill-lifecycle/import.mjs"
       },
@@ -1467,8 +1476,8 @@
         "id": "cli:skill/registry",
         "namespace": "skill",
         "verb": "registry",
-        "args": "[<skill>] [--check] [--backfill --assume-imported] [--apply] [--json]",
-        "summary": "Registration profiles: what each imported skill came from, what its import turned on here, and whether the record still matches disk",
+        "args": "[<skill>...] [--check] [--all] [--apply] [--backfill --assume-imported] [--json]",
+        "summary": "Registration profiles: what each imported skill came from, what its import turned on here, and whether the record still matches disk. --apply re-records a drifted mirror (never files{}); --backfill writes an inferred receipt for a skill that has none",
         "status": "implemented",
         "module": "lib/skill-lifecycle/registry.mjs"
       },
@@ -1485,7 +1494,7 @@
         "id": "cli:skill/repo",
         "namespace": "skill",
         "verb": "repo",
-        "args": "init <path> [--private] [--name <n>] [--remote <url>] [--json]",
+        "args": "init <path> [--private] [--name <n>] [--remote <url>] [--peer <public-repository-name>] [--json]",
         "summary": "Scaffold the hand-authored half of a skills repository — licence, LAYOUT.md, README.md and one browse page per family, with the generated regions empty but marked; idempotent, and never writes catalog.yaml",
         "status": "implemented",
         "module": "lib/skill-lifecycle/repo.mjs"
@@ -1520,9 +1529,9 @@
     ]
   },
   "framework": {
-    "entry_count": 61,
+    "entry_count": 62,
     "rule_count": 28,
-    "criterion_count": 18,
+    "criterion_count": 19,
     "hook_count": 15,
     "floor_count": 17,
     "entries": [
@@ -1674,6 +1683,19 @@
           "sk-office-viz"
         ],
         "body_at": ".agents/skills/sk-agent-tray/rules/criterion.official-names.md",
+        "body_marker": null,
+        "script": null,
+        "floor": false,
+        "source": "skill"
+      },
+      {
+        "id": "criterion.publish-regression-check",
+        "kind": "criterion",
+        "title": "Compare the test suite against the target's base before any merge hop",
+        "owners": [
+          "sk-shp-publish"
+        ],
+        "body_at": ".agents/skills/sk-shp-publish/rules/criterion.publish-regression-check.md",
         "body_marker": null,
         "script": null,
         "floor": false,
@@ -1907,7 +1929,7 @@
         "owners": [],
         "body_at": null,
         "body_marker": null,
-        "script": ".sidekicks/hooks/rtk-hook.sh",
+        "script": ".sidekicks/hooks/rtk-hook.mjs",
         "floor": false,
         "source": "core"
       },
@@ -2164,10 +2186,10 @@
       {
         "id": "rule.protected-branches",
         "kind": "rule",
-        "title": "Never implement on a protected branch",
+        "title": "Protected-branch writes require explicit waiver",
         "owners": [],
         "body_at": "AGENTS.md",
-        "body_marker": "Protected branches — never implement on them",
+        "body_marker": "Protected branches — explicit waiver required",
         "script": null,
         "floor": true,
         "source": "core"
@@ -2270,10 +2292,10 @@
     ]
   },
   "skills": {
-    "active_count": 128,
+    "active_count": 129,
     "parked_count": 18,
-    "edge_count": 127,
-    "hard_edge_count": 105,
+    "edge_count": 132,
+    "hard_edge_count": 104,
     "mutual_composition": [
       {
         "cycle": [
@@ -2939,7 +2961,10 @@
         "manifest": true,
         "logical_id": "sk-hello",
         "hard_depends_on": [],
-        "informational_refs": []
+        "informational_refs": [
+          "caveman",
+          "sk-skill-manager"
+        ]
       },
       {
         "id": "sk-implementation-planner",
@@ -3191,7 +3216,7 @@
         "id": "sk-knowledge",
         "folder": "sk-knowledge",
         "tree": ".agents/skills",
-        "descriptor": false,
+        "descriptor": true,
         "manifest": true,
         "logical_id": "sk-knowledge",
         "hard_depends_on": [],
@@ -3283,6 +3308,16 @@
         "informational_refs": []
       },
       {
+        "id": "sk-scope-switch",
+        "folder": "sk-scope-switch",
+        "tree": ".agents/skills",
+        "descriptor": false,
+        "manifest": true,
+        "logical_id": "sk-scope-switch",
+        "hard_depends_on": [],
+        "informational_refs": []
+      },
+      {
         "id": "sk-self-improve",
         "folder": "sk-self-improve",
         "tree": ".agents/skills",
@@ -3364,6 +3399,21 @@
         "informational_refs": []
       },
       {
+        "id": "sk-shp-publish",
+        "folder": "sk-shp-publish",
+        "tree": ".agents/skills",
+        "descriptor": true,
+        "manifest": true,
+        "logical_id": "sk-shp-publish",
+        "hard_depends_on": [
+          "sk-shp-snyk-test"
+        ],
+        "informational_refs": [
+          "sk-shp-redeploy-service",
+          "sk-test-gate"
+        ]
+      },
+      {
         "id": "sk-shp-redeploy-service",
         "folder": "sk-shp-redeploy-service",
         "tree": ".agents/skills",
@@ -3394,10 +3444,21 @@
         "manifest": true,
         "logical_id": "sk-skill-auditor",
         "hard_depends_on": [
-          "sk-cli-executor",
-          "sk-loop-fleet",
           "sk-self-improve"
         ],
+        "informational_refs": [
+          "sk-cli-executor",
+          "sk-loop-fleet"
+        ]
+      },
+      {
+        "id": "sk-skill-description-trimmer",
+        "folder": "sk-skill-description-trimmer",
+        "tree": ".agents/skills",
+        "descriptor": false,
+        "manifest": true,
+        "logical_id": "sk-skill-description-trimmer",
+        "hard_depends_on": [],
         "informational_refs": []
       },
       {
@@ -3714,16 +3775,6 @@
         "informational_refs": []
       },
       {
-        "id": "skill:sk-scope-switch",
-        "folder": "sk-scope-switch",
-        "tree": ".agents/skills",
-        "descriptor": false,
-        "manifest": false,
-        "logical_id": null,
-        "hard_depends_on": [],
-        "informational_refs": []
-      },
-      {
         "id": "skill:sk-security-remediation",
         "folder": "sk-security-remediation",
         "tree": ".agents/skills",
@@ -3736,16 +3787,6 @@
       {
         "id": "skill:sk-sequence-planner",
         "folder": "sk-sequence-planner",
-        "tree": ".agents/skills",
-        "descriptor": false,
-        "manifest": false,
-        "logical_id": null,
-        "hard_depends_on": [],
-        "informational_refs": []
-      },
-      {
-        "id": "skill:sk-skill-description-trimmer",
-        "folder": "sk-skill-description-trimmer",
         "tree": ".agents/skills",
         "descriptor": false,
         "manifest": false,
@@ -4460,6 +4501,24 @@
         "parked_source": false
       },
       {
+        "from": "sk-hello",
+        "from_folder": "sk-hello",
+        "to_folder": "caveman",
+        "how": "prose",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-hello",
+        "from_folder": "sk-hello",
+        "to_folder": "sk-skill-manager",
+        "how": "subprocess",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
         "from": "sk-implementation-planner",
         "from_folder": "sk-implementation-planner",
         "to_folder": "sk-bmad-create-architecture",
@@ -5009,6 +5068,33 @@
         "parked_source": false
       },
       {
+        "from": "sk-shp-publish",
+        "from_folder": "sk-shp-publish",
+        "to_folder": "sk-shp-redeploy-service",
+        "how": "prose",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-shp-publish",
+        "from_folder": "sk-shp-publish",
+        "to_folder": "sk-shp-snyk-test",
+        "how": "handoff",
+        "kind": "hard",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
+        "from": "sk-shp-publish",
+        "from_folder": "sk-shp-publish",
+        "to_folder": "sk-test-gate",
+        "how": "subprocess",
+        "kind": "informational",
+        "acquisition": false,
+        "parked_source": false
+      },
+      {
         "from": "sk-shp-snyk-test",
         "from_folder": "sk-shp-snyk-test",
         "to_folder": "sk-security-remediation",
@@ -5031,7 +5117,7 @@
         "from_folder": "sk-skill-auditor",
         "to_folder": "sk-cli-executor",
         "how": "subprocess",
-        "kind": "hard",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -5040,7 +5126,7 @@
         "from_folder": "sk-skill-auditor",
         "to_folder": "sk-loop-fleet",
         "how": "subprocess",
-        "kind": "hard",
+        "kind": "informational",
         "acquisition": false,
         "parked_source": false
       },
@@ -5137,8 +5223,8 @@
     ]
   },
   "config": {
-    "family_count": 14,
-    "block_count": 48,
+    "family_count": 15,
+    "block_count": 50,
     "families": [
       {
         "family": "agents",
@@ -5189,8 +5275,12 @@
         "block_count": 1
       },
       {
+        "family": "shp_publish",
+        "block_count": 1
+      },
+      {
         "family": "skills",
-        "block_count": 7
+        "block_count": 8
       },
       {
         "family": "snyk",
@@ -5709,6 +5799,25 @@
         "source": "skill"
       },
       {
+        "id": "config:knowledge",
+        "block": "knowledge",
+        "family": "skills",
+        "file": "skills.yaml",
+        "secret_file": "skills.secret.yaml",
+        "title": "knowledge",
+        "owners": [
+          "sk-knowledge"
+        ],
+        "readers": [],
+        "aliases": [],
+        "public_keys": [],
+        "scope": "any",
+        "inherits_root": true,
+        "merge": "per_key",
+        "defaults": ".agents/skills/sk-knowledge/config.defaults.yaml",
+        "source": "skill"
+      },
+      {
         "id": "config:mail_sender",
         "block": "mail_sender",
         "family": "comms",
@@ -5902,6 +6011,25 @@
         "inherits_root": false,
         "merge": "per_key",
         "defaults": null,
+        "source": "skill"
+      },
+      {
+        "id": "config:shp_publish",
+        "block": "shp_publish",
+        "family": "shp_publish",
+        "file": "shp-publish.yaml",
+        "secret_file": "shp-publish.secret.yaml",
+        "title": "shp_publish",
+        "owners": [
+          "sk-shp-publish"
+        ],
+        "readers": [],
+        "aliases": [],
+        "public_keys": [],
+        "scope": "project",
+        "inherits_root": false,
+        "merge": "per_key",
+        "defaults": ".agents/skills/sk-shp-publish/config.defaults.yaml",
         "source": "skill"
       },
       {
@@ -6144,11 +6272,7 @@
     "registry_file": ".sidekicks/config/cli-executors.json",
     "registry_present": true,
     "executor_count": 4,
-    "routing_prefer": [
-      "claude",
-      "codex",
-      "antigravity"
-    ],
+    "routing_prefer": [],
     "executors": [
       {
         "id": "executor:antigravity",
@@ -6173,12 +6297,12 @@
         "name": "claude",
         "builtin": true,
         "registered": true,
-        "kind": "generic",
+        "kind": "builtin",
         "enabled": true,
-        "transport": "print-mode",
-        "sandbox": "constraint-block-only",
-        "usage_exposed": false,
-        "description": "Claude Code CLI (claude -p) — main/default executor",
+        "transport": "json",
+        "sandbox": "cli-sandbox",
+        "usage_exposed": true,
+        "description": "Claude Code CLI",
         "model_tiers": [
           "high",
           "low",
@@ -6201,7 +6325,8 @@
         "model_tiers": [
           "high",
           "low",
-          "mid"
+          "mid",
+          "top"
         ],
         "specialty_count": 5
       },
@@ -6209,15 +6334,19 @@
         "id": "executor:gemini",
         "name": "gemini",
         "builtin": true,
-        "registered": false,
+        "registered": true,
         "kind": "builtin",
         "enabled": true,
         "transport": "print-mode",
         "sandbox": "cli-sandbox",
         "usage_exposed": false,
         "description": null,
-        "model_tiers": [],
-        "specialty_count": 0
+        "model_tiers": [
+          "high",
+          "low",
+          "mid"
+        ],
+        "specialty_count": 4
       }
     ]
   },

@@ -7,7 +7,6 @@ categories:
   - bugfix
   - refactor
   - testing
-cli: claude
 role: worker
 model: mid
 persona: "Pragmatic implementer. Small focused diffs, tests alongside the change, and nothing claimed done that has not been run."

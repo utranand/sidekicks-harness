@@ -1,0 +1,167 @@
+# Audit groups — named clusters of skills, AND the SOLE manifest of what the auditor may audit at all.
+# This is the skill's BUNDLED, PORTABLE DEFAULT manifest: it travels with the skill so a fresh clone
+# (or a repo with no auditor block in its AGENTS.md) audits a sensible set out of the box. The repo's
+# AGENTS.md MAY OVERRIDE it — if AGENTS.md carries its own `skill-auditing groups:` block, that block
+# WINS WHOLESALE and this default is ignored (see auditor.sh `group_md`). Edit this file to change the
+# default; edit AGENTS.md to override per-repo without touching the skill.
+#
+# A run scoped to a group audits EXACTLY that group's members; an ungrouped run audits the UNION of
+# all groups (the .sidekicks/skill-offloaded/ archive sits outside the scanned .agents/skills/ tree,
+# so it is never in scope to begin with). The user MUST name the group to run a grouped audit
+# — the auditor asks for one when groups exist.
+# Edit freely: add a group, rename one, move a skill between groups. A skill may appear in more than
+# one group (it's audited once). To keep a skill OUT of audits, leave it out of every group — there
+# is no opt-out list. A NEWLY added skill is not audited until you place it in a group.
+#
+# FORMAT (parsed by auditor.sh): the `skill-auditing groups:` header at column 0, each group name
+# indented, each member a `-` item indented further. Keep all comments either above this header or
+# indented within the block — a column-0 line ends the block.
+#
+# DELIBERATE EXCLUSION: sk-skill-auditor itself is in NO group by design — its coverage
+# comes from the `audit_self` knob in assets/audit-config.yaml, which injects it into ungrouped
+# (whole-manifest) runs only. This is the documented exception to AGENTS.md's "register every
+# first-party skill into a group" rule; do not "fix" it by adding the auditor to a group unless
+# you also want it swept in that group's runs.
+skill-auditing groups:
+  # `single` is a RESERVED, ROTATING-CURSOR group — NOT a normal members list. Auditing it
+  # ("audit the single group") audits exactly ONE skill per run and then auto-advances a saved
+  # cursor to the NEXT skill, so running it repeatedly rolls through the whole registry one skill at
+  # a time, picking up where it left off. The rotation pool is the UNION of every OTHER group below
+  # (this `single` block is excluded from that union), and the cursor lives as run state at
+  # artifacts/runs/skill-auditor/single-rotation.yaml (git-ignored, durable on disk). The member
+  # line below is IGNORED for resolution — the real target comes from auditor.sh single-current;
+  # steer with `auditor.sh single-reset [skill]`, inspect with `auditor.sh single-status`.
+  single:
+    - sk-jira-connector   # placeholder only — ignored; the audited skill is the rotating cursor
+  jira:
+    - sk-jira-connector
+    - sk-jira-footprint
+    - sk-jira-my-work
+    - sk-jira-autopilot
+    - sk-jira-kanban
+    - sk-jira-ready-gate
+    - sk-jira-subtask-planner
+    - sk-jira-subtask-consolidator
+    - sk-get-jira-done
+    - sk-is-jira-done
+    - sk-jira-investigate
+    - sk-jira-loop-engineer
+    - sk-jira-epic-report
+    - sk-jira-workspace
+    - sk-jira-harvest
+  planning:
+    - sk-implementation-planner
+    - sk-sequence-planner
+    - sk-task-planner
+    - sk-feasibility-probe
+    - sk-grill-me
+    - sk-fable-council
+  bmad:
+    - sk-bmad-pm
+    - sk-bmad-create-architecture
+    - sk-bmad-create-story
+    - sk-bmad-developer
+    - sk-bmad-epic-tech-context
+    - sk-bmad-code-review
+    - sk-bmad-validate-architect
+    - sk-bmad-validate-prd
+  delivery:
+    - sk-get-things-done
+    - sk-get-plan-done
+    - sk-is-things-done
+    - sk-commander
+    - sk-loop-fleet
+    - sk-cli-executor
+    - sk-cli-orchestrator
+    - sk-fable-mission
+    - sk-fable-advised
+    - sk-squad
+    - sk-framework-dev
+    - sk-test-gate
+  database:
+    - sk-database-rules
+    - sk-database-connector
+    - sk-teleport-database-connector
+    - sk-database-analyst
+    - sk-database-data-importer
+    - sk-database-transfer
+    - sk-safe-data-importer
+    - sk-shp-add-pcu
+    - sk-shp-add-province-admin
+    - sk-shp-backup-table
+    - sk-shp-fix-running-number
+    - sk-xlsx-to-csv
+    - sk-database-drift
+    - sk-database-schema-sync
+  architecture:
+    - sk-project-architect
+    - sk-architect-rules
+    - sk-implementation-rules
+    - sk-jira-rules
+    - sk-validation-gate
+    - sk-api-cartographer
+  skill-improvement:
+    - sk-self-improve
+    - sk-auto-improve
+    - sk-skill-description-trimmer
+    - sk-skill-offload
+    - sk-inherit
+    - sk-skill-manager
+  core:
+    - sk-cli
+    - sk-hello
+    - sk-scope-switch
+    - sk-config-doctor
+    - sk-knowledge
+    - fable-mind
+    # caveman is NOT listed here on purpose. It is a VENDORED THIRD-PARTY skill
+    # (github.com/JuliusBrussee/caveman, MIT — see .agents/skills/caveman/license.txt), installed as
+    # a Claude Code plugin. Audit groups are for first-party skills only, and group membership is what
+    # marks a skill first-party and pulls it into the distributed `framework` preset — a framework core
+    # we publish must not redistribute someone else's work. AGENTS.md still loads it here as the default
+    # comms mode; `sk-hello` points a new workspace at the upstream install.
+    - skill-nickname
+  ops:
+    - sk-argocd-ops
+    - sk-cluster-ops
+    - sk-shp-redeploy-service
+    - sk-shp-snyk-test
+    - sk-shp-publish
+    - sk-teleport-cluster-ops
+    - sk-aws-kms
+    - sk-security-remediation
+    - sk-packager
+    # Distribution, like sk-packager beside it: it publishes the framework core rather than
+    # operating a cluster. Deliberately NOT in the `framework` preset — inherit refuses to run from
+    # inside a runtime, so a core carrying this skill could never use it.
+    - sk-framework-core
+    - sk-office-viz
+    - sk-agent-tray
+    - sk-scan-ui-design
+    - sk-capture-web-views
+    - sk-interaction-recorder
+    - sk-ui-change-briefer
+    - sk-artifact-manager
+    - sk-run-doctor
+    - sk-parity-keeper
+    - sk-shp-dev-frontend
+  git:
+    - sk-git-ship
+    - sk-worktree
+    - sk-worktree-integrate
+    - sk-git-sweep
+    - sk-release-notes
+  integrations:
+    - sk-confluence-connector
+    - sk-slack-connector
+    - sk-report
+  agents:
+    - sk-agent-standby
+    - sk-agent-creator
+    - sk-agent-master
+    - sk-agent-journal
+    - sk-agent-skill-learning
+    - sk-agent-bridge
+    - sk-agent-schedule-planner
+    - sk-agent-dry-run
+    - sk-agent-mission-loop

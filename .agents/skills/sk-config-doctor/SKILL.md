@@ -12,6 +12,8 @@ description: >-
   reporting an alias it cannot resolve. NOT first-run onboarding or seeding a config
   (sk-hello); NOT operating the connectors (sk-database-connector /
   jira-connector / slack-connector); NOT BMAD's bmad/bmm/config.yaml.
+sidekicks:
+  runtime-class: framework
 ---
 
 # Sidekicks Config Doctor

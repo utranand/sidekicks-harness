@@ -135,11 +135,12 @@ async function main() {
   const map = sk(repoRoot, ['memory', 'map']);
   // The empty-store message starts with "No local-memory entries".
   if (!map || map.startsWith('No local-memory entries')) {
-    // An empty store is silent EXCEPT in the one case where it is a mistake rather than a fact: the
-    // store is git-ignored, so a fresh clone starts empty while its knowledge sits in whatever
-    // sources the committed registry names. Saying nothing there is how a session runs a whole task
-    // without the memory that would have changed it. It stays a HINT — hydrating pulls from a
-    // remote, and starting a network clone unasked at session start is not this hook's call.
+    // An empty store always says SOMETHING, but the two empties are different sentences. The store
+    // is git-ignored, so a fresh clone starts empty while its knowledge sits in whatever sources the
+    // committed registry names — that one is a mistake, and saying nothing about it is how a session
+    // runs a whole task without the memory that would have changed it. It stays a HINT: hydrating
+    // pulls from a remote, and starting a network clone unasked at session start is not this hook's
+    // call.
     const registered = sk(repoRoot, ['memory', 'source', 'list', '--json']);
     let names = [];
     try { names = (JSON.parse(registered || '{}').sources ?? []).map((s) => s.name); } catch { names = []; }
@@ -153,7 +154,22 @@ async function main() {
       );
       return;
     }
-    process.exit(0);
+    // No entries AND no sources: a genuinely empty store. Say so in one line rather than exiting
+    // silently — silence is indistinguishable from "the hook did not run", and a session that
+    // cannot tell those apart cannot trust "there is no memory about this"
+    // (INC-2026-09-06-06 B-8).
+    //
+    // NOT on a delegate wake: an agent's private namespace is empty by default rather than by
+    // accident, the shared store has already been loaded by the time we get here, and a wake loop
+    // pays this block's tokens on every single tick.
+    if (isDelegateWake) process.exit(0);
+    emit(
+      '# Project local memory (sidekicks memory) — empty\n\n'
+      + 'No entries, and no external source registered. Register a decision worth keeping with '
+      + '`sidekicks memory add`; point this checkout at an existing store with '
+      + '`sidekicks memory source add`.\n'
+    );
+    return;
   }
 
   const parts = [

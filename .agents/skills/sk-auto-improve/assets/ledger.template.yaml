@@ -1,0 +1,50 @@
+# ▶ LIVE LEDGER for sk-auto-improve — additive-only, never applies behavior changes ◀
+# One ledger per run: docs/auto-improve/<run-slug>/ledger.yaml  (repo-root scope).
+#
+# This file is the run's resumable state AND its exit-status artifact. Each ralph iteration reads
+# it, processes the next `pending` target, and writes the outcome back. When no target is pending,
+# the run is finalized: `summary` is rolled up and `status: done`. A run where every target came
+# back `clean` (nothing additive-safe to apply) is a valid, fully-recorded outcome — the ledger
+# says "N targets checked, 0 applied, 0 waiting, N clean: no skill needed improving."
+#
+# HARD INVARIANT (the whole safety case): this skill auto-applies ONLY artifacts that are
+# risk:low AND kind:assets AND purely additive (a NEW file under the target's assets/). Anything
+# that changes existing behavior — instructions, description, scripts, any edit to an existing
+# file — is FILED as a proposed artifact that WAITS for a human, never applied here.
+#
+# All timestamps are Asia/Bangkok (+07:00), ISO-8601.
+
+run: <run-slug>                # kebab-case slug for this run
+created: <YYYY-MM-DDTHH:mm:ss+07:00>
+mode: additive-only            # FIXED. Documents the invariant above; not a knob.
+control:
+  stage: running               # running | pause | stop   ← the loop gate (live-editable)
+  lease:
+    run_id: <ai-<epoch>-<pid>> # this run's identity (one ralph loop owns the ledger)
+    heartbeat_at: <timestamp>  # refreshed each writing pass
+status: running                # running | done
+started_at: <timestamp>
+finished_at: null              # stamped at finalize
+summary:                       # rollup, filled at finalize
+  targets_total: 0
+  applied: 0                   # additive-safe artifacts auto-applied (approved_by: auto)
+  waiting: 0                   # behavior-change proposals filed, awaiting human approval
+  clean: 0                     # targets with no improvement needed
+  failed: 0
+notes: []                      # run-level findings (per-target one-liners, assumptions)
+runtime_errors: []             # failures of the run itself: {at, target, error, context}
+
+targets:                       # processed sequentially, top to bottom
+  - skill: <skill-name>        # must be an ACTIVE skill under .agents/skills/
+    source: harvest            # "harvest" = scan this skill's own `proposed` additive artifacts;
+                               # OR an evidence path (run artifact / eval report) to TRIAGE from
+    status: pending            # pending | in_progress | done | failed
+    outcome: null              # applied | waiting | clean | mixed
+    started_at: null
+    finished_at: null
+    applied_ids: []            # artifact ids auto-applied this run (approved_by: auto)
+    waiting_ids: []            # artifact ids filed that now WAIT for a human (behavior changes)
+    no_file: null              # TRIAGE no-file reason, when nothing was even worth filing
+    attempts: 0
+    max_attempts: 2
+    issues: []                 # appended on failure: {attempt, summary, evidence}

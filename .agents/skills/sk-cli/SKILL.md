@@ -6,6 +6,8 @@ description: >-
   or arguments, what a verb does, or how to perform a project/service operation with the CLI. This
   is the source of truth for the verb surface — never answer from memory or a hardcoded list,
   because the CLI evolves and a static answer drifts silently.
+sidekicks:
+  runtime-class: framework
 ---
 
 # Sidekicks CLI Reference

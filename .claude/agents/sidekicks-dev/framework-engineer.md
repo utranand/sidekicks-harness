@@ -1,6 +1,6 @@
 ---
 name: sk-framework-engineer
-description: Sidekicks framework engineer for the CLI substrate — bin/sidekicks, lib/*.mjs lifecycle modules, scripts/*.mjs hooks, and their node --test suites. Use for any code change to the framework itself (CLI verbs, scope/index/memory lifecycle, Claude hooks). Enforces the zero-dependency rule and macOS+Windows portability.
+description: Sidekicks framework engineer for the CLI substrate — bin/sidekicks, lib/*.mjs lifecycle modules, scripts/*.mjs hooks, and their node --test suites. Use for any code change to the framework itself (CLI verbs, scope/index/memory lifecycle, agent hooks). Enforces the zero-dependency rule and macOS+Windows portability.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: sonnet
 ---

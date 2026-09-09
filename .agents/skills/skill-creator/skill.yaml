@@ -1,0 +1,16 @@
+# Skill descriptor — see lib/framework-settings/registry.mjs (discovered by scanning).
+#
+# This skill owns no rule, hook or config block, so the descriptor exists for exactly one statement:
+# where it may be published.
+
+skill: skill-creator
+
+# VENDORED THIRD-PARTY WORK — never published to any skills repository. skill-creator is
+# vendor-authored (docs/skill-modular-category.md classifies it external alongside `caveman`), and
+# republishing someone else's skill under our catalog is not ours to do.
+#
+# It is NOT excluded from runtimes: sk-inherit's `framework` preset carries it, because
+# sk-self-improve declares it in `depends-on` and it is the APPLY stage that edits a skill.
+# Travelling into a runtime and being published are different questions, and this answers only the
+# second. `skill export` exits non-zero rather than relying on anyone remembering the distinction.
+skill_repo: none

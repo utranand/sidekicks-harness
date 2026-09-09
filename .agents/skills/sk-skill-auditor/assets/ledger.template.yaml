@@ -1,0 +1,99 @@
+# ▶ LIVE LEDGER for sk-skill-auditor — discover → verify → (autonomous) auto-apply below the safety floor ◀
+# One ledger per run, at the run's RESOLVED base: `auditor.sh run-base <run-slug>`/ledger.yaml
+# (runs layout v2, --bare shape: the audit-run slug IS the work item). The pre-v2 shape
+# artifacts/runs/skill-auditor/<run-slug>/ledger.yaml is a read/resume-only fallback — never a write target.
+#
+# This file is the run's resumable STATE and the single source of truth for its RESULT. The readable
+# result is rendered from it — `auditor.sh report <slug>` writes audit-report.md (prose, for the human
+# deciding whether the branch merges) + audit-record.json (normalized, for the next run) beside this
+# file, and cross-checks the hand-written `summary:` rollup below against the `targets:` entries. So
+# write this ledger accurately and never hand-author those two: a wrong number in the report means a
+# wrong number HERE.
+#
+# Each ralph iteration reads
+# it, audits the next `pending` target skill, files what the evidence justifies (through
+# sk-self-improve PROPOSE), and — in autonomous mode — self-verifies and auto-applies the
+# survivors below the safety floor. When no target is pending, the run is finalized.
+#
+# DRY-SWEEP EXIT: the loop ends after a full pass over every in-scope skill. A run where every target
+# came back `clean` (no evidenced finding) is a valid, fully-recorded outcome — "N skills audited,
+# nothing the evidence justified improving." That is success, not failure.
+#
+# HARD INVARIANTS (the whole discipline):
+#   • Every proposal must cite concrete evidence from the audited skill — a finding with no evidence
+#     is dropped by TRIAGE, never filed.
+#   • In CLASSIC mode (autonomous: false) the skill only FILES `proposed` artifacts; every one waits
+#     for a human to approve + apply.
+#   • In AUTONOMOUS mode it self-verifies each finding (majority of independent refuters) and
+#     auto-applies the survivors via sk-self-improve APPLY — but the SAFETY FLOOR holds: any
+#     change softening a TARGET skill's safety/irreversible/permission rule, or whose loss is not
+#     cleanly git-reversible, or that fails verification, is PARKED as `proposed` for a human, never
+#     auto-applied. A change that merely edits the auditor's OWN machinery (this rubric, the
+#     verification step, the floor) is NOT floor-hitting — it auto-applies like any other verified
+#     finding (the git diff is the review). The floor is enforced twice (auditor + APPLY), is scoped
+#     to genuine safety guards in the skills being improved, and is not a knob.
+#
+# All timestamps are Asia/Bangkok (+07:00), ISO-8601.
+
+run: <run-slug>                # kebab-case slug for this run
+created: <YYYY-MM-DDTHH:mm:ss+07:00>
+run_base: <repo-relative path of the base this run PINNED via $SIDEKICKS_RUN_BASE>   # audit trail + cross-check
+mode: autonomous               # autonomous → self-verify + auto-apply below the floor; classic → file only, human applies
+control:
+  stage: running               # running | pause | stop   ← the loop gate (live-editable)
+  # The lease is ENFORCED, not decorative: every RESUME iteration runs
+  # `auditor.sh assert <slug> <run_id>` FIRST — exit 4 means a takeover superseded this run
+  # (stop immediately: no writes, no promise), exit 1 means the ledger is gone (run cancelled).
+  # `auditor.sh takeover <slug>` adopts an ABANDONED run: only once the ledger has not been
+  # written for lease_ttl_seconds (audit-config.yaml) — the ledger file's mtime is the heartbeat
+  # clock, refreshed by every writing pass. A fresh foreign lease is never taken automatically.
+  lease:
+    run_id: <au-<epoch>-<pid>> # this run's identity (one ralph loop owns the ledger)
+    claimed_at: <timestamp>    # when this run_id took the lease (START or takeover)
+    host: <hostname>           # where the owning session runs
+    heartbeat_at: <timestamp>  # refreshed each writing pass
+status: running                # running | done
+started_at: <timestamp>
+finished_at: null              # stamped at finalize
+summary:                       # rollup, filled at finalize
+  targets_total: 0
+  audited: 0                   # skills the loop actually processed
+  filed: 0                     # findings filed (classic mode: all await a human)
+  applied: 0                   # autonomous mode: findings auto-applied (verified + below the safety floor)
+  parked: 0                    # autonomous mode: findings parked for a human (floor-hit or unverified)
+  clean: 0                     # skills where the evidence justified nothing to file
+  failed: 0
+notes: []                      # run-level findings (per-skill one-liners, assumptions)
+runtime_errors: []             # failures of the run itself: {at, skill, error, context}
+
+targets:                       # processed sequentially, top to bottom
+  - skill: <skill-name>        # must be an ACTIVE skill under .agents/skills/
+    status: pending            # pending | in_progress | done | failed
+    outcome: null              # autonomous: applied | parked | mixed | clean   (classic: filed | clean)
+    started_at: null
+    finished_at: null
+    log: log/<skill-name>.log   # relative to this run's base — resolve with `auditor.sh run-base <run-slug>`
+    filed_ids: []              # all improvement artifact ids filed for this skill
+    verified_ids: []           # autonomous: ids that passed adversarial self-verification (majority confirmed)
+    applied_ids: []            # autonomous: ids AUTO-APPLIED (verified AND below the safety floor) — already landed
+    parked_ids: []             # autonomous: {id, reason: safety-floor|unverified|apply-failed|apply-broke-target} — WAIT for a human
+    no_file: []                # findings TRIAGE dropped: {finding: <one line>, reason: <no-evidence|input-caused>}
+    rounds: []                 # one entry per audit round: {at, tier, focus, candidates, filed, verified, applied, parked}
+    rounds_run: 0            # total audit rounds this skill took to converge
+    dry_streak: 0            # consecutive rounds that filed nothing new (loop ends at dry_rounds_to_converge)
+    converged: null          # true = stopped on the dry streak (nothing left to improve); false = stopped on max_rounds_per_skill
+    trigger_eval:            # the measured triggering benchmark for this skill (ALWAYS run — dimension 1)
+      eval_set_size: null    # number of should/should-not queries scored
+      eval_set_id: null      # self-improve asset id if the query set was generated+committed this run
+      baseline_score: null   # current description score, "passed/total" (FIRST run)
+      baseline_score_replicated: null  # the SAME description re-scored — a delta counts only once replicated
+      best_score_replicated: null      # the winner re-scored; file only if its WORST beats baseline's BEST
+      best_score: null       # best candidate score, "passed/total" (== baseline if nothing beat it)
+      candidates_tried: 0    # hand-authored candidate descriptions scored (manual loop, no API key)
+      winning_desc_id: null  # self-improve kind:description id when a candidate strictly out-scored current
+      converged: null        # true = score stopped improving / hit perfect; false = hit trigger_max_candidates
+    doctor_before: null        # `skill doctor <target>` error/notice counts BEFORE this run applied anything (step 2)
+    doctor_after: null         # the same counts after the last auto-apply + `skill manifest --apply` (step 7)
+    attempts: 0
+    max_attempts: 2
+    issues: []                 # appended on failure: {attempt, summary, evidence}

@@ -1,0 +1,15 @@
+{
+  "name": "sk-inherit",
+  "version": "2.8.0",
+  "description": "Forge and maintain a standalone, lightweight Sidekicks runtime — a new self-contained folder and git repo that inherits the Sidekicks principles plus a hand-picked subset of skills, optionally a hand-picked set of delegate agents (charter + routines plus the scripts that start and supervise them; never their memory unless asked, never their runtime state or the credential-bearing .bridge/), its own minimal generated AGENTS.md, a full copy of bin/lib/scripts, and its own freshly-built Python venv, with no symlink back to the sidekicks root. Also runs the one-way, three-way drift check (source vs runtime vs the baseline recorded at inherit time) that fast-forwards clean units and refuses to clobber ones edited inside the runtime.",
+  "files": [
+    "SKILL.md",
+    "scripts/inherit.mjs",
+    "assets/AGENTS.min.md.tmpl",
+    "assets/module-distribution.json",
+    "assets/presets.yaml",
+    "assets/py-stdlib.json",
+    "assets/runtime.gitignore",
+    "references/runtime-anatomy.md"
+  ]
+}

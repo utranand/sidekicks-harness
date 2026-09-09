@@ -29,6 +29,5 @@ requires:
 
 # DERIVED hash baseline (LF-normalized sha256) — do not hand-edit.
 bundle:
-  SKILL.md: sha256:339bbc3ed4999dc91550811ea86f99d994dba6d5d1bf71f04c06b8092d7f95d8
-  VERSION.json: sha256:23ae847800c72cb55557e9a52d3d9e1f5f5650f218db63c1b8ab7ade771c1646
-  evals/evals.json: sha256:72aa2d239a8db4dfbdf438ecb34c16d84675b608b7863ebb440abbad03025143
+  SKILL.md: sha256:7165b90d56d2fee3e0533493c4ee8bd7928aa607e144d9aea231f46249b99a1e
+  VERSION.json: sha256:0fb008e56eb890ea2c586019ba368ba5668b11664ed0c54b5e2b94a2bc4458e9

@@ -1,0 +1,8 @@
+jira:
+  my-board:
+    jira_url: https://your-domain.atlassian.net
+    jira_email: you@example.com
+    api_token:                       # REQUIRED, config-only — blank in the committed example
+    default_project: PROJ            # default project key for search / my-tasks / create
+    default_assignee:                # optional accountId; my-tasks defaults to the API user when blank
+    cloud_id:                        # optional; auto-discovered from jira_url when blank

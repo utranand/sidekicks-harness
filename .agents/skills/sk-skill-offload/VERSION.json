@@ -1,0 +1,8 @@
+{
+  "name": "sk-skill-offload",
+  "version": "1.0.1",
+  "description": "Safely offload (archive/deactivate) a Sidekicks skill — first verify no OTHER active skill references it, then move it from .agents/skills/<name>/ into .sidekicks/skill-offloaded/<name>/ so skill discovery no longer loads it while its files stay in the repo and git history. Use whenever the user wants to offload, archive, retire, deactivate, mothball, shelve, or 'turn off' a skill, clear out a superseded/redundant skill, or trim the active skill set — even if they just hand over a skill name or path like .agents/skills/<name>. Also restores an offloaded skill back into the active set, and lists what is currently offloaded. Operates on the framework skill registry (root scope); needs no work_dir/docs_dir.",
+  "files": [
+    "SKILL.md"
+  ]
+}

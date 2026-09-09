@@ -1,0 +1,8 @@
+{
+  "name": "sk-skill-description-trimmer",
+  "version": "1.0.1",
+  "description": "Keep Sidekicks skill frontmatter descriptions within the host limits by moving excess trigger/routing detail into each SKILL.md body — Claude's per-description 1024-char cap and Codex's ~8000-char aggregate budget across all skills. Use when the user asks to review, trim, shorten, or enforce maximum description length across skills.",
+  "files": [
+    "SKILL.md"
+  ]
+}

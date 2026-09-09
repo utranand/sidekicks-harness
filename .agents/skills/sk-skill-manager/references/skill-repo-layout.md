@@ -288,6 +288,7 @@ With `L` = local files on disk, `Lb` = local recorded bundle, `Ib` = incoming re
 | incoming `undeclared` | `unversioned` | **stop** — declare the closure at the source |
 | local absent | `new` | copy it in |
 | both baselined, `L == Lb`, `Ib != Lb` | `ff` | back up, then replace — a clean fast-forward |
+| any row that would be `ff`, incoming version **lower** | `behind` | **stop** — this would downgrade the skill; `--force` accepts it |
 | both baselined, `L == Lb`, `Ib == Lb` | `up-to-date` | skip |
 | both baselined, `L != Lb`, `Ib != Lb` | `conflict` | **stop and ask** — both sides moved |
 | both baselined, `L != Lb`, `Ib == Lb` | `local-only` | **stop** — your edits post-date the export |
@@ -298,9 +299,49 @@ With `L` = local files on disk, `Lb` = local recorded bundle, `Ib` = incoming re
 | neither baselined, `content ==` | `up-to-date` | skip |
 | neither baselined, content differs | `unversioned` | **stop** — nothing attributes the difference |
 
-Every row also reports whether its file list came from a recorded baseline (`verified` in `--json`).
+### The third baseline: the import receipt
+
+`bundle{}` and raw content are not the only bases. An IMPORTED skill also has
+`.sidekicks/registry/skills/<name>.yaml`, whose `files:` records the hashes as installed — a
+reference distinct from both sides, available exactly where a foreign skill has no manifest anywhere
+and content comparison could otherwise only say "these differ", never who moved. With `B` = the
+receipt's recorded hashes:
+
+| Condition | Status |
+|---|---|
+| `L == B`, `I == B` | `up-to-date` |
+| `L == B`, `I != B` | `ff` |
+| `L != B`, `I == B` | `local-only` |
+| `L != B`, `I != B`, `L == I` | `up-to-date` |
+| otherwise | `conflict` |
+
+It applies only when the receipt names the SAME upstream (`upstream.name`, `upstream.path`,
+`adapter.layout`, `source.kind`; `source.remote` only ever disqualifies, because a plain-folder
+source has none). It sits after the both-baselined three-way — which uses the *blessed* baseline and
+is strictly stronger — and before the content fallback. A backfilled receipt is not a base: its
+`files:` is a snapshot of now, not of the install.
+
+**A file absent from BOTH the receipt and the incoming copy is left out of the compare**, and that
+is a rule rather than a filename list. The import's own plan says to run `skill manifest --apply`,
+so a synthesized manifest is what a compliant operator has; counting it as a local edit would report
+`local-only` on every correctly-followed import's next update. Naming `skill.manifest.yaml`
+specifically would have missed the `VERSION.json` `lib/package-lifecycle` auto-creates for every
+skill directory, which breaks the same population the same way. The prune obeys the same rule: an
+update only ever deletes what THIS upstream previously brought.
+
+Every row also reports whether its file list came from a recorded baseline (`verified` in `--json`)
+and which baseline decided it (`base`: `bundle`, `receipt` or `content`). A receipt-lane foreign row
+is `base: receipt` and still `verified: false` — its file list came from a walk, and letting that
+read as verified is exactly the conflation the field exists to prevent.
 A content comparison is weaker than a three-way compare, and the report says so rather than letting
 an unverified import read as a verified one.
+
+`ff` is about LOSS, not direction: it says nothing recorded here would be lost. It never asserted
+the incoming copy was newer, and the reconcile had no way to tell — so a stale export read as a
+clean fast-forward. `behind` is that missing direction: the incoming `VERSION.json` (or, on a tie,
+the SKILL.md frontmatter `version:`) is lower than the local one. Both sides must parse as exactly
+`N.N.N` or no direction is asserted at all — `1.2.0-beta` against `1.2.0` is not evidence of
+anything, and treating it as such would refuse a legitimate fast-forward.
 
 `broken` is the one status `--force` will not open. `--force` means "I accept losing the local
 side"; it has never meant "I accept importing corruption". A copy that contradicts its own manifest

@@ -8,7 +8,6 @@ categories:
   - data-modeling
   - greenfield-design
   - migration-planning
-cli: claude
 role: worker
 model: high
 persona: "Senior architect who plans before anyone builds. Asks what the project's own rules say before proposing anything, states trade-offs plainly, and always names the rejected alternative and the reason it lost."

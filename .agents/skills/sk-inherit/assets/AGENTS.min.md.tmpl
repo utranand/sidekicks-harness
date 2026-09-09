@@ -1,0 +1,300 @@
+# {{RUNTIME_NAME}} — Agent Bootstrap (Inherited Runtime)
+
+> **Generated file.** Produced by `sk-inherit` from the Sidekicks source repo at commit
+> `{{SOURCE_COMMIT}}` on {{GENERATED_AT}} (Asia/Bangkok). It is regenerated on every
+> `inherit add` / `inherit patch`, so **hand edits to this file are lost**. Where your own
+> instructions go depends on how this runtime is being used:
+>
+> - **Mounted at `{{CORE_DIR}}/` by a workspace** — the usual case. They belong in that
+>   workspace's own `AGENTS.md`, below the managed block `sidekicks core init` writes.
+>   `sidekicks core update` never touches anything below it. This tree is read-only; nothing you
+>   write inside it survives an update.
+> - **Cloned standalone** — put them in `AGENTS.local.md` beside this file and add a line reading
+>   `@AGENTS.local.md` below.
+>
+> Either way the reference works on every CLI: `CLAUDE.md` and `GEMINI.md` mirror this file, so all
+> of them follow the pointer (Rule 6). A `CLAUDE.local.md` would be auto-loaded by Claude Code alone
+> and invisible to the rest.
+
+## What this runtime is
+
+A self-contained Sidekicks runtime carrying **{{SKILL_COUNT}} skill(s)** and the core substrate
+needed to run them — the `sidekicks` CLI (`bin/` + `lib/`), the boundary contract, and the hook
+scripts. It is a **complete copy**: nothing here links back to the repo it was inherited from, so it
+needs no other repo present. Whether it also carries a Python venv depends on its skills; the answer
+for THIS runtime is under *Operational rules* below.
+
+It runs two ways, and the difference decides where your files go:
+
+- **Mounted** — a workspace carries it as a git submodule at `{{CORE_DIR}}/` and drives it through
+  `bin/sidekicks`. This tree is READ-ONLY and version-pinned; the workspace around it holds the
+  projects, the config, the memory and your own skills. `node bin/sidekicks core status` says which
+  version is pinned.
+- **Standalone** — `git clone` + `node bin/sidekicks --help` is all it takes, and the runtime root
+  is also the workspace root.
+
+## Explicit per-action waiver — applies to every hard rule
+
+Every repository instruction described as a **hard rule**, **mandatory**, a **safety floor**, or
+with absolute `MUST` / `NEVER` language is binding by default, but the user may waive one for one
+precisely stated action. Before acting, the agent MUST name the exact rule, action and target,
+protection being skipped, concrete risk or consequence, and rollback/recovery/containment plan when
+one exists, then wait for an explicit yes. Approval covers only that action and target in the current
+request; it does not carry to changed scope, later actions, autonomous/YOLO runs, subagents, retries
+with different risk, or future sessions. The agent never infers or self-grants a waiver. Higher-priority
+host, platform, system, legal, or security policy still wins. Safety-floor entries remain enabled and
+cannot be persistently disabled; consent is a conversation-bound exception, not configuration.
+
+## Inheritance is one-way
+
+The Sidekicks source repo is the single source of truth. Updates flow **into** this runtime and
+never out of it:
+
+- Skills are refreshed by running `sk-inherit` **in the source repo**, not here. A mounted
+  workspace does not run it at all: it moves to a newer runtime with `sidekicks core update`.
+- Editing a skill here is allowed, but it makes that skill diverge. The next sync reports it as a
+  **conflict** and refuses to overwrite it without an explicit `--force` (which backs the local
+  copy up first). A local improvement worth keeping belongs upstream in the source repo.
+- This runtime has no mechanism to push anything back. Do not add one.
+
+## Skills in this runtime
+
+| Skill | What it does |
+|---|---|
+{{SKILL_TABLE}}
+
+Skills are canonical at `.agents/skills/`. The per-CLI exposure directories
+(`.claude/skills/`, `.agent/skills/`, `.agents/skills/`, `.gemini/skills/`) are git-ignored
+folder links pointing there, self-healed by the CLI on every invocation. Never install a skill
+with `claude skills install` or a CLI equivalent — drop a directory into `.agents/skills/` and
+it is discovered.
+{{DELEGATE_SECTION}}
+
+## The Six Boundary Rules
+
+> Canonical source: `.sidekicks/RULES.md` in this runtime. Rules 1–2 are stated below in the form
+> they take here: a runtime has no `projects/` tree unless one is created, so the active scope is
+> the root scope.
+
+**Rule 1 — CLI Write Surface**
+The CLI mediates all structural writes. The CLI-managed write surface is `.sidekicks/` (and
+`projects/<name>/` if any project is ever created here). Only `sidekicks` CLI verbs may create,
+modify, or delete files under those paths.
+
+**Rule 2 — Agent Free-Write Surface**
+The agent's free-write surface is the repo root, **excluding** `.sidekicks/` and `projects/`. With
+a user project active, it narrows to `projects/<active>/` only.
+
+**Rule 3 — Skills Canonical Location**
+Skills are canonical at `.agents/skills/`. The host-level exposure directories — one per
+supported agent CLI (`.claude/skills/`, `.agent/skills/`, `.agents/skills/`, `.gemini/skills/`) —
+are folder-level links pointing at `.agents/skills/`. They are git-ignored and self-healed by
+the CLI on every invocation (junction on Windows, symlink on POSIX;
+`lib/sk-cli/skill-links.mjs`), and are outside the framework's write scope.
+
+**Rule 4 — Database Write Safety (Mandatory Permission & Transaction)**
+Before executing any command that modifies a database (including `INSERT`, `UPDATE`, `DELETE`,
+`TRUNCATE`, or `ALTER`/`DROP` DDL), or using the `--confirm-write` flag, the agent **MUST** obtain
+explicit user permission. This rule applies even in YOLO/Autonomous mode. Describe the intended
+modification and wait for user confirmation before proceeding. **All execution on a live database
+MUST be performed within a transaction scope and be capable of rolling back upon error to protect
+the database.**
+
+**Rule 5 — Empirical Verification (No Assumptions)**
+Before proposing schema changes, reporting on data characteristics, or making technical claims
+about file contents, the agent **MUST** perform empirical verification (e.g. `grep` scans, SQL
+queries, targeted reads). Never assume limits or requirements based on intuition or partial
+headers; always ground suggestions in concrete evidence found within the active scope.
+
+**Rule 6 — Multi-CLI Parity (instructions canonical at AGENTS.md)**
+This runtime **MUST** work identically across every supported agent CLI — Claude Code, Codex CLI,
+Gemini CLI, Antigravity. The project persists capabilities and model tiers, never a project-wide
+provider or model default; only individual agent charters or explicit invocations may pin a CLI.
+Instructions, hooks, and subagents have CLI-neutral canonical sources, and every CLI **inherits** shared surfaces rather than carrying a divergent copy: instructions via the
+`CLAUDE.md`/`GEMINI.md` mirrors of `AGENTS.md`, skills via the Rule 3 exposure links, hooks and
+subagents via the per-CLI ports under `.codex/`, `.gemini/`, `.agent/`, `.agents/`. Any change to
+a shared surface **MUST** propagate to all supported CLIs in the same change, and every script
+involved **MUST** run on both macOS and Windows.
+
+## Active scope, working folder, artifacts
+
+Active project resolves via `.sidekicks/settings.json` → `active_project`; when absent, the **root
+scope** is the default. **A missing settings file is never an error.** Inspect with
+`sidekicks project current`; get a full snapshot with `sidekicks index show --json`.
+
+Never hand-derive paths. Ask the CLI, then anchor every relative path to what it returns:
+
+```bash
+WORKDIR="$(node bin/sidekicks scope working-folder)"      # where CODE goes
+ARTIFACTSBASE="$(node bin/sidekicks scope artifacts-base)" # where generated output goes
+```
+
+**Three anchors** — the working folder (where code lands), the artifacts base (what
+`artifacts/runs/…` hangs off), and the run base (`sidekicks scope run-base <skill-id> [<work-item>]`,
+the ONE place the run-folder join lives). An explicit `work_dir=` passed to a skill **overrides**
+resolution and becomes the working folder. `docs_dir=` and `artifacts_dir=` are pure artifact
+anchors and never drive scope. Generated executable output and run state go under the resolved run
+base — never into `docs/`, never into a service's `src/`, never loose in the workdir root.
+
+**Portable paths:** no machine-absolute path (`/Users/...`, `C:\...`) may be persisted into any
+artifact. Use paths relative to the working folder, or repo-relative forms.
+
+**Secret-bearing manifests** go to a separate git-ignored folder — never committed under
+`artifacts/`, and never inside a run folder that a report or a diff will carry outward.
+
+## Operational rules
+
+- **Plan-first — enter plan mode before implementation (hard rule):** before the first code write of
+  any non-trivial implementation, enter the CLI's plan mode, present the plan, and get the user's
+  approval to exit it. No plan artifact file is required — the approved plan IS the gate. Exempt:
+  trivial edits (typo, one-liner, mechanical rename); an explicit user instruction to skip planning
+  (a NAMED override you state back, never a silent skip); and executing an already-authored
+  command-sequence. If this runtime also enables `rule.bmad-first`, ask the user ONCE at the first
+  implementation attempt of a work item — BMAD pipeline or plan mode — and let that answer hold for
+  the rest of the work item. Check either with `sidekicks framework check <id>` (exit 0 enabled);
+  turn this one off with `sidekicks framework disable rule.plan-first`.
+- **Cross-platform:** every script must run on both macOS and Windows — one unified
+  implementation, never an OS fork. Watch path joining, line endings (tolerate `\r\n`), and
+  executable suffixes (`.venv/bin` vs `.venv/Scripts`).
+{{PYTHON_SECTION}}
+- **Timezone:** `Asia/Bangkok` (UTC+07:00) for ALL timestamps and dates.
+- **Protected branches — explicit waiver required (hard rule):** by default, no implementation work may be
+  edited, committed, or amended directly on `main`, `sit`, `uat`, `staging`, `prod`, or
+  `release/*`. Before the first write, align a supplied target path to its scope (otherwise read the
+  active project/service configuration), resolve every intended write path to its nearest owning
+  Git worktree, and check the live branch in each de-duplicated owner. An enclosing repo that merely
+  contains a nested service checkout may stay protected; a dirty submodule/gitlink observation is
+  not itself an intentional write. If parent-owned metadata or artifacts are also written, that
+  parent repo must be checked too. Get every protected owner onto a work branch `<type>/<slug>`
+  first (`feature|fix|chore|docs`) — never commit on the protected branch to "move it later".
+  Protected branches normally receive work through a merge or PR the user approves. Direct work
+  requires a separate, scoped approval under the *Explicit per-action waiver* contract above.
+- **Never hijack a shared working tree (hard rule):** the checkout may have another agent session,
+  a dev server, a build, or the user's editor live in it. Getting onto the work branch is
+  worktree-first — `git worktree add ../worktrees/<slug> -b <type>/<slug> <base>`, then work
+  through `git -C ../worktrees/<slug> …`; HEAD in the original checkout never moves. With
+  uncommitted tracked changes present, `git switch`/`checkout <branch>` and
+  `git stash`/`reset --hard`/`restore`/`checkout -- <path>`/`clean -f` are forbidden — `git stash`
+  is never the way to carry work onto a branch. Commit in-flight changes on a work branch made as
+  above, or leave them alone and use a worktree.
+- **Branch naming:** `<type>/<key>-<slug>` — `feature|fix|chore|docs`, lowercased issue key when the
+  work is card-bound. Cut from the integration base.
+- **Git worktrees — never create one without asking (hard rule):** a worktree puts the run's files
+  outside the folder the user is watching. Say what it is for, which branch it carries, and where it
+  will be, then wait for a yes. Layout: always a **sibling** of the repo (`../worktrees/<name>/`),
+  never nested inside the repo root. Never check a protected branch out into a worktree — git locks
+  the branch to that worktree, so the primary checkout can no longer return to it; branch *off* it
+  instead. `--force` removal only after the user OKs losing unmerged work.
+- **Landing already-tested work on `main` — leanest safe path (hard rule):** when the operator asks
+  for an already-tested commit to be merged to remote `main`, that request is the approval the
+  protected-branch rule requires, and it authorises the merge **and nothing else**. Treat the
+  existing test results as accepted: run no tests, builds, linters or audits, and re-verify nothing
+  that was already green. **Create nothing** — no plan, no documentation, no subagent, no branch, no
+  commit, no worktree; the commit to land already exists. **Include nothing else** — never modify
+  unrelated working-tree changes and never let them ride along in the push. The only permitted work
+  is three read-only checks: the target commit is the intended one (`git log -1 <ref>`), the source
+  branch is clean (`git status --porcelain` empty), and `main` fast-forwards to it
+  (`git merge-base --is-ancestor origin/main <target>`). Then push **without `--force`**, ever. Where
+  policy forbids a direct push to `main` — the default assumption, since a protected branch receives
+  work only through an approved merge or PR — push the existing branch as-is and open the smallest
+  possible PR into `main`, then merge that. Close by confirming remote `main` actually contains the
+  target commit (`git merge-base --is-ancestor <target> origin/main`) and stop there. Report only the
+  target commit, the push or merge result, the remote `main` SHA, and any blocker — never a summary
+  of the work itself, and never any follow-up beyond the merge.
+- **Production access — direct allowed, Teleport as fallback (hard rule):** production Kubernetes
+  and production PostgreSQL MAY be reached directly through the registered non-Teleport target
+  (`sk-cluster-ops` or raw `kubectl` for Kubernetes, `sk-database-connector` for PostgreSQL). When
+  the direct route is unreachable — no route or VPN, blocked ingress, an expired or absent direct
+  credential — fall back to the Teleport skills (`sk-teleport-cluster-ops`,
+  `sk-teleport-database-connector`). Every run states which route it used: the direct route carries
+  no JIT approval gate and no per-session audit trail. Prefer Teleport when a live session already
+  exists and the run is not time-critical. Rule 4 still governs every production write (explicit
+  user permission, inside a rollback-capable transaction), and an unregistered prod target is
+  reachable by neither route. This rule stands whether or not those skills are installed here.
+- **Irreversible / outward-facing actions (hard rule):** confirm before acting unless durably
+  authorized. Sending to an external service publishes; it may be cached or indexed even after
+  deletion. Approval in one context does not extend to the next.
+- **Google-account browser automation — headful only:** a browser read driven through a real
+  logged-in Google account must NEVER run headless — headless is a bot flag on the user's account.
+- **Skill-auditor autonomous mode (hard rule):** anything that would soften a safety or permission
+  rule, anything failing verification, and anything not cleanly git-reversible is
+  parked for a human — never auto-applied.
+- **Subagent model selection — by tier, never exact ID:** model names in skills are tier examples.
+  When the named model is absent in the active CLI, substitute the same tier — never silently
+  downgrade; fall back to the nearest *higher* tier if the requested one is missing.
+- **Evidence before claims (Rule 5):** keep observed and assumed visibly separate. A worker's
+  self-report is a claim — check the real artifact or behavior before marking anything done.
+- **Report faithfully:** failures with their output, skipped steps declared. Never "should work
+  now" without verification.
+- **Persist decisions:** register architecture and design choices, non-obvious constraints, and
+  rejected alternatives with `sidekicks memory add` — the bar is "a future agent on a fresh clone
+  would be wrong without this." The store is committed and **LOCAL-ONLY**: never write project
+  memory to a per-CLI global store (`~/.claude`).
+
+### Session working practices — ten standing defaults
+
+1. **Orient once, then act** — inspect the index once and align scope before artifact work.
+2. **Depth by stakes** — reserve high-tier reasoning for planning, architecture, review, and verification.
+3. **Parallelize independent work** — batch independent reads and sequence only true dependencies.
+4. **Evidence before claims** — keep observed facts separate from assumptions.
+5. **Verify independently of the executor** — treat self-reports as claims until checked.
+6. **Adversarially check high-stakes findings** — try to refute them before reporting.
+7. **Lead with the outcome** — answer what happened before narrating the work.
+8. **Report faithfully** — include failures and skips; never claim unverified success.
+9. **Persist decisions** — register durable, non-obvious choices in project memory.
+10. **Big work = plan → execute → verify loops** — stop only at the hard safety gates.
+
+## Skills
+
+**New skill checklist:** record both independent decisions when creating a Sidekicks skill:
+`sidekicks.runtime-class` (`catalog-only` by default, or deliberate `framework` / `source-only`) and
+publication intent (`public` / `private` / `none`). Register first-party skills in one audit group,
+keep publication category separate from runtime disposition, wire scope/artifact anchors from day
+one, keep every helper and asset inside the skill, validate the bundle, and regenerate its manifest.
+
+## Token discipline — two declared plugins
+
+Two third-party plugins are **declared** in this runtime's per-CLI wiring (`.claude/settings.json`
+`enabledPlugins` + `extraKnownMarketplaces`) and **not redistributed** — their code is fetched from
+their own marketplaces, and nothing is installed until you run `sk-hello --apply`, which names each
+one first. They cut token spend on independent axes and do not conflict by construction: caveman
+compresses the prose *around* code and leaves code verbatim; ponytail shrinks the code *itself* and
+disclaims prose.
+
+| | **caveman** (`caveman@caveman`) | **ponytail** (`ponytail@ponytail`) |
+|---|---|---|
+| Governs | prose / communication | code architecture + implementation |
+| Never touches | code blocks, variable names, file paths, terminal commands, exact error strings, and **all** persisted text (commits, docs, PRs, memory) | validation at trust boundaries, error handling that prevents data loss, security, accessibility, anything explicitly requested |
+| Turn off for a session | "stop caveman" / "normal mode"; `/caveman off` | "stop ponytail" / "normal mode" |
+| Turn off for the repo | remove `caveman@caveman` from `.claude/settings.json` | remove `ponytail@ponytail` from the same file |
+
+Neither is required. A runtime that declares neither behaves identically, only more verbosely.
+
+## Local memory — register decisions that matter
+
+ONE central, committed store at `.sidekicks/memory/`. Scope is a **namespace inside it**, not a
+separate directory: `root` is the tree itself, a project is `store/projects/<p>/`, an agent is
+`store/agents/<n>/`. A project inherits root and wins a collision; an agent namespace inherits
+nothing. All writes go through the CLI — never hand-write the files:
+
+```sh
+sidekicks memory add <slug> --type=decision --category=<c> --description="<one line>" \
+  --what="<choice>" --why="<rationale>" --alt="<rejected>"
+sidekicks memory add <slug> --type=rule --category=<c> --description="…" --body="…" \
+  --source=commit:<sha>                                  # a hard rule + durable lineage
+sidekicks memory map | query <term> [--related] | pack <category> | graph <slug>
+sidekicks memory list | show <slug> [--trace] | remove <slug> | rebuild | doctor
+```
+
+**Memory loads lazily.** Session start injects only the **category map** (~300 tokens: which
+categories exist, how many entries and hard rules each holds), never the bodies. Before acting in a
+listed category, load its pack with `sidekicks memory pack <category>`; on a CLI with tool-call
+hooks that pull is automatic, once per category per session. **A `rule` entry in a triggered
+category is mandatory reading in full before the action proceeds.**
+
+`metadata.source` must be DURABLE — `commit:<sha>`, `journal:<id>`, `evidence/…`, or a committed
+repo-relative path. A pointer into `artifacts/runs/…` is refused: runs are temporary, so the
+reference dangles the moment one is cleaned. Snapshot the content instead (`--snapshot <path>`).
+
+This runtime started with an **empty** memory store by design — the source repo's memory is never
+inherited, because its decisions describe a different codebase.

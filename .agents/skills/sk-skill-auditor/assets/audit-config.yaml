@@ -1,0 +1,132 @@
+# Operational knobs for sk-skill-auditor — the HOW of an audit.
+# (The WHICH-skills policy is the `skill-auditing groups:` manifest, which defaults to the bundled
+# assets/audit-groups.yaml and is overridable by a block in the repo's AGENTS.md — see `auditor.sh
+# groups` / `group <name>`. This file is only the per-skill mechanics.)
+#
+# These are defaults. A run may override any of them by passing the knob to START; the ledger
+# records the effective values it used.
+
+# Round 0's discovery panel fans out one subagent PER tier listed here, each critiquing the same
+# evidence against the rubric. Later probing rounds use this same list as the rotation pool for
+# `auditor.sh tier-for <round>`. Different tiers surface different real issues — breadth, not
+# redundancy. Resolve each tier to the active CLI's model at spawn (high = Opus/equiv, mid =
+# Sonnet/equiv, low = Haiku/equiv); see AGENTS.md tier resolution.
+tiers: [high, mid, low]
+
+# The gate is NOT the panel. Candidate findings from any tier are verified (evidence gate +
+# attribution gate, the same ones sk-self-improve TRIAGE enforces) at THIS tier before
+# anything is filed. The deciding stays strong even though discovery fans out cheaply.
+verify_tier: high
+
+# ── CONVERGENCE: loop each skill until nothing more can be improved ───────────────────────────────
+# The auditor does NOT run a fixed number of rounds. It keeps running rounds on a skill until it
+# converges: round 0 is the full multi-tier discovery panel above; later rounds are single-tier
+# probes selected by `auditor.sh tier-for <round>` with a fresh focus angle (a different rubric
+# dimension, or "re-examine X harder"). `dry_rounds_to_converge` is the number of CONSECUTIVE rounds
+# that file nothing NEW. A round is "dry" when its gated candidates are all duplicates of findings
+# already filed/applied/parked/dropped this run or in the skill's improvements/ (i.e. nothing new
+# clears the bar). The first new grounded finding RESETS the dry streak, so a skill with real issues
+# keeps getting rounds until it is genuinely exhausted; a healthy skill hits the dry streak quickly.
+# This is how "loop until nothing left to improve" stays terminating instead of infinite:
+# convergence is measured by NEW findings drying up, not patience.
+#
+# CRITICAL: more rounds dig HARDER, they NEVER lower the evidence bar. A finding still files only if
+# it cites real evidence and is skill-attributable, and only if it is genuinely NEW (dedup is what
+# makes the loop converge — without it the same finding would re-file forever). "Loop until dry"
+# varies the search angle and tier across rounds; it never relaxes the standard for filing or invents
+# findings to keep the loop alive. When the well is dry, stop.
+dry_rounds_to_converge: 2
+
+# Hard backstop guaranteeing termination even if dedup ever fails to converge (e.g. the model keeps
+# proposing near-duplicate "new" findings). Total audit rounds per skill are capped here; on hitting
+# the cap the skill is recorded done with a `hit-round-cap` note (NOT `clean` — it stopped on the cap,
+# not on genuine convergence) so the run stays honest. The dry-streak convergence above is the NORMAL
+# exit; this only fires in a pathological loop. Set to 0 to disable the cap entirely (pure
+# convergence — only do this if you trust dedup to always dry out).
+max_rounds_per_skill: 20
+
+# How many panel subagents to issue concurrently before awaiting the wave (bounds load on big
+# fan-outs). The panel for one skill is usually small (= number of tiers), so this rarely bites.
+panel_wave: 3
+
+# ── TRIGGERING BENCHMARK: measure + optimize the description, every skill (ALWAYS ON) ─────────────
+# Dimension 1 (description triggering) is not judged by eyeballing — it is MEASURED. For every
+# audited skill the auditor scores the current description against a real should/should-not query set
+# with scripts/trigger_eval.py (which shells `claude -p`), then runs the "do until it cannot score
+# better" optimize loop: read the misses, HAND-AUTHOR a better description, re-score, keep the best,
+# stop when the score stops improving. This embodies the AGENTS.md rule "Skill optimization — manual
+# loop only, never an API key": trigger_eval.py SCORES only; the auditor agent is the proposer. There
+# is deliberately no knob to disable this phase — it always runs.
+#
+# runs_per_query: trigger-rate denominator per query (3 = each query fired 3x, rate = hits/3).
+trigger_eval_runs_per_query: 3
+# trigger-rate threshold for a should-trigger query to count as PASS (and the ceiling a should-not
+# must stay under). Matches skill-creator's default.
+trigger_eval_threshold: 0.5
+# Target size of a GENERATED query set when a skill has no committed evals/trigger-eval.json — a mix
+# of ~half should-trigger (varied phrasings, uncommon uses, competes-but-wins) and ~half should-not
+# near-misses (share keywords, need a neighbor). The set is filed via sk-self-improve PROPOSE as
+# kind: assets, risk: low — but it lands in evals/, which is OUTSIDE the assets/-scoped additive
+# auto-apply lane, so it rides the autonomous-verified lane in autonomous mode and waits for a human
+# in classic mode. See SKILL.md step 2b.1 for the lane rule; do not assume it commits unattended.
+trigger_eval_set_size: 20
+# CONVERGENCE of the optimize loop ("until cannot get better"): consecutive hand-authored candidates
+# that fail to STRICTLY beat the best score so far before the loop concludes the description is
+# already optimal on this set. A candidate that beats best resets the streak. A perfect score also
+# ends it immediately.
+trigger_score_dry_to_converge: 2
+# Hard backstop on total candidate descriptions scored per skill (guarantees termination if the
+# model keeps proposing near-ties). On hitting it, record converged: false for the trigger benchmark.
+trigger_max_candidates: 6
+# KEEP AT 1. trigger_eval.py defaults workers to 1 because higher concurrency silently turns
+# true-positives into false-negatives — trigger rates can't be trusted above one worker. Surfaced
+# here so a run can SEE it, not so it gets raised.
+trigger_eval_num_workers: 1
+# Model id for the `claude -p` triggering probe. Empty → the probe uses the session's configured
+# model, which is what the user actually experiences (best signal). Set only to pin a specific model.
+trigger_eval_model: ""
+
+# Should the auditor audit ITSELF on an UNGROUPED sweep? `sk-skill-auditor` is in no group, so
+# on a whole-manifest (ungrouped) run this knob is what injects it into the sweep — set `true` to
+# dogfood, `false` to leave self out unless a group lists it. It does NOT affect a NAMED-group run:
+# there, self is audited only if you place `sk-skill-auditor` in that group.
+audit_self: false
+
+# ── AUTONOMOUS MODE ──────────────────────────────────────────────────────────────────────────────
+# When true, the auditor runs the WHOLE process with no human in the loop and never asks permission:
+# it sweeps, files, ADVERSARIALLY SELF-VERIFIES each finding, and AUTO-APPLIES the survivors through
+# sk-self-improve APPLY (which goes through skill-creator). The self-verification + the hard
+# safety floor below stand in for the human reviewer. When false, the auditor only files `proposed`
+# artifacts and a human approves/applies them (the classic funnel).
+autonomous: true
+
+# How many INDEPENDENT adversarial verifiers re-check each filed finding before it may auto-apply.
+# Each is prompted to REFUTE the finding (default to "reject if uncertain"); a finding survives only
+# on a strict MAJORITY of confirmations. This is the machine substitute for human review — more
+# votes = more conservative. Used only when autonomous: true.
+verify_votes: 3
+
+# Multi-session coordination: how long (seconds) a run's heartbeat may go quiet before its lease,
+# per-skill claims, and checkout lock count as ABANDONED and become takeover-eligible
+# (auditor.sh claim / assert / takeover / checkout-lock). Heartbeat = file mtime — the ledger is
+# rewritten every RESUME pass and each claim's owner.tsv on every refresh. Deliberately looser than
+# GTD's 900s: one skill's audit round (panel + refuters + trigger benchmark) can legitimately run
+# tens of minutes with no ledger write. A FRESH foreign lease is never taken over automatically at
+# any TTL — that decision is the user's.
+lease_ttl_seconds: 3600
+
+# ── THE HARD SAFETY FLOOR (always on; NOT a knob) ────────────────────────────────────────────────
+# Even in autonomous mode, the auditor NEVER auto-applies a change that:
+#   • softens, removes, or makes-optional a safety / irreversible / permission rule IN THE TARGET
+#     SKILL being improved — DB-write confirmation (AGENTS.md Rule 4), never-prod, hard stops,
+#     destructive-op guards, irreversible-action confirmations; or
+#   • performs a destructive edit whose loss is not cleanly git-reversible.
+# Any finding a verifier flags as floor-hitting is PARKED as a `proposed` artifact for a human —
+# never auto-applied. The floor is conservative: a single verifier's floor flag parks the change.
+#
+# SCOPE (deliberately narrowed): the floor protects GENUINE safety guards in the skills being
+# improved. It does NOT park a change merely because it edits the auditor's own autonomous machinery
+# (this floor, the rubric, the verification step) — those are not target-skill safety guards, so they
+# auto-apply like any other verified finding. Everything below this floor ships unattended once
+# verified; the GIT DIFF is the review (every auto-apply is git-reversible, so a bad change is caught
+# and reverted at commit time rather than gated behind up-front human approval).
